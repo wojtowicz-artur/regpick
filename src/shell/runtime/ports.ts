@@ -1,5 +1,5 @@
-import fs from "fs-extra";
-import axios from "axios";
+import fs from "node:fs";
+import fsPromises from "node:fs/promises";
 import {
   cancel,
   confirm,
@@ -69,10 +69,17 @@ export type RuntimePorts = {
 export const defaultRuntimePorts: RuntimePorts = {
   fs: {
     existsSync: (path) => fs.existsSync(path),
-    pathExists: (path) => fs.pathExists(path),
+    pathExists: async (path) => {
+      try {
+        await fsPromises.access(path);
+        return true;
+      } catch {
+        return false;
+      }
+    },
     ensureDir: async (path) => {
       try {
-        await fs.ensureDir(path);
+        await fsPromises.mkdir(path, { recursive: true });
         return ok(undefined);
       } catch (cause) {
         return err(appError("RuntimeError", `Failed to ensure directory: ${path}`, cause));
@@ -80,7 +87,7 @@ export const defaultRuntimePorts: RuntimePorts = {
     },
     writeFile: async (path, content, encoding) => {
       try {
-        await fs.writeFile(path, content, encoding);
+        await fsPromises.writeFile(path, content, encoding);
         return ok(undefined);
       } catch (cause) {
         return err(appError("RuntimeError", `Failed to write file: ${path}`, cause));
@@ -88,7 +95,7 @@ export const defaultRuntimePorts: RuntimePorts = {
     },
     readFile: async (path, encoding) => {
       try {
-        const content = await fs.readFile(path, encoding);
+        const content = await fsPromises.readFile(path, encoding);
         return ok(content);
       } catch (cause) {
         return err(appError("RuntimeError", `Failed to read file: ${path}`, cause));
@@ -96,15 +103,16 @@ export const defaultRuntimePorts: RuntimePorts = {
     },
     readJsonSync: <T = unknown>(path: string) => {
       try {
-        const content = fs.readJsonSync(path);
-        return ok(content as T);
+        const content = fs.readFileSync(path, "utf8");
+        return ok(JSON.parse(content) as T);
       } catch (cause) {
         return err(appError("RuntimeError", `Failed to read JSON: ${path}`, cause));
       }
     },
     writeJson: async (path, value, options) => {
       try {
-        await fs.writeJson(path, value, options);
+        const content = JSON.stringify(value, null, options?.spaces ?? 2);
+        await fsPromises.writeFile(path, content, "utf8");
         return ok(undefined);
       } catch (cause) {
         return err(appError("RuntimeError", `Failed to write JSON: ${path}`, cause));
@@ -112,7 +120,7 @@ export const defaultRuntimePorts: RuntimePorts = {
     },
     stat: async (path) => {
       try {
-        const stats = await fs.stat(path);
+        const stats = await fsPromises.stat(path);
         return ok(stats);
       } catch (cause) {
         return err(appError("RuntimeError", `Failed to stat path: ${path}`, cause));
@@ -120,7 +128,7 @@ export const defaultRuntimePorts: RuntimePorts = {
     },
     readdir: async (path) => {
       try {
-        const files = await fs.readdir(path);
+        const files = await fsPromises.readdir(path);
         return ok(files);
       } catch (cause) {
         return err(appError("RuntimeError", `Failed to read directory: ${path}`, cause));
@@ -130,16 +138,28 @@ export const defaultRuntimePorts: RuntimePorts = {
   http: {
     getJson: async <T>(url: string, timeoutMs = 15000): Promise<Result<T, AppError>> => {
       try {
-        const response = await axios.get(url, { timeout: timeoutMs, responseType: "json" });
-        return ok(response.data as T);
+        const response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+        
+        if (!response.ok) {
+          return err(appError("RuntimeError", `HTTP error! status: ${response.status} when fetching JSON from: ${url}`));
+        }
+        
+        const data = await response.json();
+        return ok(data as T);
       } catch (cause) {
         return err(appError("RuntimeError", `Failed to fetch JSON from: ${url}`, cause));
       }
     },
     getText: async (url: string, timeoutMs = 15000): Promise<Result<string, AppError>> => {
       try {
-        const response = await axios.get<string>(url, { timeout: timeoutMs, responseType: "text" });
-        return ok(response.data);
+        const response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+        
+        if (!response.ok) {
+          return err(appError("RuntimeError", `HTTP error! status: ${response.status} when fetching text from: ${url}`));
+        }
+        
+        const data = await response.text();
+        return ok(data);
       } catch (cause) {
         return err(appError("RuntimeError", `Failed to fetch text from: ${url}`, cause));
       }
