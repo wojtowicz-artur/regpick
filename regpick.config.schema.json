@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "regpick config",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "registries": {
+      "type": "object",
+      "description": "Alias map for registry URLs or local paths.",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "targetsByType": {
+      "type": "object",
+      "description": "Maps registry item types to local output directories.",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "overwritePolicy": {
+      "type": "string",
+      "enum": ["prompt", "overwrite", "skip"],
+      "default": "prompt"
+    },
+    "packageManager": {
+      "type": "string",
+      "enum": ["auto", "npm", "yarn", "pnpm"],
+      "default": "auto"
+    },
+    "preferManifestTarget": {
+      "type": "boolean",
+      "default": true
+    },
+    "allowOutsideProject": {
+      "type": "boolean",
+      "default": false
+    }
+  }
+}
