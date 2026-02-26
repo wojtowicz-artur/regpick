@@ -1,0 +1,28 @@
+{
+  "name": "Tebra Utils Registry",
+  "description": "Kolekcja prostych funkcji pomocniczych używanych w organizacji.",
+  "items": [
+    {
+      "name": "format-date",
+      "type": "registry:util",
+      "description": "Funkcja do bezpiecznego formatowania dat",
+      "files": [
+        {
+          "path": "formatDate.ts",
+          "content": "export function formatDate(date: Date | string): string {\n  const d = new Date(date);\n  if (isNaN(d.getTime())) return '';\n  return new Intl.DateTimeFormat('pl-PL', {\n    year: 'numeric',\n    month: 'long',\n    day: 'numeric'\n  }).format(d);\n}\n"
+        }
+      ]
+    },
+    {
+      "name": "use-debounce",
+      "type": "registry:hook",
+      "description": "React hook do opóźniania wywołań (debounce)",
+      "files": [
+        {
+          "path": "useDebounce.ts",
+          "content": "import { useState, useEffect } from 'react';\n\nexport function useDebounce<T>(value: T, delay: number): T {\n  const [debouncedValue, setDebouncedValue] = useState<T>(value);\n\n  useEffect(() => {\n    const handler = setTimeout(() => {\n      setDebouncedValue(value);\n    }, delay);\n\n    return () => {\n      clearTimeout(handler);\n    };\n  }, [value, delay]);\n\n  return debouncedValue;\n}\n"
+        }
+      ]
+    }
+  ]
+}

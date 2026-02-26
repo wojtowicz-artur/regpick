@@ -1,0 +1,35 @@
+{
+  "name": "Tebra UI Components",
+  "description": "Złożone komponenty UI dla projektów React z TailwindCSS.",
+  "items": [
+    {
+      "name": "button",
+      "type": "registry:component",
+      "description": "Główny przycisk systemowy ze wsparciem dla ikon i wariantów.",
+      "dependencies": ["lucide-react", "clsx", "tailwind-merge"],
+      "devDependencies": ["@types/react"],
+      "files": [
+        {
+          "path": "Button.tsx",
+          "content": "import * as React from 'react';\nimport { Slot } from '@radix-ui/react-slot';\nimport { clsx, type ClassValue } from 'clsx';\nimport { twMerge } from 'tailwind-merge';\nimport { Loader2 } from 'lucide-react';\n\nexport function cn(...inputs: ClassValue[]) {\n  return twMerge(clsx(inputs));\n}\n\nexport interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {\n  asChild?: boolean;\n  isLoading?: boolean;\n}\n\nexport const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(\n  ({ className, asChild = false, isLoading, children, ...props }, ref) => {\n    const Comp = asChild ? Slot : \"button\";\n    return (\n      <Comp\n        className={cn(\"inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50\", className)}\n        ref={ref}\n        {...props}\n      >\n        {isLoading && <Loader2 className=\"mr-2 h-4 w-4 animate-spin\" />}\n        {children}\n      </Comp>\n    );\n  }\n);\nButton.displayName = \"Button\";\n"
+        }
+      ]
+    },
+    {
+      "name": "auth-form",
+      "type": "registry:feature",
+      "description": "Kompletny formularz logowania z walidacją i obsługą stanu.",
+      "dependencies": ["react-hook-form", "zod", "@hookform/resolvers"],
+      "files": [
+        {
+          "path": "AuthForm.tsx",
+          "content": "import React from 'react';\nimport { useForm } from 'react-hook-form';\nimport { zodResolver } from '@hookform/resolvers/zod';\nimport * as z from 'zod';\nimport { authApi } from './api';\n\nconst schema = z.object({\n  email: z.string().email(),\n  password: z.string().min(8),\n});\n\ntype FormData = z.infer<typeof schema>;\n\nexport function AuthForm() {\n  const { register, handleSubmit } = useForm<FormData>({\n    resolver: zodResolver(schema)\n  });\n\n  const onSubmit = async (data: FormData) => {\n    await authApi.login(data);\n  };\n\n  return (\n    <form onSubmit={handleSubmit(onSubmit)} className=\"space-y-4\">\n      <input {...register('email')} type=\"email\" placeholder=\"Email\" />\n      <input {...register('password')} type=\"password\" placeholder=\"Hasło\" />\n      <button type=\"submit\">Zaloguj</button>\n    </form>\n  );\n}\n"
+        },
+        {
+          "path": "api.ts",
+          "content": "export const authApi = {\n  login: async (credentials: any) => {\n    // Mock API call\n    return new Promise(resolve => setTimeout(resolve, 1000));\n  }\n};\n"
+        }
+      ]
+    }
+  ]
+}
