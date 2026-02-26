@@ -9,6 +9,7 @@ import { readLockfile, computeHash, writeLockfile } from "../shell/lockfile.js";
 import { loadRegistry, resolveFileContent } from "../shell/registry.js";
 import { resolveOutputPathFromPolicy } from "../domain/pathPolicy.js";
 import { readConfig } from "../shell/config.js";
+import { applyAliases } from "../domain/aliasCore.js";
 
 function printDiff(oldContent: string, newContent: string) {
   const changes = diff.diffLines(oldContent, newContent);
@@ -68,14 +69,7 @@ export async function runUpdateCommand(
         const contentRes = await resolveFileContent(file, registryItem, context.cwd, context.runtime);
         if (!contentRes.ok) continue;
 
-        let content = contentRes.value;
-        for (const [oldAlias, newAlias] of Object.entries(config.aliases || {})) {
-          const regex = new RegExp(`from ["']${oldAlias}(.*?)["']`, "g");
-          content = content.replace(regex, `from "${newAlias}$1"`);
-          const dynRegex = new RegExp(`import\\(["']${oldAlias}(.*?)["']\\)`, "g");
-          content = content.replace(dynRegex, `import("${newAlias}$1")`);
-        }
-
+        let content = applyAliases(contentRes.value, config);
         remoteContents.push(content);
         
         const outputRes = resolveOutputPathFromPolicy(registryItem, file, context.cwd, config);

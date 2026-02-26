@@ -10,6 +10,7 @@ import { resolveFileContent, loadRegistry } from "../shell/registry.js";
 import { collectMissingDependencies, installDependencies } from "../shell/installer.js";
 import { resolvePackageManager } from "../shell/packageManagers/resolver.js";
 import { readLockfile, writeLockfile, computeHash } from "../shell/lockfile.js";
+import { applyAliases } from "../domain/aliasCore.js";
 
 async function promptForSource(
   context: CommandContext,
@@ -218,14 +219,7 @@ export async function runAddCommand(
       return contentResult;
     }
 
-    let content = contentResult.value;
-    for (const [oldAlias, newAlias] of Object.entries(config.aliases || {})) {
-      const regex = new RegExp(`from ["']${oldAlias}(.*?)["']`, "g");
-      content = content.replace(regex, `from "${newAlias}$1"`);
-      // Also handle dynamic imports
-      const dynRegex = new RegExp(`import\\(["']${oldAlias}(.*?)["']\\)`, "g");
-      content = content.replace(dynRegex, `import("${newAlias}$1")`);
-    }
+    let content = applyAliases(contentResult.value, config);
 
     const ensureRes = await context.runtime.fs.ensureDir(path.dirname(write.absoluteTarget));
     if (!ensureRes.ok) return ensureRes;
