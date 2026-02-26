@@ -14,9 +14,9 @@ Lightweight CLI for selecting and installing registry entries from shadcn-compat
 cd /path/to/project
 cd /path/to/packages/regpick
 npm run build
-node ./dist/index.js init
-node ./dist/index.js list tebra
-node ./dist/index.js add tebra
+node ./dist/index.mjs init
+node ./dist/index.mjs list tebra
+node ./dist/index.mjs add tebra
 ```
 
 ## Config (`regpick.json`)
