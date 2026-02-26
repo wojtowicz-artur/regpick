@@ -4,6 +4,7 @@ import pc from "picocolors";
 import { appError, type AppError } from "../core/errors.js";
 import { err, ok, type Result } from "../core/result.js";
 import type { CommandContext, CommandOutcome, RegistryItem } from "../types.js";
+import { extractDependencies } from "../domain/packCore.js";
 
 async function getFilesRecursive(
   dir: string,
@@ -35,51 +36,6 @@ async function getFilesRecursive(
   const scanRes = await scan(dir);
   if (!scanRes.ok) return err(scanRes.error);
   return ok(result);
-}
-
-function extractDependencies(content: string): string[] {
-    const importRegex = /import\s+[\s\S]*?from\s+["']([^"']+)["']/g;
-    const dynamicImportRegex = /import\(["']([^"']+)["']\)/g;
-    
-    const deps = new Set<string>();
-    
-    let match;
-    while ((match = importRegex.exec(content)) !== null) {
-      const specifier = match[1];
-      if (
-        !specifier.startsWith(".") &&
-        !specifier.startsWith("/") &&
-        !specifier.startsWith("~") &&
-        !specifier.startsWith("@/") &&
-        !specifier.startsWith("@\\")
-      ) {
-        const parts = specifier.split("/");
-        if (specifier.startsWith("@") && parts.length > 1) {
-          deps.add(`${parts[0]}/${parts[1]}`);
-        } else {
-          deps.add(parts[0]);
-        }
-      }
-    }
-    while ((match = dynamicImportRegex.exec(content)) !== null) {
-      const specifier = match[1];
-      if (
-        !specifier.startsWith(".") &&
-        !specifier.startsWith("/") &&
-        !specifier.startsWith("~") &&
-        !specifier.startsWith("@/") &&
-        !specifier.startsWith("@\\")
-      ) {
-        const parts = specifier.split("/");
-        if (specifier.startsWith("@") && parts.length > 1) {
-          deps.add(`${parts[0]}/${parts[1]}`);
-        } else {
-          deps.add(parts[0]);
-        }
-      }
-    }
-
-    return Array.from(deps);
 }
 
 export async function runPackCommand(
