@@ -19,6 +19,7 @@ export type PackageManager = "auto" | "npm" | "yarn" | "pnpm";
 export type RegpickConfig = {
   registries: Record<string, string>;
   targetsByType: Record<string, string>;
+  aliases?: Record<string, string>;
   overwritePolicy: OverwritePolicy;
   packageManager: PackageManager;
   preferManifestTarget: boolean;
@@ -68,6 +69,16 @@ export type InstallPlan = {
   plannedWrites: PlannedWrite[];
   dependencyPlan: DependencyPlan;
   conflicts: PlannedWrite[];
+};
+
+export type LockfileItem = {
+  version?: string;
+  source?: string;
+  hash: string;
+};
+
+export type RegpickLockfile = {
+  components: Record<string, LockfileItem>;
 };
 
 export type CommandOutcome =

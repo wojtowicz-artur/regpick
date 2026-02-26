@@ -1,0 +1,141 @@
+import path from "node:path";
+import pc from "picocolors";
+
+import { appError, type AppError } from "../core/errors.js";
+import { err, ok, type Result } from "../core/result.js";
+import type { CommandContext, CommandOutcome, RegistryItem } from "../types.js";
+
+async function getFilesRecursive(
+  dir: string,
+  context: CommandContext,
+): Promise<Result<string[], AppError>> {
+  const result: string[] = [];
+  
+  async function scan(currentDir: string): Promise<Result<void, AppError>> {
+    const dirRes = await context.runtime.fs.readdir(currentDir);
+    if (!dirRes.ok) return dirRes;
+    
+    for (const file of dirRes.value) {
+      const fullPath = path.join(currentDir, file);
+      const statRes = await context.runtime.fs.stat(fullPath);
+      if (!statRes.ok) return statRes;
+      
+      if (statRes.value.isDirectory()) {
+        const scanRes = await scan(fullPath);
+        if (!scanRes.ok) return scanRes;
+      } else {
+        if (fullPath.endsWith(".ts") || fullPath.endsWith(".tsx")) {
+          result.push(fullPath);
+        }
+      }
+    }
+    return ok(undefined);
+  }
+
+  const scanRes = await scan(dir);
+  if (!scanRes.ok) return err(scanRes.error);
+  return ok(result);
+}
+
+function extractDependencies(content: string): string[] {
+    const importRegex = /import\s+[\s\S]*?from\s+["']([^"']+)["']/g;
+    const dynamicImportRegex = /import\(["']([^"']+)["']\)/g;
+    
+    const deps = new Set<string>();
+    
+    let match;
+    while ((match = importRegex.exec(content)) !== null) {
+      const specifier = match[1];
+      if (
+        !specifier.startsWith(".") &&
+        !specifier.startsWith("/") &&
+        !specifier.startsWith("~") &&
+        !specifier.startsWith("@/") &&
+        !specifier.startsWith("@\\")
+      ) {
+        const parts = specifier.split("/");
+        if (specifier.startsWith("@") && parts.length > 1) {
+          deps.add(`${parts[0]}/${parts[1]}`);
+        } else {
+          deps.add(parts[0]);
+        }
+      }
+    }
+    while ((match = dynamicImportRegex.exec(content)) !== null) {
+      const specifier = match[1];
+      if (
+        !specifier.startsWith(".") &&
+        !specifier.startsWith("/") &&
+        !specifier.startsWith("~") &&
+        !specifier.startsWith("@/") &&
+        !specifier.startsWith("@\\")
+      ) {
+        const parts = specifier.split("/");
+        if (specifier.startsWith("@") && parts.length > 1) {
+          deps.add(`${parts[0]}/${parts[1]}`);
+        } else {
+          deps.add(parts[0]);
+        }
+      }
+    }
+
+    return Array.from(deps);
+}
+
+export async function runPackCommand(
+  context: CommandContext,
+): Promise<Result<CommandOutcome, AppError>> {
+  const targetDirArg = context.args.positionals[1] || ".";
+  const targetDir = path.resolve(context.cwd, targetDirArg);
+
+  const statRes = await context.runtime.fs.stat(targetDir);
+  if (!statRes.ok || !statRes.value.isDirectory()) {
+    return err(appError("ValidationError", `Target is not a directory: ${targetDir}`));
+  }
+
+  context.runtime.prompt.info(`Scanning ${targetDir} for components...`);
+
+  const filesRes = await getFilesRecursive(targetDir, context);
+  if (!filesRes.ok) return filesRes;
+
+  const files = filesRes.value;
+  if (files.length === 0) {
+    context.runtime.prompt.warn("No .ts or .tsx files found.");
+    return ok({ kind: "noop", message: "No files found." });
+  }
+
+  const items: RegistryItem[] = [];
+
+  for (const file of files) {
+    const contentRes = await context.runtime.fs.readFile(file, "utf8");
+    if (!contentRes.ok) return err(contentRes.error);
+
+    const dependencies = extractDependencies(contentRes.value);
+    const relativePath = path.relative(targetDir, file).replace(/\\/g, "/");
+    const name = path.basename(file, path.extname(file));
+
+    items.push({
+      name,
+      title: name,
+      description: "Packed component",
+      type: "registry:component",
+      dependencies,
+      devDependencies: [],
+      registryDependencies: [],
+      files: [
+        {
+          path: relativePath,
+          type: "registry:component",
+        },
+      ],
+    } as any);
+  }
+
+  const registry = { items };
+  const outPath = path.join(context.cwd, "registry.json");
+  const writeRes = await context.runtime.fs.writeJson(outPath, registry, { spaces: 2 });
+  if (!writeRes.ok) return err(writeRes.error);
+
+  context.runtime.prompt.success(`Packed ${items.length} components into registry.json`);
+  return ok({ kind: "success", message: `Generated registry.json` });
+}
