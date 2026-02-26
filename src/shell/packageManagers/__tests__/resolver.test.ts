@@ -35,6 +35,7 @@ function runtimeWithLockfiles(lockfiles: string[]): RuntimePorts {
       confirm: async () => true,
       select: async () => "overwrite",
       multiselect: async () => [],
+      autocompleteMultiselect: async () => [],
     },
     process: {
       run: () => ({ status: 0 }),

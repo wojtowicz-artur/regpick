@@ -72,9 +72,10 @@ async function promptForItems(
     return ok([]);
   }
 
-  const selectedNames = await context.runtime.prompt.multiselect({
+  const selectedNames = await context.runtime.prompt.autocompleteMultiselect({
     message: "Select items to install",
     options: mapOptions(items),
+    maxItems: 10,
     required: true,
   });
 

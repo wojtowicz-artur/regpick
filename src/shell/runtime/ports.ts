@@ -7,6 +7,7 @@ import {
   isCancel,
   log,
   multiselect,
+  autocompleteMultiselect,
   outro,
   select,
   text,
@@ -53,6 +54,12 @@ export type PromptPort = {
     maxItems?: number;
     required?: boolean;
   }): Promise<Array<string> | symbol>;
+  autocompleteMultiselect(options: {
+    message: string;
+    options: Array<{ value: string; label: string; hint?: string }>;
+    maxItems?: number;
+    required?: boolean;
+  }): Promise<Array<string> | symbol>;
 };
 
 export type ProcessPort = {
@@ -66,7 +73,7 @@ export type RuntimePorts = {
   process: ProcessPort;
 };
 
-export const defaultRuntimePorts: RuntimePorts = {
+export const createRuntimePorts = (options?: { signal?: AbortSignal }): RuntimePorts => ({
   fs: {
     existsSync: (path) => fs.existsSync(path),
     pathExists: async (path) => {
@@ -109,9 +116,9 @@ export const defaultRuntimePorts: RuntimePorts = {
         return err(appError("RuntimeError", `Failed to read JSON: ${path}`, cause));
       }
     },
-    writeJson: async (path, value, options) => {
+    writeJson: async (path, value, opts) => {
       try {
-        const content = JSON.stringify(value, null, options?.spaces ?? 2);
+        const content = JSON.stringify(value, null, opts?.spaces ?? 2);
         await fsPromises.writeFile(path, content, "utf8");
         return ok(undefined);
       } catch (cause) {
@@ -174,10 +181,11 @@ export const defaultRuntimePorts: RuntimePorts = {
     warn: (message) => log.warn(message),
     error: (message) => log.error(message),
     success: (message) => log.success(message),
-    text: (options) => text(options),
-    confirm: (options) => confirm(options),
-    select: (options) => select(options),
-    multiselect: (options) => multiselect(options),
+    text: (opts) => text({ signal: options?.signal, ...opts }),
+    confirm: (opts) => confirm({ signal: options?.signal, ...opts }),
+    select: (opts) => select({ signal: options?.signal, ...opts } as any),
+    multiselect: (opts) => multiselect({ signal: options?.signal, ...opts } as any),
+    autocompleteMultiselect: (opts) => autocompleteMultiselect({ signal: options?.signal, ...opts } as any),
   },
   process: {
     run: (command, args, cwd) =>
@@ -187,4 +195,6 @@ export const defaultRuntimePorts: RuntimePorts = {
         shell: process.platform === "win32",
       }),
   },
-};
+});
+
+export const defaultRuntimePorts: RuntimePorts = createRuntimePorts();
