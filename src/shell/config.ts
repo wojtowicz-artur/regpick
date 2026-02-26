@@ -13,6 +13,7 @@ const DEFAULT_CONFIG: RegpickConfig = {
     "registry:component": "src/components/ui",
     "registry:file": "src/components/ui",
   },
+  aliases: {},
   overwritePolicy: "prompt",
   packageManager: "auto",
   preferManifestTarget: true,
@@ -54,6 +55,10 @@ export async function readConfig(cwd: string): Promise<{
         ...DEFAULT_CONFIG.targetsByType,
         ...(config.targetsByType || {}),
       },
+      aliases: {
+        ...DEFAULT_CONFIG.aliases,
+        ...(config.aliases || {}),
+      },
     },
     configPath: result.filepath,
   };
@@ -63,6 +68,14 @@ export async function writeDefaultConfig(
   cwd: string,
   { overwrite = false }: { overwrite?: boolean } = {},
 ): Promise<{ filePath: string; written: boolean }> {
+  return writeConfig(cwd, DEFAULT_CONFIG, { overwrite });
+}
+
+export async function writeConfig(
+  cwd: string,
+  config: RegpickConfig,
+  { overwrite = false }: { overwrite?: boolean } = {},
+): Promise<{ filePath: string; written: boolean }> {
   const filePath = getConfigPath(cwd);
   const exists = await fs.pathExists(filePath);
 
@@ -70,7 +83,7 @@ export async function writeDefaultConfig(
     return { filePath, written: false };
   }
 
-  await fs.writeJson(filePath, DEFAULT_CONFIG, { spaces: 2 });
+  await fs.writeJson(filePath, config, { spaces: 2 });
   return { filePath, written: true };
 }
 

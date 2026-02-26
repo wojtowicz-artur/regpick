@@ -9,6 +9,7 @@ import { readConfig, resolveRegistrySource } from "../shell/config.js";
 import { resolveFileContent, loadRegistry } from "../shell/registry.js";
 import { collectMissingDependencies, installDependencies } from "../shell/installer.js";
 import { resolvePackageManager } from "../shell/packageManagers/resolver.js";
+import { readLockfile, writeLockfile, computeHash } from "../shell/lockfile.js";
 
 async function promptForSource(
   context: CommandContext,
@@ -205,6 +206,9 @@ export async function runAddCommand(
 
   // --- EXECUTION PHASE: Pure IO without UI interruptions ---
   let writtenFiles = 0;
+  const lockfile = await readLockfile(context.cwd, context.runtime);
+  const hashesAcc: Record<string, string[]> = {};
+
   for (const write of finalWrites) {
     const item = selectedItems.find((entry) => entry.name === write.itemName);
     if (!item) continue;
@@ -214,13 +218,38 @@ export async function runAddCommand(
       return contentResult;
     }
 
+    let content = contentResult.value;
+    for (const [oldAlias, newAlias] of Object.entries(config.aliases || {})) {
+      const regex = new RegExp(`from ["']${oldAlias}(.*?)["']`, "g");
+      content = content.replace(regex, `from "${newAlias}$1"`);
+      // Also handle dynamic imports
+      const dynRegex = new RegExp(`import\\(["']${oldAlias}(.*?)["']\\)`, "g");
+      content = content.replace(dynRegex, `import("${newAlias}$1")`);
+    }
+
     const ensureRes = await context.runtime.fs.ensureDir(path.dirname(write.absoluteTarget));
     if (!ensureRes.ok) return ensureRes;
-    const writeRes = await context.runtime.fs.writeFile(write.absoluteTarget, contentResult.value, "utf8");
+    const writeRes = await context.runtime.fs.writeFile(write.absoluteTarget, content, "utf8");
     if (!writeRes.ok) return writeRes;
+    
+    // Update lockfile
+    const contentHash = computeHash(content);
+    if (!hashesAcc[item.name]) hashesAcc[item.name] = [];
+    hashesAcc[item.name].push(contentHash);
     
     writtenFiles += 1;
     context.runtime.prompt.success(`Wrote ${write.relativeTarget}`);
+  }
+
+  if (writtenFiles > 0) {
+    for (const [itemName, fileHashes] of Object.entries(hashesAcc)) {
+      const combinedHash = computeHash(fileHashes.sort().join(""));
+      lockfile.components[itemName] = {
+        source: source,
+        hash: combinedHash,
+      };
+    }
+    await writeLockfile(context.cwd, lockfile, context.runtime);
   }
 
   if (shouldInstallDeps) {

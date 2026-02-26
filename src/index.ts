@@ -7,6 +7,8 @@ import type { Result } from "./core/result.js";
 import { runAddCommand } from "./commands/add.js";
 import { runInitCommand } from "./commands/init.js";
 import { runListCommand } from "./commands/list.js";
+import { runUpdateCommand } from "./commands/update.js";
+import { runPackCommand } from "./commands/pack.js";
 import { parseCliArgs } from "./shell/cli/args.js";
 import { defaultRuntimePorts } from "./shell/runtime/ports.js";
 
@@ -16,6 +18,8 @@ Usage:
   regpick init
   regpick list [registry-name-or-url]
   regpick add [registry-name-or-url]
+  regpick update
+  regpick pack [directory]
 
 Options:
   --cwd=<path>           Working directory (default: current directory)
@@ -52,6 +56,10 @@ async function run(): Promise<void> {
       result = await runListCommand(context);
     } else if (command === "add") {
       result = await runAddCommand(context);
+    } else if (command === "update") {
+      result = await runUpdateCommand(context);
+    } else if (command === "pack") {
+      result = await runPackCommand(context);
     } else {
       runtime.prompt.error(`Unknown command: ${command}`);
       printHelp();
