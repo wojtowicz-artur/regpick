@@ -28,6 +28,7 @@
     "picocolors": "^1.1.1"
   },
   "devDependencies": {
+    "@release-it/conventional-changelog": "^10.0.5",
     "@types/diff": "^7.0.2",
     "@types/node": "^24.3.0",
     "release-it": "^19.2.4",

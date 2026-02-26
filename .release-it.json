@@ -4,6 +4,12 @@
     "tagName": "v${version}",
     "requireCleanWorkingDir": true
   },
+  "plugins": {
+    "@release-it/conventional-changelog": {
+      "preset": "angular",
+      "infile": "CHANGELOG.md"
+    }
+  },
   "github": {
     "release": true
   },
