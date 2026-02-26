@@ -1,5 +1,5 @@
 import path from "node:path";
-import fs from "fs-extra";
+import fs from "node:fs/promises";
 import { cosmiconfig } from "cosmiconfig";
 
 import type { RegpickConfig } from "../types.js";
@@ -77,13 +77,18 @@ export async function writeConfig(
   { overwrite = false }: { overwrite?: boolean } = {},
 ): Promise<{ filePath: string; written: boolean }> {
   const filePath = getConfigPath(cwd);
-  const exists = await fs.pathExists(filePath);
+  
+  let exists = false;
+  try {
+    await fs.access(filePath);
+    exists = true;
+  } catch {}
 
   if (exists && !overwrite) {
     return { filePath, written: false };
   }
 
-  await fs.writeJson(filePath, config, { spaces: 2 });
+  await fs.writeFile(filePath, JSON.stringify(config, null, 2), "utf8");
   return { filePath, written: true };
 }
 

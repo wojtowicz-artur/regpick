@@ -22,15 +22,12 @@
   },
   "dependencies": {
     "@clack/prompts": "^0.10.1",
-    "axios": "^1.8.4",
     "cosmiconfig": "^9.0.0",
     "diff": "^8.0.3",
-    "fs-extra": "^11.2.0",
     "picocolors": "^1.1.1"
   },
   "devDependencies": {
     "@types/diff": "^7.0.2",
-    "@types/fs-extra": "^11.0.4",
     "@types/node": "^24.3.0",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
