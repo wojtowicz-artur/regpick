@@ -10,7 +10,7 @@ import { runListCommand } from "./commands/list.js";
 import { runUpdateCommand } from "./commands/update.js";
 import { runPackCommand } from "./commands/pack.js";
 import { parseCliArgs } from "./shell/cli/args.js";
-import { defaultRuntimePorts } from "./shell/runtime/ports.js";
+import { createRuntimePorts } from "./shell/runtime/ports.js";
 
 function printHelp(): void {
   console.log(`
@@ -31,7 +31,25 @@ Options:
 }
 
 async function run(): Promise<void> {
-  const runtime = defaultRuntimePorts;
+  const abortController = new AbortController();
+  
+  // Abort prompts on background errors or process termination
+  const handleTerminate = (err?: Error) => {
+    if (!abortController.signal.aborted) {
+      abortController.abort(err);
+    }
+    if (err instanceof Error) {
+      console.error(pc.red(`\n[Fatal Error] ${err.message}`));
+    }
+    process.exit(1);
+  };
+  
+  process.on("SIGINT", () => handleTerminate());
+  process.on("SIGTERM", () => handleTerminate());
+  process.on("uncaughtException", handleTerminate);
+  process.on("unhandledRejection", (reason) => handleTerminate(reason instanceof Error ? reason : new Error(String(reason))));
+
+  const runtime = createRuntimePorts({ signal: abortController.signal });
   const parsed = parseCliArgs(process.argv.slice(2));
   const command = parsed.positionals[0];
 
