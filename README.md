@@ -10,13 +10,21 @@ Lightweight CLI for selecting and installing registry entries from shadcn-compat
 
 ## Quick start
 
+The easiest way to use `regpick` is via `npx`. You don't need to install it globally.
+
+```bash
+npx regpick init
+npx regpick list tebra
+npx regpick add tebra
+```
+
+## Local development
+
 ```bash
 cd /path/to/project
 cd /path/to/packages/regpick
 npm run build
 node ./dist/index.mjs init
-node ./dist/index.mjs list tebra
-node ./dist/index.mjs add tebra
 ```
 
 ## Config (`regpick.json`)

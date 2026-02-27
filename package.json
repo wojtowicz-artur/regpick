@@ -3,6 +3,19 @@
   "version": "0.2.3",
   "description": "Lightweight CLI for selecting and installing registry entries.",
   "type": "module",
+  "files": [
+    "dist",
+    "bin",
+    "regpick.config.schema.json"
+  ],
+  "keywords": [
+    "cli",
+    "registry",
+    "shadcn",
+    "components"
+  ],
+  "author": "",
+  "license": "MIT",
   "bin": {
     "regpick": "./bin/regpick.js"
   },
