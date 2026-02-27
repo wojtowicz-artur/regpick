@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.3.0](https://github.com/wojtowicz-artur/regpick/compare/v0.2.12...v0.3.0) (2026-02-27)
+
+### Features
+
+* **website:** redesign landing page with Vite-inspired layout ([865cc48](https://github.com/wojtowicz-artur/regpick/commit/865cc48d48fdf50a3040486da6ab024492a68ced))
+
 ## [0.2.12](https://github.com/wojtowicz-artur/regpick/compare/v0.2.11...v0.2.12) (2026-02-27)
 
 ### Chores
