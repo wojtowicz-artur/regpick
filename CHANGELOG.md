@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.12](https://github.com/wojtowicz-artur/regpick/compare/v0.2.11...v0.2.12) (2026-02-27)
+
+### Chores
+
+* include config ([ff89151](https://github.com/wojtowicz-artur/regpick/commit/ff89151f932a544a0356082a77fc59887d91ffa3))
+* test commit ([5e22ca5](https://github.com/wojtowicz-artur/regpick/commit/5e22ca56f9099ac9a1766542aa6c1b769e683207))
+* test commit ([0d274e4](https://github.com/wojtowicz-artur/regpick/commit/0d274e473790dd36f0168ecf92c4cfc86d4416d6))
+
 ## [0.2.11](https://github.com/wojtowicz-artur/regpick/compare/v0.2.10...v0.2.11) (2026-02-27)
 
 ## [0.2.10](https://github.com/wojtowicz-artur/regpick/compare/v0.2.9...v0.2.10) (2026-02-27)
