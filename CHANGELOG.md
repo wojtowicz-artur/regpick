@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.4.0](https://github.com/wojtowicz-artur/regpick/compare/v0.3.0...v0.4.0) (2026-02-27)
+
+### Features
+
+* redesign website hero section, update theme, enhance terminal UI ([5612898](https://github.com/wojtowicz-artur/regpick/commit/5612898386f23842eb3b73aab1306e3590701616))
+
 ## [0.3.0](https://github.com/wojtowicz-artur/regpick/compare/v0.2.12...v0.3.0) (2026-02-27)
 
 ### Features
