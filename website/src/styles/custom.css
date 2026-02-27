@@ -66,60 +66,15 @@ header {
 	z-index: 100;
 }
 
-/* ── Animated hero background ── */
-.hero-bg {
-	position: absolute;
+/* ── 3D Canvas Background ── */
+.hero-canvas {
+	position: fixed;
 	top: 0;
-	left: 50%;
-	transform: translateX(-50%);
+	left: 0;
 	width: 100vw;
-	height: 110vh;
-	overflow: hidden;
+	height: 100vh;
 	pointer-events: none;
 	z-index: -1;
-}
-
-.hero-bg::before,
-.hero-bg::after {
-	content: '';
-	position: absolute;
-	border-radius: 50%;
-	filter: blur(80px);
-	animation: orbFloat 12s ease-in-out infinite;
-}
-
-.hero-bg::before {
-	width: 600px;
-	height: 600px;
-	top: -10%;
-	left: 15%;
-	background: radial-gradient(circle, var(--rp-glow-1), transparent 70%);
-}
-
-.hero-bg::after {
-	width: 500px;
-	height: 500px;
-	top: 5%;
-	right: 10%;
-	background: radial-gradient(circle, var(--rp-glow-2), transparent 70%);
-	animation-delay: -6s;
-	animation-duration: 15s;
-}
-
-@keyframes orbFloat {
-
-	0%,
-	100% {
-		transform: translate(0, 0) scale(1);
-	}
-
-	33% {
-		transform: translate(30px, -20px) scale(1.05);
-	}
-
-	66% {
-		transform: translate(-20px, 15px) scale(0.95);
-	}
 }
 
 /* ── Custom Hero Section ── */
