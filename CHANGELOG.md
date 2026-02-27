@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.5.0](https://github.com/wojtowicz-artur/regpick/compare/v0.4.0...v0.5.0) (2026-02-27)
+
+### Features
+
+* implement an animated 3D grid and particle background, replacing the previous orb animation ([9f2fac0](https://github.com/wojtowicz-artur/regpick/commit/9f2fac08f4e0fe06fb5e37098917ca087dc77067))
+
 ## [0.4.0](https://github.com/wojtowicz-artur/regpick/compare/v0.3.0...v0.4.0) (2026-02-27)
 
 ### Features
