@@ -1,40 +1,35 @@
 ---
-title: Welcome to Starlight
-description: Get started building your docs site with Starlight.
-template: splash # Remove or comment out this line to display the site sidebar on this page.
+title: Regpick
+description: Lightweight CLI for selecting and installing registry entries.
+template: splash
 hero:
-  tagline: Congrats on setting up a new Starlight project!
-  image:
-    file: ../../assets/houston.webp
+  tagline: Lightweight CLI for selecting and installing registry entries (shadcn-compatible).
   actions:
-    - text: Example Guide
-      link: /guides/example/
+    - text: Read the Docs
+      link: /how_to/
       icon: right-arrow
-    - text: Read the Starlight docs
-      link: https://starlight.astro.build
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/tebra-icon-registry/regpick
       icon: external
       variant: minimal
 ---
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
 
-## Next steps
+## Features
 
 <CardGrid stagger>
-	<Card title="Update content" icon="pencil">
-		Edit `src/content/docs/index.mdx` to see this page change.
+	<Card title="Shadcn Compatible" icon="puzzle">
+		Uses a registry format compatible with **shadcn-ui v2**, allowing easy integration with existing ecosystems.
 	</Card>
-	<Card title="Change page layout" icon="document">
-		Delete `template: splash` in `src/content/docs/index.mdx` to display a
-		sidebar on this page.
+	<Card title="Zero Configuration" icon="setting">
+		Works out of the box for most projects. Just run the CLI and pick what you need.
 	</Card>
-	<Card title="Add new content" icon="add-document">
-		Add Markdown or MDX files to `src/content/docs` to create new pages.
+	<Card title="Flexible Registries" icon="list-format">
+		Extends standard registries to allow flexible local development and directory-based structures.
 	</Card>
-	<Card title="Configure your site" icon="setting">
-		Edit your `sidebar` and other config in `astro.config.mjs`.
-	</Card>
-	<Card title="Read the docs" icon="open-book">
-		Learn more in [the Starlight Docs](https://starlight.astro.build/).
+	<Card title="Lightweight & Fast" icon="rocket">
+		Minimal dependencies and high performance, designed to speed up your development workflow.
 	</Card>
 </CardGrid>

@@ -1,0 +1,31 @@
+:root[data-theme='light'] {
+	--sl-color-accent-low: #d1f4e0;
+	--sl-color-accent: #10b981;
+	--sl-color-accent-high: #047857;
+	--sl-color-white: #ffffff;
+	--sl-color-gray-1: #f3f4f6;
+	--sl-color-gray-2: #e5e7eb;
+	--sl-color-gray-3: #d1d5db;
+	--sl-color-gray-4: #9ca3af;
+	--sl-color-gray-5: #6b7280;
+	--sl-color-gray-6: #4b5563;
+	--sl-color-black: #111827;
+}
+
+:root {
+	/* Dark theme (default) */
+	--sl-color-accent-low: #064e3b;
+	--sl-color-accent: #10b981;
+	--sl-color-accent-high: #a7f3d0;
+	--sl-color-white: #111827;
+	--sl-color-gray-1: #1f2937;
+	--sl-color-gray-2: #374151;
+	--sl-color-gray-3: #4b5563;
+	--sl-color-gray-4: #6b7280;
+	--sl-color-gray-5: #9ca3af;
+	--sl-color-gray-6: #d1d5db;
+	--sl-color-black: #f3f4f6;
+	
+	/* Adjust hue for built-in Starlight components */
+	--sl-hue-accent: 160;
+}
