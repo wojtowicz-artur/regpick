@@ -1,43 +1,54 @@
 ---
+
 ---
+
 <interactive-terminal class="hero-terminal">
   <div class="hero-terminal-header">
+    <div class="terminal-dots">
+      <span></span>
+      <span></span>
+      <span></span>
+    </div>
     <button class="active" data-pm="npm">npm</button>
     <button data-pm="yarn">yarn</button>
     <button data-pm="pnpm">pnpm</button>
     <button data-pm="bun">bun</button>
   </div>
   <div class="hero-terminal-body">
-    <code><span style="color: #a7f3d0;">$</span> <span class="cmd-text">npx regpick add</span></code>
+    <code
+      ><span style="color: #34d399;">$</span>
+      <span class="cmd-text">npx regpick add</span></code
+    >
   </div>
 </interactive-terminal>
 
 <script>
   class InteractiveTerminal extends HTMLElement {
     connectedCallback() {
-      const buttons = this.querySelectorAll('button');
-      const cmdText = this.querySelector('.cmd-text');
+      const buttons = this.querySelectorAll("button");
+      const cmdText = this.querySelector(".cmd-text");
 
       const commands = {
-        'npm': 'npx regpick add',
-        'yarn': 'yarn dlx regpick add',
-        'pnpm': 'pnpm dlx regpick add',
-        'bun': 'bunx regpick add'
+        npm: "npx regpick add",
+        yarn: "yarn dlx regpick add",
+        pnpm: "pnpm dlx regpick add",
+        bun: "bunx regpick add",
       };
 
-      buttons.forEach(btn => {
-        btn.addEventListener('click', () => {
-          buttons.forEach(b => b.classList.remove('active'));
-          btn.classList.add('active');
+      buttons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          buttons.forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
           if (cmdText && btn.dataset.pm) {
-            cmdText.textContent = commands[btn.dataset.pm as keyof typeof commands];
+            cmdText.textContent =
+              commands[btn.dataset.pm as keyof typeof commands];
           }
         });
       });
     }
   }
-  
-  if (!customElements.get('interactive-terminal')) {
-    customElements.define('interactive-terminal', InteractiveTerminal);
+
+  if (!customElements.get("interactive-terminal")) {
+    customElements.define("interactive-terminal", InteractiveTerminal);
   }
 </script>
