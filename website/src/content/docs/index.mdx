@@ -1,50 +1,49 @@
 ---
-title: Regpick CLI
+title: Regpick
 description: The lightweight CLI for selecting and installing registry entries.
 template: splash
 hero:
-  tagline: A powerful, lightweight CLI tool to browse, select, and install components from any shadcn-compatible registry. Zero configuration required.
-  actions:
-    - text: Get Started
-      link: /how_to/
-      icon: right-arrow
-      variant: primary
-    - text: Configuration
-      link: /configuration_reference/
-      icon: document
-      variant: secondary
-    - text: View on GitHub
-      link: https://github.com/wojtowicz-artur/regpick
-      icon: github
-      variant: minimal
+  title: ""
 ---
 
-import { Card, CardGrid } from '@astrojs/starlight/components';
+import { Card, CardGrid, Icon } from '@astrojs/starlight/components';
 
-## Why Regpick?
+## Redefining developer experience
 
-<CardGrid stagger>
-	<Card title="Fully Compatible" icon="puzzle">
-		Designed to work seamlessly with **shadcn-ui v2** registry formats. Integrate it into your existing component ecosystem without friction.
-	</Card>
-	<Card title="Zero Configuration" icon="setting">
-		Ready to use out of the box. Just run the CLI command, pick the components you need, and start building.
-	</Card>
-	<Card title="Extensible Registries" icon="list-format">
-		Go beyond the defaults. Use flexible local development options, custom directory-based structures, and multiple registry sources.
-	</Card>
-	<Card title="Blazing Fast" icon="rocket">
-		Built for speed. Minimal dependencies and a lightweight architecture mean faster installs and a better developer experience.
-	</Card>
-</CardGrid>
+<div class="bento-grid">
+  <div class="bento-item bento-large">
+    <div class="bento-icon"><Icon name="laptop" size="1.5rem" /></div>
+    <h3>Instant Registry Access</h3>
+    <p>On-demand component serving from any shadcn-compatible registry. Blazing fast dependency resolution that keeps you in the flow.</p>
+  </div>
+  <div class="bento-item">
+    <div class="bento-icon"><Icon name="rocket" size="1.5rem" /></div>
+    <h3>Lightning Fast CLI</h3>
+    <p>Instantly reflect changes as you install, no matter how big your project is.</p>
+  </div>
+  <div class="bento-item">
+    <div class="bento-icon"><Icon name="puzzle" size="1.5rem" /></div>
+    <h3>Rich Features</h3>
+    <p>TypeScript, JSX, CSS, and more with just a command away.</p>
+  </div>
+  <div class="bento-item bento-large">
+    <div class="bento-icon"><Icon name="setting" size="1.5rem" /></div>
+    <h3>Optimized Installation</h3>
+    <p>Advanced diffing, built-in validation, and fine-grained control over your component library to ensure your codebase stays clean.</p>
+  </div>
+</div>
 
-## Next Steps
+## A shared foundation to build upon
 
-<CardGrid>
-	<Card title="Learn how to use it" icon="open-book">
-		Check out our [How-to Guides](/how_to/) to see real-world examples and recipes.
-	</Card>
-	<Card title="Customize the CLI" icon="laptop">
-		Read the [Configuration Reference](/configuration_reference/) to adjust `regpick` to your exact needs.
-	</Card>
-</CardGrid>
+<div class="bento-grid">
+  <div class="bento-item">
+    <div class="bento-icon"><Icon name="list-format" size="1.5rem" /></div>
+    <h3>Flexible Plugin System</h3>
+    <p>Extend regpick's well-designed interface with custom registry adapters and path policies.</p>
+  </div>
+  <div class="bento-item">
+    <div class="bento-icon"><Icon name="random" size="1.5rem" /></div>
+    <h3>Fully Typed API</h3>
+    <p>Designed to be built on top of. Full TypeScript support for your registry configurations.</p>
+  </div>
+</div>

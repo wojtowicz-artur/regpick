@@ -1,14 +1,290 @@
 :root {
-	/* Dark theme - emerald/teal accent */
-	--sl-color-accent-low: #064e3b;
-	--sl-color-accent: #10b981;
-	--sl-color-accent-high: #a7f3d0;
-	--sl-hue-accent: 152;
+	/* Dark theme - Clean Vite-inspired palette (no gradients) */
+	--sl-color-accent-low: #1e1b4b;
+	--sl-color-accent: #818cf8;
+	--sl-color-accent-high: #c7d2fe;
+	--sl-hue-accent: 240;
+
+	/* Override Starlight default backgrounds to be much darker (almost black) */
+	--sl-color-bg: #09090b !important;
+	--sl-color-bg-nav: rgba(9, 9, 11, 0.8) !important;
+	--sl-color-bg-sidebar: #09090b !important;
+	--sl-color-hairline-shade: rgba(255, 255, 255, 0.05) !important;
+	--sl-color-hairline: rgba(255, 255, 255, 0.05) !important;
+
+	--glass-bg: rgba(9, 9, 11, 0.8);
 }
 
 :root[data-theme='light'] {
-	/* Light theme - darker emerald for good contrast against white background */
-	--sl-color-accent-low: #d1f4e0;
-	--sl-color-accent: #059669;
-	--sl-color-accent-high: #022c22;
+	/* Light theme */
+	--sl-color-accent-low: #e0e7ff;
+	--sl-color-accent: #4f46e5;
+	--sl-color-accent-high: #312e81;
+	--sl-color-bg: #ffffff !important;
+	--sl-color-bg-nav: rgba(255, 255, 255, 0.8) !important;
+}
+
+/* Fix header isolation */
+header {
+	background-color: transparent !important;
+	backdrop-filter: blur(12px);
+	-webkit-backdrop-filter: blur(12px);
+	border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+	position: sticky;
+	top: 0;
+	z-index: 100;
+}
+
+.hero-bg {
+	position: absolute;
+	top: 0;
+	left: 50%;
+	transform: translateX(-50%);
+	width: 100vw;
+	height: 100vh;
+	/* Dual-color subtle spotlight effect */
+	background: 
+		radial-gradient(ellipse 40% 40% at 30% 0%, rgba(129, 140, 248, 0.08), transparent),
+		radial-gradient(ellipse 40% 40% at 70% 0%, rgba(192, 132, 252, 0.06), transparent);
+	pointer-events: none;
+	z-index: -1;
+}
+
+/* Custom Hero Section */
+.custom-hero {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 4rem;
+	align-items: center;
+	padding: 0 0 4rem;
+	margin-top: 2rem; /* Adjusted margin to fix the gap */
+}
+
+.hero-badge {
+	display: inline-block;
+	padding: 0.25rem 0.75rem;
+	background: rgba(129, 140, 248, 0.1);
+	border: 1px solid rgba(129, 140, 248, 0.2);
+	color: var(--sl-color-accent-high);
+	border-radius: 9999px;
+	font-size: 0.875rem;
+	font-weight: 500;
+	margin-bottom: 1rem;
+	letter-spacing: 0.05em;
+}
+
+@media (max-width: 768px) {
+	.custom-hero {
+		grid-template-columns: 1fr;
+		text-align: center;
+		padding: 0 0 2rem;
+		margin-top: -1rem;
+	}
+}
+
+.custom-hero h1 {
+	font-size: clamp(3rem, 6vw, 4.5rem) !important;
+	font-weight: 800;
+	line-height: 1.05;
+	margin-bottom: 1.25rem;
+	color: var(--sl-color-white);
+	letter-spacing: -0.03em;
+}
+
+.custom-hero p {
+	font-size: 1.25rem;
+	color: var(--sl-color-gray-3);
+	margin-bottom: 2.5rem;
+	line-height: 1.6;
+	max-width: 90%;
+}
+
+.hero-buttons {
+	display: flex;
+	gap: 1rem;
+}
+
+@media (max-width: 768px) {
+	.hero-buttons {
+		justify-content: center;
+	}
+}
+
+.btn-primary {
+	background: transparent;
+	border: 1px solid var(--sl-color-accent);
+	color: var(--sl-color-white);
+	padding: 0.75rem 1.5rem;
+	border-radius: 8px;
+	text-decoration: none;
+	font-weight: 600;
+	box-shadow: 0 0 15px rgba(129, 140, 248, 0.3);
+	transition: all 0.2s;
+}
+
+.btn-primary:hover {
+	background: var(--sl-color-accent);
+	color: #fff;
+	box-shadow: 0 0 25px rgba(129, 140, 248, 0.5);
+}
+
+.btn-secondary {
+	background: rgba(255, 255, 255, 0.05);
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	color: var(--sl-color-white);
+	padding: 0.75rem 1.5rem;
+	border-radius: 8px;
+	text-decoration: none;
+	font-weight: 600;
+	transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+	background: rgba(255, 255, 255, 0.1);
+	border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Terminal Snippet */
+.hero-terminal {
+	background: #1e1e20;
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	border-radius: 12px;
+	padding: 1.5rem;
+	font-family: monospace;
+	color: #e2e8f0;
+	box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+	display: block;
+}
+
+.hero-terminal-header {
+	display: flex;
+	gap: 1.5rem;
+	margin-bottom: 1rem;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+	padding-bottom: 0;
+	align-items: flex-end;
+}
+
+.hero-terminal-header button {
+	background: none;
+	border: none;
+	color: var(--sl-color-gray-4);
+	font-size: 0.875rem;
+	cursor: pointer;
+	padding: 0 0 0.75rem 0;
+	font-family: inherit;
+	position: relative;
+	top: 1px;
+}
+
+.hero-terminal-header button.active {
+	color: var(--sl-color-white);
+	border-bottom: 2px solid var(--sl-color-accent);
+}
+
+/* Bento Grid System */
+.bento-grid {
+	display: grid;
+	grid-template-columns: repeat(3, 1fr);
+	gap: 1.5rem;
+	margin-top: 2rem;
+	margin-bottom: 4rem;
+	align-items: stretch;
+}
+
+.bento-grid-half {
+	grid-template-columns: repeat(2, 1fr);
+}
+
+@media (max-width: 1024px) {
+	.bento-grid {
+		grid-template-columns: repeat(2, 1fr);
+	}
+	.bento-large {
+		grid-column: span 2;
+	}
+}
+
+@media (max-width: 768px) {
+	.bento-grid, .bento-grid-half {
+		grid-template-columns: 1fr;
+	}
+	.bento-large {
+		grid-column: span 1;
+	}
+}
+
+.bento-item {
+	background: var(--sl-color-bg-nav);
+	border: 1px solid var(--sl-color-hairline);
+	border-radius: 16px;
+	padding: 2rem;
+	transition: all 0.3s ease;
+	position: relative;
+	overflow: hidden;
+	display: flex;
+	flex-direction: column;
+	text-decoration: none !important;
+	height: 100%;
+}
+
+.bento-large {
+	grid-column: span 2;
+}
+
+.bento-item::before {
+	content: '';
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	background: radial-gradient(circle at top right, rgba(129, 140, 248, 0.1), transparent 60%);
+	opacity: 0;
+	transition: opacity 0.3s ease;
+	pointer-events: none;
+}
+
+.bento-item:hover {
+	border-color: rgba(129, 140, 248, 0.4);
+	transform: translateY(-4px);
+	box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.bento-item:hover::before {
+	opacity: 1;
+}
+
+.bento-large {
+	grid-column: span 2;
+}
+
+.bento-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 48px;
+	height: 48px;
+	border-radius: 12px;
+	background: rgba(129, 140, 248, 0.1);
+	color: var(--sl-color-accent);
+	margin-bottom: 1.5rem;
+	border: 1px solid rgba(129, 140, 248, 0.2);
+}
+
+.bento-item h3 {
+	font-size: 1.25rem !important;
+	font-weight: 600 !important;
+	color: var(--sl-color-white) !important;
+	margin-bottom: 0.75rem !important;
+	margin-top: 0 !important;
+	line-height: 1.3 !important;
+}
+
+.bento-item p {
+	color: var(--sl-color-gray-3) !important;
+	font-size: 0.95rem !important;
+	line-height: 1.6 !important;
+	margin: 0 !important;
+	flex-grow: 1;
 }

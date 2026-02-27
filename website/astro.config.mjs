@@ -7,6 +7,9 @@ export default defineConfig({
 	integrations: [
 		starlight({
 			title: 'Regpick',
+			components: {
+				Hero: './src/components/Hero.astro',
+			},
 			customCss: [
 				// Relative path to your custom CSS file
 				'./src/styles/custom.css',
