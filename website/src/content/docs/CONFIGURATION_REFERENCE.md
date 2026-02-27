@@ -1,4 +1,6 @@
-# Configuration Reference
+---
+title: Configuration Reference
+---
 
 This document provides a complete overview of the options available in `regpick.config.json` (or `regpick.json`) and the CLI flags you can use to modify `regpick`'s behavior on the fly.
 

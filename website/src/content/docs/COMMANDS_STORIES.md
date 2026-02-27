@@ -1,4 +1,6 @@
-# Command Stories
+---
+title: Command Stories
+---
 
 This document explores the `regpick` CLI through a behavior-driven perspective, outlining the "Success Story" (happy path) and "Errors Story" (unhappy paths and edge cases) for each command.
 

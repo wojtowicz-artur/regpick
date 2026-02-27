@@ -1,4 +1,6 @@
-# How-to Guides
+---
+title: How-to Guides
+---
 
 This section provides practical, step-by-step instructions on how to solve specific, common problems using `regpick`.
 

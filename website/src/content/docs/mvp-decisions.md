@@ -1,4 +1,6 @@
-# MVP Decisions and Documentation Gaps Closed
+---
+title: MVP Decisions
+---
 
 This file closes the open items from the implementation plan for prototype scope.
 

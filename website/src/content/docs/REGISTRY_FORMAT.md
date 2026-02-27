@@ -1,4 +1,6 @@
-# Registry Format
+---
+title: Registry Format
+---
 
 `regpick` uses a registry format compatible with **shadcn-ui v2**. However, it extends the way you can serve and define registries to allow more flexible local development and directory-based structures.
 

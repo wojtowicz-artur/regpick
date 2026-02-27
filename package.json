@@ -20,6 +20,8 @@
     "regpick": "./bin/regpick.js"
   },
   "scripts": {
+    "docs:dev": "npm run dev --prefix website",
+    "docs:build": "npm run build --prefix website",
     "build": "tsdown",
     "test": "vitest run",
     "release": "release-it",
