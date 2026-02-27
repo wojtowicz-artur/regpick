@@ -1,35 +1,50 @@
 ---
-title: Regpick
-description: Lightweight CLI for selecting and installing registry entries.
+title: Regpick CLI
+description: The lightweight CLI for selecting and installing registry entries.
 template: splash
 hero:
-  tagline: Lightweight CLI for selecting and installing registry entries (shadcn-compatible).
+  tagline: A powerful, lightweight CLI tool to browse, select, and install components from any shadcn-compatible registry. Zero configuration required.
   actions:
-    - text: Read the Docs
+    - text: Get Started
       link: /how_to/
       icon: right-arrow
       variant: primary
+    - text: Configuration
+      link: /configuration_reference/
+      icon: document
+      variant: secondary
     - text: View on GitHub
       link: https://github.com/tebra-icon-registry/regpick
-      icon: external
+      icon: github
       variant: minimal
 ---
 
 import { Card, CardGrid } from '@astrojs/starlight/components';
 
-## Features
+## Why Regpick?
 
 <CardGrid stagger>
-	<Card title="Shadcn Compatible" icon="puzzle">
-		Uses a registry format compatible with **shadcn-ui v2**, allowing easy integration with existing ecosystems.
+	<Card title="Fully Compatible" icon="puzzle">
+		Designed to work seamlessly with **shadcn-ui v2** registry formats. Integrate it into your existing component ecosystem without friction.
 	</Card>
 	<Card title="Zero Configuration" icon="setting">
-		Works out of the box for most projects. Just run the CLI and pick what you need.
+		Ready to use out of the box. Just run the CLI command, pick the components you need, and start building.
 	</Card>
-	<Card title="Flexible Registries" icon="list-format">
-		Extends standard registries to allow flexible local development and directory-based structures.
+	<Card title="Extensible Registries" icon="list-format">
+		Go beyond the defaults. Use flexible local development options, custom directory-based structures, and multiple registry sources.
 	</Card>
-	<Card title="Lightweight & Fast" icon="rocket">
-		Minimal dependencies and high performance, designed to speed up your development workflow.
+	<Card title="Blazing Fast" icon="rocket">
+		Built for speed. Minimal dependencies and a lightweight architecture mean faster installs and a better developer experience.
+	</Card>
+</CardGrid>
+
+## Next Steps
+
+<CardGrid>
+	<Card title="Learn how to use it" icon="open-book">
+		Check out our [How-to Guides](/how_to/) to see real-world examples and recipes.
+	</Card>
+	<Card title="Customize the CLI" icon="laptop">
+		Read the [Configuration Reference](/configuration_reference/) to adjust `regpick` to your exact needs.
 	</Card>
 </CardGrid>
