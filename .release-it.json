@@ -14,7 +14,7 @@
     "release": true
   },
   "npm": {
-    "publish": false
+    "publish": true
   },
   "hooks": {
     "before:init": ["npm run test", "npm run build"]
