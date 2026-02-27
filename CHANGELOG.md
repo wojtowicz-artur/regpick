@@ -1,5 +1,7 @@
 # Changelog
 
+## [0.2.10](https://github.com/wojtowicz-artur/regpick/compare/v0.2.9...v0.2.10) (2026-02-27)
+
 ## [0.2.9](https://github.com/wojtowicz-artur/regpick/compare/v0.2.8...v0.2.9) (2026-02-27)
 
 ## [0.2.8](https://github.com/wojtowicz-artur/regpick/compare/v0.2.7...v0.2.8) (2026-02-27)
