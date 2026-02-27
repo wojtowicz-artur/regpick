@@ -5,4 +5,5 @@ export default defineConfig({
   format: ['esm'],
   target: 'node24',
   clean: true,
+  minify: true,
 })

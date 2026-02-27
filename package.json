@@ -1,6 +1,6 @@
 {
   "name": "regpick",
-  "version": "0.2.4",
+  "version": "0.2.8",
   "description": "Lightweight CLI for selecting and installing registry entries.",
   "type": "module",
   "files": [
@@ -30,7 +30,8 @@
     "init": "node ./dist/index.mjs init",
     "list": "node ./dist/index.mjs list",
     "add": "node ./dist/index.mjs add",
-    "validate:tebra": "node ./dist/index.mjs list ../../tebra-icon-registry/registry"
+    "validate:tebra": "node ./dist/index.mjs list ../../tebra-icon-registry/registry",
+    "prepare": "husky"
   },
   "engines": {
     "node": ">=20"
@@ -42,13 +43,16 @@
     "picocolors": "^1.1.1"
   },
   "devDependencies": {
+    "@commitlint/cli": "^20.4.2",
+    "@commitlint/config-conventional": "^20.4.2",
     "@release-it/conventional-changelog": "^10.0.5",
     "@types/diff": "^7.0.2",
     "@types/node": "^24.3.0",
+    "husky": "^9.1.7",
     "release-it": "^19.2.4",
     "tsdown": "^0.21.0-beta.2",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
-    "vitest": "^2.1.8"
+    "vitest": "^4.0.18"
   }
 }
