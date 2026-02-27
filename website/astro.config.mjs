@@ -11,7 +11,7 @@ export default defineConfig({
 				// Relative path to your custom CSS file
 				'./src/styles/custom.css',
 			],
-			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/tebra-icon-registry/regpick' }], // Example URL, adjust if needed
+			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/wojtowicz-artur/regpick' }],
 			sidebar: [
 				{
 					label: 'Documentation',
