@@ -3,6 +3,10 @@
   "version": "0.2.10",
   "description": "Lightweight CLI for selecting and installing registry entries.",
   "type": "module",
+  "main": "./dist/index.mjs",
+  "exports": {
+    ".": "./dist/index.mjs"
+  },
   "files": [
     "dist",
     "bin",
