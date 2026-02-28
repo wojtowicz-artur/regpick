@@ -1,4 +1,3 @@
-import * as diff from "diff";
 import path from "node:path";
 import { styleText } from "node:util";
 
@@ -11,8 +10,12 @@ import { computeHash, readLockfile, writeLockfile } from "../shell/lockfile.js";
 import { loadRegistry, resolveFileContent } from "../shell/registry.js";
 import type { CommandContext, CommandOutcome } from "../types.js";
 
-function printDiff(oldContent: string, newContent: string) {
-  const changes = diff.diffLines(oldContent, newContent);
+async function printDiff(oldContent: string, newContent: string) {
+  // TODO: Use a native diff implementation to avoid the dependency. This is a temporary solution. WHEN: implement when ecosystem will move further from Node 20, because native diff landad in Node 22.15
+  const changes = await import("diff").then(({ diffLines }) => {
+    return diffLines(oldContent, newContent);
+  });
+
   for (const part of changes) {
     const format = part.added ? "green" : part.removed ? "red" : "gray";
     const prefix = part.added ? "+ " : part.removed ? "- " : "  ";
@@ -124,7 +127,7 @@ export async function runUpdateCommand(
               ? localContentRes.value
               : "";
             console.log(styleText("bold", `\nDiff for ${rf.target}:`));
-            printDiff(localContent, rf.content);
+            await printDiff(localContent, rf.content);
           }
 
           const confirm = await context.runtime.prompt.confirm({
