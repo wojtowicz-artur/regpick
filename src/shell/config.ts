@@ -32,38 +32,24 @@ export async function readConfig(cwd: string): Promise<{
     sources: [
       {
         files: ["regpick", ".regpickrc", "regpickrc"],
-        extensions: ["json", ""],
+        extensions: ["json", "js", "ts", "mjs", "cjs", ""],
+      },
+      {
+        files: "package.json",
+        extensions: [],
+        rewrite(config: any) {
+          return config?.regpick;
+        },
       },
     ],
     defaults: DEFAULT_CONFIG,
+    merge: true,
     cwd,
   });
 
-  if (!sources.length) {
-    return {
-      config: { ...DEFAULT_CONFIG },
-      configPath: null,
-    };
-  }
-
   return {
-    config: {
-      ...DEFAULT_CONFIG,
-      ...config,
-      registries: {
-        ...DEFAULT_CONFIG.registries,
-        ...(config.registries || {}),
-      },
-      targetsByType: {
-        ...DEFAULT_CONFIG.targetsByType,
-        ...(config.targetsByType || {}),
-      },
-      aliases: {
-        ...DEFAULT_CONFIG.aliases,
-        ...(config.aliases || {}),
-      },
-    },
-    configPath: sources[0],
+    config,
+    configPath: sources[0] || null,
   };
 }
 
