@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.6.0](https://github.com/wojtowicz-artur/regpick/compare/v0.5.0...v0.6.0) (2026-02-28)
+
+### Features
+
+* update package dependencies, add unconfig, and implement readConfig tests ([aa74623](https://github.com/wojtowicz-artur/regpick/commit/aa74623c218c96be6f684527ecf19e62e78943f9))
+
 ## [0.5.0](https://github.com/wojtowicz-artur/regpick/compare/v0.4.0...v0.5.0) (2026-02-27)
 
 ### Features
