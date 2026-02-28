@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.6.4](https://github.com/wojtowicz-artur/regpick/compare/v0.6.3...v0.6.4) (2026-02-28)
+
+### Code Refactoring
+
+* update diff implementation to use dynamic import and change TypeScript target to esnext ([ec3037c](https://github.com/wojtowicz-artur/regpick/commit/ec3037cc5c589c081ef29424a081099b3367fca1))
+
 ## [0.6.3](https://github.com/wojtowicz-artur/regpick/compare/v0.6.2...v0.6.3) (2026-02-28)
 
 ### Code Refactoring
