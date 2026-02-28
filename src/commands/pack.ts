@@ -1,26 +1,25 @@
 import path from "node:path";
-import pc from "picocolors";
 
 import { appError, type AppError } from "../core/errors.js";
 import { err, ok, type Result } from "../core/result.js";
-import type { CommandContext, CommandOutcome, RegistryItem } from "../types.js";
 import { extractDependencies } from "../domain/packCore.js";
+import type { CommandContext, CommandOutcome, RegistryItem } from "../types.js";
 
 async function getFilesRecursive(
   dir: string,
   context: CommandContext,
 ): Promise<Result<string[], AppError>> {
   const result: string[] = [];
-  
+
   async function scan(currentDir: string): Promise<Result<void, AppError>> {
     const dirRes = await context.runtime.fs.readdir(currentDir);
     if (!dirRes.ok) return dirRes;
-    
+
     for (const file of dirRes.value) {
       const fullPath = path.join(currentDir, file);
       const statRes = await context.runtime.fs.stat(fullPath);
       if (!statRes.ok) return statRes;
-      
+
       if (statRes.value.isDirectory()) {
         const scanRes = await scan(fullPath);
         if (!scanRes.ok) return scanRes;
@@ -46,7 +45,9 @@ export async function runPackCommand(
 
   const statRes = await context.runtime.fs.stat(targetDir);
   if (!statRes.ok || !statRes.value.isDirectory()) {
-    return err(appError("ValidationError", `Target is not a directory: ${targetDir}`));
+    return err(
+      appError("ValidationError", `Target is not a directory: ${targetDir}`),
+    );
   }
 
   context.runtime.prompt.info(`Scanning ${targetDir} for components...`);
@@ -89,9 +90,13 @@ export async function runPackCommand(
 
   const registry = { items };
   const outPath = path.join(context.cwd, "registry.json");
-  const writeRes = await context.runtime.fs.writeJson(outPath, registry, { spaces: 2 });
+  const writeRes = await context.runtime.fs.writeJson(outPath, registry, {
+    spaces: 2,
+  });
   if (!writeRes.ok) return err(writeRes.error);
 
-  context.runtime.prompt.success(`Packed ${items.length} components into registry.json`);
+  context.runtime.prompt.success(
+    `Packed ${items.length} components into registry.json`,
+  );
   return ok({ kind: "success", message: `Generated registry.json` });
 }
