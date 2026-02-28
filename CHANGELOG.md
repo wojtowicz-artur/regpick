@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.6.5](https://github.com/wojtowicz-artur/regpick/compare/v0.6.4...v0.6.5) (2026-02-28)
+
+### Code Refactoring
+
+* enhance config reading logic and improve prompt interface with async imports ([bcee748](https://github.com/wojtowicz-artur/regpick/commit/bcee7481ce0d97e0c6cae3d27ffe1ecb816c0f58))
+
 ## [0.6.4](https://github.com/wojtowicz-artur/regpick/compare/v0.6.3...v0.6.4) (2026-02-28)
 
 ### Code Refactoring

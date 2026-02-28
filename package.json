@@ -1,6 +1,6 @@
 {
   "name": "regpick",
-  "version": "0.6.4",
+  "version": "0.6.5",
   "description": "Lightweight CLI for selecting and installing registry entries.",
   "type": "module",
   "main": "./dist/index.mjs",
