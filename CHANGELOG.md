@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.6.6](https://github.com/wojtowicz-artur/regpick/compare/v0.6.5...v0.6.6) (2026-02-28)
+
+### Code Refactoring
+
+* improve code formatting and enhance GitHub URL handling in registry functions ([cfe4264](https://github.com/wojtowicz-artur/regpick/commit/cfe42641f73970eaf8f983b519f02fdb2259be9a))
+
 ## [0.6.5](https://github.com/wojtowicz-artur/regpick/compare/v0.6.4...v0.6.5) (2026-02-28)
 
 ### Code Refactoring
