@@ -52,12 +52,11 @@
     "prepare": "husky"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=20.12.0"
   },
   "dependencies": {
     "@clack/prompts": "^1.0.1",
     "diff": "^8.0.3",
-    "picocolors": "^1.1.1",
     "unconfig": "^7.5.0"
   },
   "devDependencies": {
