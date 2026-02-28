@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.6.3](https://github.com/wojtowicz-artur/regpick/compare/v0.6.2...v0.6.3) (2026-02-28)
+
+### Code Refactoring
+
+* lazy load command modules and improve runtime initialization ([930d80b](https://github.com/wojtowicz-artur/regpick/commit/930d80b487dcbd8c1a73f37c84be9c9f089ab3ff))
+
 ## [0.6.2](https://github.com/wojtowicz-artur/regpick/compare/v0.6.1...v0.6.2) (2026-02-28)
 
 ### Code Refactoring
