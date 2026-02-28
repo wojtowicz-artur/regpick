@@ -1,15 +1,9 @@
 import path from "node:path";
 import { styleText } from "node:util";
 
-import { runAddCommand } from "./commands/add.js";
-import { runInitCommand } from "./commands/init.js";
-import { runListCommand } from "./commands/list.js";
-import { runPackCommand } from "./commands/pack.js";
-import { runUpdateCommand } from "./commands/update.js";
 import { type AppError, toAppError } from "./core/errors.js";
 import type { Result } from "./core/result.js";
 import { parseCliArgs } from "./shell/cli/args.js";
-import { createRuntimePorts } from "./shell/runtime/ports.js";
 import type { CommandContext, CommandOutcome } from "./types.js";
 
 function printHelp(): void {
@@ -53,9 +47,16 @@ async function run(): Promise<void> {
     ),
   );
 
-  const runtime = createRuntimePorts({ signal: abortController.signal });
   const parsed = parseCliArgs(process.argv.slice(2));
   const command = parsed.positionals[0];
+
+  if (!command || parsed.flags.help) {
+    printHelp();
+    return;
+  }
+
+  const { createRuntimePorts } = await import("./shell/runtime/ports.js");
+  const runtime = createRuntimePorts({ signal: abortController.signal });
 
   if (!command || parsed.flags.help) {
     printHelp();
@@ -75,15 +76,25 @@ async function run(): Promise<void> {
   try {
     let result: Result<CommandOutcome, AppError>;
     if (command === "init") {
-      result = await runInitCommand(context);
+      result = await import("./commands/init.js").then((mod) =>
+        mod.runInitCommand(context),
+      );
     } else if (command === "list") {
-      result = await runListCommand(context);
+      result = await import("./commands/list.js").then((mod) =>
+        mod.runListCommand(context),
+      );
     } else if (command === "add") {
-      result = await runAddCommand(context);
+      result = await import("./commands/add.js").then((mod) =>
+        mod.runAddCommand(context),
+      );
     } else if (command === "update") {
-      result = await runUpdateCommand(context);
+      result = await import("./commands/update.js").then((mod) =>
+        mod.runUpdateCommand(context),
+      );
     } else if (command === "pack") {
-      result = await runPackCommand(context);
+      result = await import("./commands/pack.js").then((mod) =>
+        mod.runPackCommand(context),
+      );
     } else {
       runtime.prompt.error(`Unknown command: ${command}`);
       printHelp();
