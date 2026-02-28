@@ -12,6 +12,14 @@
   "dependencies": {
     "@astrojs/starlight": "^0.37.6",
     "astro": "^5.6.1",
-    "sharp": "^0.34.2"
+    "sharp": "^0.34.2",
+    "@astrojs/svelte": "^7.2.5",
+    "@threlte/core": "^8.4.0",
+    "@threlte/extras": "^9.8.1",
+    "svelte": "^5.53.6",
+    "three": "^0.183.2"
+  },
+  "devDependencies": {
+    "@types/three": "^0.183.1"
   }
 }
