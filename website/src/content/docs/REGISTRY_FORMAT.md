@@ -46,7 +46,25 @@ Whether it's inside an array in `registry.json` or as a standalone file in a dir
 - `files`: The source files for the component.
   - `path`: The path relative to the registry root (or the file itself if local).
   - `target` (optional): If `preferManifestTarget` is enabled in your config, `regpick` will use this path instead of the one inferred from `targetsByType`.
+  - `url` (optional): A remote URL for the file content. `regpick` automatically converts GitHub web URLs (`blob/...`) to raw content URLs.
   - `content` (optional): You can embed the file contents directly as a string to avoid additional network/file reads.
+
+## GitHub Integration
+
+`regpick` natively supports GitHub URLs. You can use standard "web" links to files in your manifest, and they will be automatically resolved to their raw counterparts:
+
+```json
+{
+  "name": "my-component",
+  "files": [
+    {
+      "url": "https://github.com/user/repo/blob/main/src/component.tsx"
+    }
+  ]
+}
+```
+
+This works for both the registry source itself and individual file URLs within the registry.
 
 ## The `pack` Command
 

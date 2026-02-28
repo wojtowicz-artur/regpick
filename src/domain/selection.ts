@@ -2,7 +2,9 @@ import { appError, type AppError } from "../core/errors.js";
 import { err, ok, type Result } from "../core/result.js";
 import type { CommandContext, RegistryItem } from "../types.js";
 
-export function parseSelectedNames(rawSelectFlag: string | boolean | undefined): string[] {
+export function parseSelectedNames(
+  rawSelectFlag: string | boolean | undefined,
+): string[] {
   if (!rawSelectFlag) {
     return [];
   }
@@ -13,7 +15,10 @@ export function parseSelectedNames(rawSelectFlag: string | boolean | undefined):
     .filter(Boolean);
 }
 
-export function filterItemsByQuery(items: RegistryItem[], query: string): RegistryItem[] {
+export function filterItemsByQuery(
+  items: RegistryItem[],
+  query: string,
+): RegistryItem[] {
   if (!query) {
     return items;
   }
@@ -28,7 +33,10 @@ export function filterItemsByQuery(items: RegistryItem[], query: string): Regist
   });
 }
 
-export function selectItemsFromFlags(items: RegistryItem[], context: CommandContext): Result<RegistryItem[] | null, AppError> {
+export function selectItemsFromFlags(
+  items: RegistryItem[],
+  context: CommandContext,
+): Result<RegistryItem[] | null, AppError> {
   const { flags } = context.args;
   const explicit = parseSelectedNames(flags.select);
   if (Boolean(flags.all)) {
@@ -38,7 +46,12 @@ export function selectItemsFromFlags(items: RegistryItem[], context: CommandCont
   if (explicit.length) {
     const selected = items.filter((item) => explicit.includes(item.name));
     if (!selected.length) {
-      return err(appError("ValidationError", `No items matched --select=${String(flags.select)}`));
+      return err(
+        appError(
+          "ValidationError",
+          `No items matched --select=${String(flags.select)}`,
+        ),
+      );
     }
     return ok(selected);
   }

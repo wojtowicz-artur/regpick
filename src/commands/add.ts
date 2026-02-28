@@ -2,15 +2,24 @@ import path from "node:path";
 
 import { appError, type AppError } from "../core/errors.js";
 import { err, ok, type Result } from "../core/result.js";
-import type { CommandContext, CommandOutcome, PlannedWrite, RegpickConfig, RegistryItem } from "../types.js";
 import { buildInstallPlan } from "../domain/addPlan.js";
+import { applyAliases } from "../domain/aliasCore.js";
 import { selectItemsFromFlags } from "../domain/selection.js";
 import { readConfig, resolveRegistrySource } from "../shell/config.js";
-import { resolveFileContent, loadRegistry } from "../shell/registry.js";
-import { collectMissingDependencies, installDependencies } from "../shell/installer.js";
+import {
+  collectMissingDependencies,
+  installDependencies,
+} from "../shell/installer.js";
+import { computeHash, readLockfile, writeLockfile } from "../shell/lockfile.js";
 import { resolvePackageManager } from "../shell/packageManagers/resolver.js";
-import { readLockfile, writeLockfile, computeHash } from "../shell/lockfile.js";
-import { applyAliases } from "../domain/aliasCore.js";
+import { loadRegistry, resolveFileContent } from "../shell/registry.js";
+import type {
+  CommandContext,
+  CommandOutcome,
+  PlannedWrite,
+  RegistryItem,
+  RegpickConfig,
+} from "../types.js";
 
 async function promptForSource(
   context: CommandContext,
@@ -22,10 +31,12 @@ async function promptForSource(
     return ok(resolveRegistrySource(argValue, config));
   }
 
-  const aliases = Object.entries(config.registries || {}).map(([alias, value]) => ({
-    label: `${alias} -> ${value}`,
-    value: alias,
-  }));
+  const aliases = Object.entries(config.registries || {}).map(
+    ([alias, value]) => ({
+      label: `${alias} -> ${value}`,
+      value: alias,
+    }),
+  );
 
   if (aliases.length) {
     const picked = await context.runtime.prompt.multiselect({
@@ -56,7 +67,9 @@ async function promptForSource(
   return ok(String(manual));
 }
 
-function mapOptions(items: RegistryItem[]): Array<{ value: string; label: string; hint: string }> {
+function mapOptions(
+  items: RegistryItem[],
+): Array<{ value: string; label: string; hint: string }> {
   return items.map((item) => ({
     value: item.name,
     label: `${item.name} (${item.type || "registry:file"})`,
@@ -84,7 +97,9 @@ async function promptForItems(
   }
 
   const selectedValues = Array.isArray(selectedNames) ? selectedNames : [];
-  const selectedSet = new Set(selectedValues.map((entry: string) => String(entry)));
+  const selectedSet = new Set(
+    selectedValues.map((entry: string) => String(entry)),
+  );
   return ok(items.filter((item) => selectedSet.has(item.name)));
 }
 
@@ -93,7 +108,11 @@ export async function runAddCommand(
 ): Promise<Result<CommandOutcome, AppError>> {
   const assumeYes = Boolean(context.args.flags.yes);
   const { config } = await readConfig(context.cwd);
-  const sourceResult = await promptForSource(context, config, context.args.positionals);
+  const sourceResult = await promptForSource(
+    context,
+    config,
+    context.args.positionals,
+  );
   if (!sourceResult.ok) {
     return sourceResult;
   }
@@ -102,7 +121,11 @@ export async function runAddCommand(
     return ok({ kind: "noop", message: "No registry source provided." });
   }
 
-  const registryResult = await loadRegistry(source, context.cwd, context.runtime);
+  const registryResult = await loadRegistry(
+    source,
+    context.cwd,
+    context.runtime,
+  );
   if (!registryResult.ok) {
     return registryResult;
   }
@@ -113,7 +136,10 @@ export async function runAddCommand(
   }
 
   const preselected = selectItemsFromFlags(items, context);
-  const promptedSelectionResult = preselected.ok && preselected.value ? preselected : await promptForItems(context, items);
+  const promptedSelectionResult =
+    preselected.ok && preselected.value
+      ? preselected
+      : await promptForItems(context, items);
   if (!promptedSelectionResult.ok) {
     return promptedSelectionResult;
   }
@@ -136,17 +162,26 @@ export async function runAddCommand(
   }
 
   const existingTargets = new Set<string>();
-  const installPlanProbeRes = buildInstallPlan(selectedItems, context.cwd, config);
+  const installPlanProbeRes = buildInstallPlan(
+    selectedItems,
+    context.cwd,
+    config,
+  );
   if (!installPlanProbeRes.ok) return installPlanProbeRes;
   const installPlanProbe = installPlanProbeRes.value;
-  
+
   for (const write of installPlanProbe.plannedWrites) {
     if (await context.runtime.fs.pathExists(write.absoluteTarget)) {
       existingTargets.add(write.absoluteTarget);
     }
   }
 
-  const installPlanRes = buildInstallPlan(selectedItems, context.cwd, config, existingTargets);
+  const installPlanRes = buildInstallPlan(
+    selectedItems,
+    context.cwd,
+    config,
+    existingTargets,
+  );
   if (!installPlanRes.ok) return installPlanRes;
   const installPlan = installPlanRes.value;
 
@@ -157,7 +192,9 @@ export async function runAddCommand(
       if (assumeYes || config.overwritePolicy === "overwrite") {
         finalWrites.push(write);
       } else if (config.overwritePolicy === "skip") {
-        context.runtime.prompt.warn(`Skipped existing file: ${write.absoluteTarget}`);
+        context.runtime.prompt.warn(
+          `Skipped existing file: ${write.absoluteTarget}`,
+        );
       } else {
         const answer = await context.runtime.prompt.select({
           message: `File exists: ${write.absoluteTarget}`,
@@ -168,7 +205,9 @@ export async function runAddCommand(
           ],
         });
         if (context.runtime.prompt.isCancel(answer) || answer === "abort") {
-          return err(appError("UserCancelled", "Installation aborted by user."));
+          return err(
+            appError("UserCancelled", "Installation aborted by user."),
+          );
         }
         if (answer === "overwrite") {
           finalWrites.push(write);
@@ -180,24 +219,38 @@ export async function runAddCommand(
   }
 
   // --- UI INTERACTION PHASE: Gather Dependency Decisions ---
-  const { missingDependencies, missingDevDependencies } = collectMissingDependencies(selectedItems, context.cwd, context.runtime);
+  const { missingDependencies, missingDevDependencies } =
+    collectMissingDependencies(selectedItems, context.cwd, context.runtime);
   let shouldInstallDeps = false;
   if (missingDependencies.length || missingDevDependencies.length) {
     if (assumeYes) {
       shouldInstallDeps = true;
     } else {
-      const packageManager = resolvePackageManager(context.cwd, config.packageManager, context.runtime);
+      const packageManager = resolvePackageManager(
+        context.cwd,
+        config.packageManager,
+        context.runtime,
+      );
       const messageParts: string[] = [];
-      if (missingDependencies.length) messageParts.push(`dependencies: ${missingDependencies.join(", ")}`);
-      if (missingDevDependencies.length) messageParts.push(`devDependencies: ${missingDevDependencies.join(", ")}`);
-      
+      if (missingDependencies.length)
+        messageParts.push(`dependencies: ${missingDependencies.join(", ")}`);
+      if (missingDevDependencies.length)
+        messageParts.push(
+          `devDependencies: ${missingDevDependencies.join(", ")}`,
+        );
+
       const proceed = await context.runtime.prompt.confirm({
         message: `Install missing packages with ${packageManager}? (${messageParts.join(" | ")})`,
         initialValue: true,
       });
 
       if (context.runtime.prompt.isCancel(proceed)) {
-        return err(appError("UserCancelled", "Dependency installation cancelled by user."));
+        return err(
+          appError(
+            "UserCancelled",
+            "Dependency installation cancelled by user.",
+          ),
+        );
       }
       shouldInstallDeps = Boolean(proceed);
       if (!shouldInstallDeps) {
@@ -215,23 +268,34 @@ export async function runAddCommand(
     const item = selectedItems.find((entry) => entry.name === write.itemName);
     if (!item) continue;
 
-    const contentResult = await resolveFileContent(write.sourceFile, item, context.cwd, context.runtime);
+    const contentResult = await resolveFileContent(
+      write.sourceFile,
+      item,
+      context.cwd,
+      context.runtime,
+    );
     if (!contentResult.ok) {
       return contentResult;
     }
 
     let content = applyAliases(contentResult.value, config);
 
-    const ensureRes = await context.runtime.fs.ensureDir(path.dirname(write.absoluteTarget));
+    const ensureRes = await context.runtime.fs.ensureDir(
+      path.dirname(write.absoluteTarget),
+    );
     if (!ensureRes.ok) return ensureRes;
-    const writeRes = await context.runtime.fs.writeFile(write.absoluteTarget, content, "utf8");
+    const writeRes = await context.runtime.fs.writeFile(
+      write.absoluteTarget,
+      content,
+      "utf8",
+    );
     if (!writeRes.ok) return writeRes;
-    
+
     // Update lockfile
     const contentHash = computeHash(content);
     if (!hashesAcc[item.name]) hashesAcc[item.name] = [];
     hashesAcc[item.name].push(contentHash);
-    
+
     writtenFiles += 1;
     context.runtime.prompt.success(`Wrote ${write.relativeTarget}`);
   }
@@ -248,12 +312,24 @@ export async function runAddCommand(
   }
 
   if (shouldInstallDeps) {
-    const packageManager = resolvePackageManager(context.cwd, config.packageManager, context.runtime);
-    const depsRes = installDependencies(context.cwd, packageManager, missingDependencies, missingDevDependencies, context.runtime);
+    const packageManager = resolvePackageManager(
+      context.cwd,
+      config.packageManager,
+      context.runtime,
+    );
+    const depsRes = installDependencies(
+      context.cwd,
+      packageManager,
+      missingDependencies,
+      missingDevDependencies,
+      context.runtime,
+    );
     if (!depsRes.ok) return depsRes;
   }
 
-  context.runtime.prompt.info(`Installed ${selectedItems.length} item(s), wrote ${writtenFiles} file(s).`);
+  context.runtime.prompt.info(
+    `Installed ${selectedItems.length} item(s), wrote ${writtenFiles} file(s).`,
+  );
   return ok({
     kind: "success",
     message: `Installed ${selectedItems.length} item(s), wrote ${writtenFiles} file(s).`,

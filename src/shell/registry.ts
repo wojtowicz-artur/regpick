@@ -1,14 +1,32 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import type { RegistryFile, RegistryItem, RegistrySourceMeta } from "../types.js";
 import { appError, type AppError } from "../core/errors.js";
 import { err, ok, type Result } from "../core/result.js";
-import { extractItemReferences, normalizeItem, normalizeManifestInline } from "../domain/registryModel.js";
+import {
+  extractItemReferences,
+  normalizeItem,
+  normalizeManifestInline,
+} from "../domain/registryModel.js";
 import type { RuntimePorts } from "../shell/runtime/ports.js";
+import type {
+  RegistryFile,
+  RegistryItem,
+  RegistrySourceMeta,
+} from "../types.js";
 
 function isHttpUrl(value: string): boolean {
   return /^https?:\/\//i.test(value);
+}
+
+function normalizeGitHubUrl(url: string): string {
+  if (!url.includes("github.com")) return url;
+
+  // matches: https://github.com/user/repo/blob/branch/path/to/file
+  // matches: https://github.com/user/repo/tree/branch/path/to/dir
+  return url
+    .replace(/^https?:\/\/github\.com\//, "https://raw.githubusercontent.com/")
+    .replace(/\/(blob|tree)\//, "/");
 }
 
 function isFileUrl(value: string): boolean {
@@ -34,7 +52,7 @@ async function normalizeManifest(
   if (!references.length) {
     return inlineItemsRes;
   }
-  
+
   const inlineItems = inlineItemsRes.ok ? inlineItemsRes.value : [];
 
   const resolvedItems: RegistryItem[] = [];
@@ -45,32 +63,53 @@ async function normalizeManifest(
       if (!res.ok) return err(res.error);
       itemData = res.value;
     } else if (sourceMeta.type === "http" && sourceMeta.baseUrl) {
-      const res = await runtime.http.getJson(joinUrl(sourceMeta.baseUrl, itemRef));
+      const res = await runtime.http.getJson(
+        joinUrl(sourceMeta.baseUrl, itemRef),
+      );
       if (!res.ok) return err(res.error);
       itemData = res.value;
-    } else if ((sourceMeta.type === "file" || sourceMeta.type === "directory") && sourceMeta.baseDir) {
-      const res = await runtime.fs.readFile(path.resolve(sourceMeta.baseDir, itemRef), "utf8");
+    } else if (
+      (sourceMeta.type === "file" || sourceMeta.type === "directory") &&
+      sourceMeta.baseDir
+    ) {
+      const res = await runtime.fs.readFile(
+        path.resolve(sourceMeta.baseDir, itemRef),
+        "utf8",
+      );
       if (!res.ok) return err(res.error);
-      try { itemData = JSON.parse(res.value); } catch { return err(appError("RegistryError", `Invalid JSON: ${itemRef}`)); }
+      try {
+        itemData = JSON.parse(res.value);
+      } catch {
+        return err(appError("RegistryError", `Invalid JSON: ${itemRef}`));
+      }
     } else {
       const res = await runtime.fs.readFile(path.resolve(itemRef), "utf8");
       if (!res.ok) return err(res.error);
-      try { itemData = JSON.parse(res.value); } catch { return err(appError("RegistryError", `Invalid JSON: ${itemRef}`)); }
+      try {
+        itemData = JSON.parse(res.value);
+      } catch {
+        return err(appError("RegistryError", `Invalid JSON: ${itemRef}`));
+      }
     }
 
     if (itemData && typeof itemData === "object") {
-      resolvedItems.push(normalizeItem(itemData as Record<string, unknown>, sourceMeta));
+      resolvedItems.push(
+        normalizeItem(itemData as Record<string, unknown>, sourceMeta),
+      );
     }
   }
 
   return ok([...inlineItems, ...resolvedItems]);
 }
 
-async function loadDirectoryRegistry(directoryPath: string, runtime: RuntimePorts): Promise<Result<RegistryItem[], AppError>> {
+async function loadDirectoryRegistry(
+  directoryPath: string,
+  runtime: RuntimePorts,
+): Promise<Result<RegistryItem[], AppError>> {
   const absoluteDir = path.resolve(directoryPath);
   const dirRes = await runtime.fs.readdir(absoluteDir);
   if (!dirRes.ok) return err(dirRes.error);
-  
+
   const files = dirRes.value;
   const jsonFiles = files.filter((file) => file.endsWith(".json"));
 
@@ -79,14 +118,27 @@ async function loadDirectoryRegistry(directoryPath: string, runtime: RuntimePort
     const fullPath = path.join(absoluteDir, fileName);
     const readRes = await runtime.fs.readFile(fullPath, "utf8");
     if (!readRes.ok) return err(readRes.error);
-    
+
     let parsed: unknown;
-    try { parsed = JSON.parse(readRes.value); } catch { continue; }
-    
-    if (!parsed || typeof parsed !== "object" || !Array.isArray((parsed as Record<string, unknown>).files)) {
+    try {
+      parsed = JSON.parse(readRes.value);
+    } catch {
       continue;
     }
-    items.push(normalizeItem(parsed as Record<string, unknown>, { type: "directory", baseDir: absoluteDir }));
+
+    if (
+      !parsed ||
+      typeof parsed !== "object" ||
+      !Array.isArray((parsed as Record<string, unknown>).files)
+    ) {
+      continue;
+    }
+    items.push(
+      normalizeItem(parsed as Record<string, unknown>, {
+        type: "directory",
+        baseDir: absoluteDir,
+      }),
+    );
   }
 
   return ok(items);
@@ -101,21 +153,34 @@ export async function loadRegistry(
     return err(appError("ValidationError", "Registry source is required."));
   }
 
-  const resolved = isHttpUrl(source) || isFileUrl(source) ? source : path.resolve(cwd, source);
+  const resolved =
+    isHttpUrl(source) || isFileUrl(source)
+      ? normalizeGitHubUrl(source)
+      : path.resolve(cwd, source);
 
   if (isHttpUrl(resolved)) {
     const dataRes = await runtime.http.getJson(resolved);
     if (!dataRes.ok) return err(dataRes.error);
-    const baseUrl = resolved.endsWith("/") ? resolved : resolved.replace(/[^/]*$/, "");
-    const itemsRes = await normalizeManifest(dataRes.value, { type: "http", baseUrl }, runtime);
+    const baseUrl = resolved.endsWith("/")
+      ? resolved
+      : resolved.replace(/[^/]*$/, "");
+    const itemsRes = await normalizeManifest(
+      dataRes.value,
+      { type: "http", baseUrl },
+      runtime,
+    );
     if (!itemsRes.ok) return err(itemsRes.error);
     return ok({ items: itemsRes.value, source: resolved });
   }
 
-  const fileSystemPath = isFileUrl(resolved) ? fileURLToPath(new URL(resolved)) : path.resolve(resolved);
+  const fileSystemPath = isFileUrl(resolved)
+    ? fileURLToPath(new URL(resolved))
+    : path.resolve(resolved);
   const statsRes = await runtime.fs.stat(fileSystemPath);
   if (!statsRes.ok) {
-    return err(appError("RegistryError", `Registry source not found: ${source}`));
+    return err(
+      appError("RegistryError", `Registry source not found: ${source}`),
+    );
   }
   const stats = statsRes.value;
 
@@ -127,12 +192,14 @@ export async function loadRegistry(
 
   const readRes = await runtime.fs.readFile(fileSystemPath, "utf8");
   if (!readRes.ok) return err(readRes.error);
-  
+
   let parsed: unknown;
   try {
     parsed = JSON.parse(readRes.value);
   } catch (cause) {
-    return err(appError("RegistryError", "Failed to parse registry JSON.", cause));
+    return err(
+      appError("RegistryError", "Failed to parse registry JSON.", cause),
+    );
   }
 
   const itemsRes = await normalizeManifest(
@@ -143,7 +210,7 @@ export async function loadRegistry(
     },
     runtime,
   );
-  
+
   if (!itemsRes.ok) return err(itemsRes.error);
   return ok({ items: itemsRes.value, source: fileSystemPath });
 }
@@ -161,15 +228,24 @@ export async function resolveFileContent(
   const targetPathOrUrl = file.url || file.path;
 
   if (!targetPathOrUrl) {
-    return err(appError("ValidationError", `File entry in "${item.name}" is missing both content and path/url.`));
+    return err(
+      appError(
+        "ValidationError",
+        `File entry in "${item.name}" is missing both content and path/url.`,
+      ),
+    );
   }
 
-  if (isHttpUrl(targetPathOrUrl)) {
-    return await runtime.http.getText(targetPathOrUrl);
+  const normalizedTarget = isHttpUrl(targetPathOrUrl)
+    ? normalizeGitHubUrl(targetPathOrUrl)
+    : targetPathOrUrl;
+
+  if (isHttpUrl(normalizedTarget)) {
+    return await runtime.http.getText(normalizedTarget);
   }
 
   if (item.sourceMeta.type === "http" && item.sourceMeta.baseUrl) {
-    const remoteUrl = joinUrl(item.sourceMeta.baseUrl, targetPathOrUrl);
+    const remoteUrl = joinUrl(item.sourceMeta.baseUrl, normalizedTarget);
     return await runtime.http.getText(remoteUrl);
   }
 
