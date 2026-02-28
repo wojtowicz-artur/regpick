@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.6.2](https://github.com/wojtowicz-artur/regpick/compare/v0.6.1...v0.6.2) (2026-02-28)
+
+### Code Refactoring
+
+* clean up formatting and improve readability in pack.ts ([519401f](https://github.com/wojtowicz-artur/regpick/commit/519401faa28a3478ff47c92eee23b0eb32339118))
+
 ## [0.6.1](https://github.com/wojtowicz-artur/regpick/compare/v0.6.0...v0.6.1) (2026-02-28)
 
 ### Bug Fixes
