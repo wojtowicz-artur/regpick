@@ -1,0 +1,28 @@
+[
+  {
+    "name": "shadcn-button",
+    "title": "Shadcn Button",
+    "description": "Button component from shadcn/ui",
+    "type": "registry:component",
+    "files": [
+      {
+        "type": "registry:file",
+        "url": "https://raw.githubusercontent.com/shadcn/ui/main/components/button.tsx",
+        "target": "components/ui/button.tsx"
+      }
+    ]
+  },
+  {
+    "name": "shadcn-icon-plus",
+    "title": "Shadcn Plus Icon",
+    "description": "Icon from shadcn/ui",
+    "type": "registry:icon",
+    "files": [
+      {
+        "type": "registry:file",
+        "url": "https://raw.githubusercontent.com/shadcn/ui/main/icons/plus.tsx",
+        "target": "components/ui/icons/plus.tsx"
+      }
+    ]
+  }
+]

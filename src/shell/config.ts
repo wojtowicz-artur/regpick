@@ -1,6 +1,6 @@
-import path from "node:path";
 import fs from "node:fs/promises";
-import { cosmiconfig } from "cosmiconfig";
+import path from "node:path";
+import { loadConfig } from "unconfig";
 
 import type { RegpickConfig } from "../types.js";
 
@@ -28,20 +28,23 @@ export async function readConfig(cwd: string): Promise<{
   config: RegpickConfig;
   configPath: string | null;
 }> {
-  const explorer = cosmiconfig("regpick", {
-    searchPlaces: ["regpick.json", ".regpickrc", ".regpickrc.json"],
+  const { config, sources } = await loadConfig<RegpickConfig>({
+    sources: [
+      {
+        files: ["regpick", ".regpickrc", "regpickrc"],
+        extensions: ["json", ""],
+      },
+    ],
+    defaults: DEFAULT_CONFIG,
+    cwd,
   });
 
-  const result = await explorer.search(cwd);
-
-  if (!result || !result.config) {
+  if (!sources.length) {
     return {
       config: { ...DEFAULT_CONFIG },
       configPath: null,
     };
   }
-
-  const config = result.config as Partial<RegpickConfig>;
 
   return {
     config: {
@@ -60,7 +63,7 @@ export async function readConfig(cwd: string): Promise<{
         ...(config.aliases || {}),
       },
     },
-    configPath: result.filepath,
+    configPath: sources[0],
   };
 }
 
@@ -77,7 +80,7 @@ export async function writeConfig(
   { overwrite = false }: { overwrite?: boolean } = {},
 ): Promise<{ filePath: string; written: boolean }> {
   const filePath = getConfigPath(cwd);
-  
+
   let exists = false;
   try {
     await fs.access(filePath);
@@ -92,7 +95,10 @@ export async function writeConfig(
   return { filePath, written: true };
 }
 
-export function resolveRegistrySource(input: string | undefined, config: RegpickConfig): string | null {
+export function resolveRegistrySource(
+  input: string | undefined,
+  config: RegpickConfig,
+): string | null {
   if (!input) {
     return null;
   }

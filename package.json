@@ -14,9 +14,22 @@
   ],
   "keywords": [
     "cli",
-    "registry",
+    "component-registry",
+    "component-library",
+    "developer-tool",
+    "design-system",
+    "frontend-tooling",
+    "icon-registry",
+    "react-components",
     "shadcn",
-    "components"
+    "shadcn-ui",
+    "svg-icons",
+    "tailwind",
+    "ui-components",
+    "package-installer",
+    "registry",
+    "components",
+    "copy"
   ],
   "author": "",
   "license": "MIT",
@@ -43,9 +56,9 @@
   },
   "dependencies": {
     "@clack/prompts": "^1.0.1",
-    "cosmiconfig": "^9.0.0",
     "diff": "^8.0.3",
-    "picocolors": "^1.1.1"
+    "picocolors": "^1.1.1",
+    "unconfig": "^7.5.0"
   },
   "devDependencies": {
     "@commitlint/cli": "^20.4.2",
