@@ -17,12 +17,58 @@ import type {
   RegpickConfig,
 } from "@/types.js";
 
-async function promptForSource(
+type AddPlanInteractionState = {
+  selectedItems: RegistryItem[];
+  missingDependencies: string[];
+  missingDevDependencies: string[];
+  plannedWrites: PlannedWrite[];
+  existingTargets: Set<string>;
+};
+
+type ApprovedAddPlan = {
+  selectedItems: RegistryItem[];
+  shouldInstallDeps: boolean;
+  finalWrites: PlannedWrite[];
+  dependencyPlan: { dependencies: string[]; devDependencies: string[] }; // Combination of normal & dev
+};
+
+type HydratedAddPlan = ApprovedAddPlan & {
+  // Contains the literal file content fully prepared, downloaded, and aliases applied
+  hydratedWrites: { absoluteTarget: string; finalContent: string; itemName: string }[];
+};
+
+/**
+ * Loads the configuration required for the add command.
+ * Pure query phase.
+ *
+ * @param context - Command context.
+ * @returns Result with configuration and path.
+ */
+async function queryLoadConfiguration(
+  context: CommandContext,
+): Promise<Result<{ config: RegpickConfig; configPath: string }, AppError>> {
+  const result = await readConfig(context.cwd);
+  if (!result.configPath) {
+    context.runtime.prompt.error("No regpick.json configuration found. Please run 'init' first.");
+    return err(appError("ValidationError", "No config file found"));
+  }
+  return ok(result as { config: RegpickConfig; configPath: string });
+}
+
+/**
+ * Resolves the target registry source URL, alias, or local path.
+ *
+ * @param context - Command context.
+ * @param config - Application configuration.
+ * @returns Result with the registry source string.
+ */
+async function queryResolveRegistrySource(
   context: CommandContext,
   config: RegpickConfig,
-  positionals: string[],
 ): Promise<Result<string | null, AppError>> {
-  const argValue = positionals[1];
+  const sourcePosIdx = context.args.positionals[0] === "add" ? 1 : 0;
+  const argValue = context.args.positionals[sourcePosIdx];
+
   if (argValue) {
     return ok(resolveRegistrySource(argValue, config));
   }
@@ -40,8 +86,7 @@ async function promptForSource(
       required: false,
     });
 
-    const isCancel = await context.runtime.prompt.isCancel(picked);
-    if (isCancel) {
+    if (await context.runtime.prompt.isCancel(picked)) {
       return err(appError("UserCancelled", "Operation cancelled."));
     }
 
@@ -55,152 +100,161 @@ async function promptForSource(
     placeholder: "https://example.com/registry.json",
   });
 
-  const isManualCancel = await context.runtime.prompt.isCancel(manual);
-  if (isManualCancel) {
+  if (await context.runtime.prompt.isCancel(manual)) {
     return err(appError("UserCancelled", "Operation cancelled."));
   }
 
   return ok(String(manual));
 }
 
-function mapOptions(items: RegistryItem[]): Array<{ value: string; label: string; hint: string }> {
-  return items.map((item) => ({
-    value: item.name,
-    label: `${item.name} (${item.type || "registry:file"})`,
-    hint: item.description || `${item.files.length} file(s)`,
-  }));
+interface QueryItemsResult {
+  selectedItems: RegistryItem[];
+  missingRegistryDeps: string[];
 }
 
-async function promptForItems(
+/**
+ * Fetches the registry and identifies items selected for installation.
+ *
+ * @param context - Command context.
+ * @param source - Registry HTTP URL or local path.
+ * @returns Result containing selected items and missing dependencies.
+ */
+async function queryRegistryItemsToProcess(
   context: CommandContext,
-  items: RegistryItem[],
-): Promise<Result<RegistryItem[], AppError>> {
-  if (!items.length) {
-    return ok([]);
-  }
-
-  const selectedNames = await context.runtime.prompt.autocompleteMultiselect({
-    message: "Select items to install",
-    options: mapOptions(items),
-    maxItems: 10,
-    required: true,
-  });
-
-  const isCancel = await context.runtime.prompt.isCancel(selectedNames);
-  if (isCancel) {
-    return err(appError("UserCancelled", "Operation cancelled."));
-  }
-
-  const selectedValues = Array.isArray(selectedNames) ? selectedNames : [];
-  const selectedSet = new Set(selectedValues.map((entry: string) => String(entry)));
-  return ok(items.filter((item) => selectedSet.has(item.name)));
-}
-
-export async function runAddCommand(
-  context: CommandContext,
-): Promise<Result<CommandOutcome, AppError>> {
-  const assumeYes = Boolean(context.args.flags.yes);
-  const { config, configPath } = await readConfig(context.cwd);
-
-  if (!configPath) {
-    context.runtime.prompt.error("No regpick.json configuration found. Please run 'init' first.");
-    return err(appError("ValidationError", "No config file found"));
-  }
-
+  source: string,
+): Promise<Result<QueryItemsResult, AppError>> {
   const sourcePosIdx = context.args.positionals[0] === "add" ? 1 : 0;
   const itemPosIdx = sourcePosIdx + 1;
 
-  const sourceResult = await promptForSource(context, config, context.args.positionals);
-  if (!sourceResult.ok) {
-    return sourceResult;
-  }
-  const source = sourceResult.value;
-  if (!source) {
-    return ok({ kind: "noop", message: "No registry source provided." });
-  }
-
   const registryResult = await loadRegistry(source, context.cwd, context.runtime);
-  if (!registryResult.ok) {
-    return registryResult;
-  }
-  let { items } = registryResult.value;
+  if (!registryResult.ok) return registryResult;
+
+  const { items } = registryResult.value;
   if (!items.length) {
     context.runtime.prompt.warn("No installable items in registry.");
-    return ok({ kind: "noop", message: "No installable items in registry." });
+    return err(appError("ValidationError", "No installable items in registry."));
   }
 
-  // If item name is passed as positional, pre-select it
   const itemName = context.args.positionals[itemPosIdx];
   if (itemName && !context.args.flags.select) {
     context.args.flags.select = itemName;
   }
 
   const preselected = selectItemsFromFlags(items, context);
-
   let selectedItems: RegistryItem[];
+
   if (preselected.ok && preselected.value) {
     selectedItems = preselected.value;
   } else if (!preselected.ok) {
-    return preselected;
+    return err(preselected.error);
   } else {
-    const promptedSelectionResult = await promptForItems(context, items);
-    if (!promptedSelectionResult.ok) {
-      return promptedSelectionResult;
+    const selectedNames = await context.runtime.prompt.autocompleteMultiselect({
+      message: "Select items to install",
+      options: items.map((item) => ({
+        value: item.name,
+        label: `${item.name} (${item.type || "registry:file"})`,
+        hint: item.description || `${item.files.length} file(s)`,
+      })),
+      maxItems: 10,
+      required: true,
+    });
+
+    if (await context.runtime.prompt.isCancel(selectedNames)) {
+      return err(appError("UserCancelled", "Operation cancelled."));
     }
-    selectedItems = promptedSelectionResult.value;
+
+    const selectedSet = new Set((Array.isArray(selectedNames) ? selectedNames : []).map(String));
+    selectedItems = items.filter((item) => selectedSet.has(item.name));
+  }
+
+  if (!selectedItems.length) {
+    context.runtime.prompt.warn("No items selected.");
+    return err(appError("ValidationError", "No items selected."));
   }
 
   const { resolvedItems, missingDependencies: missingRegistryDeps } = resolveRegistryDependencies(
     selectedItems,
     items,
   );
-  selectedItems = resolvedItems;
 
-  for (const depName of missingRegistryDeps) {
-    context.runtime.prompt.warn(`Registry dependency "${depName}" not found in current registry.`);
+  return ok({ selectedItems: resolvedItems, missingRegistryDeps });
+}
+
+/**
+ * Constructs the initial installation plan including structural dependencies and conflicts.
+ *
+ * @param context - Command context.
+ * @param config - Application configuration.
+ * @param selectedItems - Registry items to install.
+ * @returns Result with interaction state payload.
+ */
+async function queryInstallPlanState(
+  context: CommandContext,
+  config: RegpickConfig,
+  selectedItems: RegistryItem[],
+): Promise<Result<AddPlanInteractionState, AppError>> {
+  const installPlanProbeRes = buildInstallPlan(selectedItems, context.cwd, config);
+  if (!installPlanProbeRes.ok)
+    return err(installPlanProbeRes.error);
+
+  const existingTargets = new Set<string>();
+  const probeWrites = installPlanProbeRes.value.plannedWrites;
+
+  for (const write of probeWrites) {
+    const exists = await context.runtime.fs.pathExists(write.absoluteTarget);
+    if (exists) existingTargets.add(write.absoluteTarget);
   }
 
-  if (!selectedItems || !selectedItems.length) {
-    context.runtime.prompt.warn("No items selected.");
-    return ok({ kind: "noop", message: "No items selected." });
-  }
+  const finalInstallPlanRes = buildInstallPlan(selectedItems, context.cwd, config, existingTargets);
+  if (!finalInstallPlanRes.ok)
+    return err(finalInstallPlanRes.error);
 
+  const { missingDependencies, missingDevDependencies } = collectMissingDependencies(
+    selectedItems,
+    context.cwd,
+    context.runtime,
+  );
+
+  return ok({
+    selectedItems,
+    missingDependencies,
+    missingDevDependencies,
+    plannedWrites: finalInstallPlanRes.value.plannedWrites,
+    existingTargets,
+  });
+}
+
+/**
+ * Prompts the user to resolve overrides, permissions, and dependencies installation.
+ * Pure UI interaction boundary.
+ *
+ * @param context - Command context.
+ * @param config - Application configuration.
+ * @param state - The current pre-calculated installation state.
+ * @returns Result with an approved action plan.
+ */
+async function interactApprovalPhase(
+  context: CommandContext,
+  config: RegpickConfig,
+  state: AddPlanInteractionState,
+): Promise<Result<ApprovedAddPlan, AppError>> {
+  const assumeYes = Boolean(context.args.flags.yes);
+
+  // 1. Confirm overall installation
   if (!assumeYes) {
     const proceed = await context.runtime.prompt.confirm({
-      message: `Install ${selectedItems.length} item(s)?`,
+      message: `Install ${state.selectedItems.length} item(s)?`,
       initialValue: true,
     });
-
-    const isProceedCancel = await context.runtime.prompt.isCancel(proceed);
-    if (isProceedCancel || !proceed) {
+    if ((await context.runtime.prompt.isCancel(proceed)) || !proceed) {
       return err(appError("UserCancelled", "Operation cancelled."));
     }
   }
 
-  const existingTargets = new Set<string>();
-  const installPlanProbeRes = buildInstallPlan(selectedItems, context.cwd, config);
-  if (!installPlanProbeRes.ok) return installPlanProbeRes;
-  const installPlanProbe = installPlanProbeRes.value;
-
-  const existingTargetsArray = await Promise.all(
-    installPlanProbe.plannedWrites.map(async (write) => {
-      const exists = await context.runtime.fs.pathExists(write.absoluteTarget);
-      return exists ? write.absoluteTarget : null;
-    }),
-  );
-
-  for (const target of existingTargetsArray) {
-    if (target) existingTargets.add(target);
-  }
-
-  const installPlanRes = buildInstallPlan(selectedItems, context.cwd, config, existingTargets);
-  if (!installPlanRes.ok) return installPlanRes;
-  const installPlan = installPlanRes.value;
-
-  // --- UI INTERACTION PHASE: Gather Overwrite Decisions ---
+  // 2. Interaction: File Overwrites
   const finalWrites: PlannedWrite[] = [];
-  for (const write of installPlan.plannedWrites) {
-    if (existingTargets.has(write.absoluteTarget)) {
+  for (const write of state.plannedWrites) {
+    if (state.existingTargets.has(write.absoluteTarget)) {
       if (assumeYes || config.overwritePolicy === "overwrite") {
         finalWrites.push(write);
       } else if (config.overwritePolicy === "skip") {
@@ -215,64 +269,73 @@ export async function runAddCommand(
           ],
         });
 
-        const isAnswerCancel = await context.runtime.prompt.isCancel(answer);
-        if (isAnswerCancel || answer === "abort") {
+        if ((await context.runtime.prompt.isCancel(answer)) || answer === "abort") {
           return err(appError("UserCancelled", "Installation aborted by user."));
         }
-        if (answer === "overwrite") {
-          finalWrites.push(write);
-        }
+        if (answer === "overwrite") finalWrites.push(write);
       }
     } else {
       finalWrites.push(write);
     }
   }
 
-  // --- UI INTERACTION PHASE: Gather Dependency Decisions ---
-  const { missingDependencies, missingDevDependencies } = collectMissingDependencies(
-    selectedItems,
-    context.cwd,
-    context.runtime,
-  );
+  // 3. Interaction: Dependencies
   let shouldInstallDeps = false;
-  if (missingDependencies.length || missingDevDependencies.length) {
+  if (state.missingDependencies.length || state.missingDevDependencies.length) {
     if (assumeYes) {
       shouldInstallDeps = true;
     } else {
-      const packageManager = resolvePackageManager(
-        context.cwd,
-        config.packageManager,
-        context.runtime,
-      );
-      const messageParts: string[] = [];
-      if (missingDependencies.length)
-        messageParts.push(`dependencies: ${missingDependencies.join(", ")}`);
-      if (missingDevDependencies.length)
-        messageParts.push(`devDependencies: ${missingDevDependencies.join(", ")}`);
+      const pm = resolvePackageManager(context.cwd, config.packageManager, context.runtime);
+      const msgParts: string[] = [];
+      if (state.missingDependencies.length)
+        msgParts.push(`dependencies: ${state.missingDependencies.join(", ")}`);
+      if (state.missingDevDependencies.length)
+        msgParts.push(`devDependencies: ${state.missingDevDependencies.join(", ")}`);
 
-      const proceed = await context.runtime.prompt.confirm({
-        message: `Install missing packages with ${packageManager}? (${messageParts.join(" | ")})`,
+      const proceedDep = await context.runtime.prompt.confirm({
+        message: `Install missing packages with ${pm}? (${msgParts.join(" | ")})`,
         initialValue: true,
       });
 
-      const isProceedCancel = await context.runtime.prompt.isCancel(proceed);
-      if (isProceedCancel) {
+      if (await context.runtime.prompt.isCancel(proceedDep)) {
         return err(appError("UserCancelled", "Dependency installation cancelled by user."));
       }
-      shouldInstallDeps = Boolean(proceed);
+      shouldInstallDeps = Boolean(proceedDep);
       if (!shouldInstallDeps) {
         context.runtime.prompt.warn("Skipped dependency installation.");
       }
     }
   }
 
-  // --- EXECUTION PHASE: Pure IO without UI interruptions ---
-  const sagaSteps: TransactionStep<any>[] = [];
-  const installedItemsInfo: RegistryItem[] = [];
-  let writtenFiles = 0;
+  return ok({
+    selectedItems: state.selectedItems,
+    shouldInstallDeps,
+    finalWrites,
+    dependencyPlan: {
+      dependencies: state.missingDependencies,
+      devDependencies: state.missingDevDependencies,
+    },
+  });
+}
 
-  for (const write of finalWrites) {
-    const item = selectedItems.find((entry) => entry.name === write.itemName);
+/**
+ * Resolves and fetches the targeted file contents over network or disk.
+ * Pre-loads all required remote IO before executing Saga transactions.
+ *
+ * @param context - Command context.
+ * @param config - Application configuration.
+ * @param approved - The user-approved installation plan.
+ * @returns Result with hydrated payload containing raw file texts.
+ */
+async function queryHydrateContents(
+  context: CommandContext,
+  config: RegpickConfig,
+  approved: ApprovedAddPlan,
+): Promise<Result<HydratedAddPlan, AppError>> {
+  const hydratedWrites = [];
+
+  for (const write of approved.finalWrites) {
+    const item = approved.selectedItems.find((entry) => entry.name === write.itemName);
     if (!item) continue;
 
     const contentResult = await resolveFileContent(
@@ -281,35 +344,116 @@ export async function runAddCommand(
       context.cwd,
       context.runtime,
     );
-    if (!contentResult.ok) return contentResult;
+    if (!contentResult.ok) return err(contentResult.error);
 
     const finalContent = applyAliases(contentResult.value, config);
 
-    sagaSteps.push(new WriteFileStep(write.absoluteTarget, finalContent, context.runtime));
-
-    if (!installedItemsInfo.some((i) => i.name === item.name)) {
-      installedItemsInfo.push(item);
-    }
-    writtenFiles++;
+    hydratedWrites.push({
+      absoluteTarget: write.absoluteTarget,
+      finalContent,
+      itemName: write.itemName,
+    });
   }
 
+  return ok({ ...approved, hydratedWrites });
+}
+
+/**
+ * Translates the hydrated user plan into a list of atomic transaction steps.
+ *
+ * @param context - Command context.
+ * @param hydrated - Hydrated installation plan.
+ * @returns Array of Saga transaction steps.
+ */
+function buildTransactionsCommand(
+  context: CommandContext,
+  hydrated: HydratedAddPlan,
+): TransactionStep<any>[] {
+  const sagaSteps: TransactionStep<any>[] = [];
+  const installedItemsInfo: RegistryItem[] = [];
+
+  // Write files
+  for (const write of hydrated.hydratedWrites) {
+    sagaSteps.push(new WriteFileStep(write.absoluteTarget, write.finalContent, context.runtime));
+
+    const originalItem = hydrated.selectedItems.find((i) => i.name === write.itemName);
+    if (originalItem && !installedItemsInfo.some((i) => i.name === originalItem.name)) {
+      installedItemsInfo.push(originalItem);
+    }
+  }
+
+  // Save Lockfile
   if (installedItemsInfo.length > 0) {
     sagaSteps.push(new UpdateLockfileStep(installedItemsInfo, context.cwd, context.runtime));
   }
 
-  if (shouldInstallDeps) {
+  // Install Dependencies
+  if (
+    hydrated.shouldInstallDeps &&
+    (hydrated.dependencyPlan.dependencies.length > 0 ||
+      hydrated.dependencyPlan.devDependencies.length > 0)
+  ) {
     sagaSteps.push(
-      new InstallDependenciesStep(
-        installPlanRes.value.dependencyPlan,
-        context.cwd,
-        context.runtime,
-      ),
+      new InstallDependenciesStep(hydrated.dependencyPlan, context.cwd, context.runtime),
     );
   }
 
+  return sagaSteps;
+}
+
+/**
+ * Main controller for the `add` command.
+ * Orchestrates CQS flow: State -> Interaction -> Hydration -> Command Builder -> Execution.
+ *
+ * @param context - Command context.
+ * @returns Result indicating command outcome.
+ */
+export async function runAddCommand(
+  context: CommandContext,
+): Promise<Result<CommandOutcome, AppError>> {
+  // 1. Initial State
+  const configQ = await queryLoadConfiguration(context);
+  if (!configQ.ok) return err(configQ.error);
+
+  // 2. Discover Source & Targets
+  const sourceQ = await queryResolveRegistrySource(context, configQ.value.config);
+  if (!sourceQ.ok) return err(sourceQ.error);
+  if (!sourceQ.value) return ok({ kind: "noop", message: "No source provided." });
+
+  const itemsQ = await queryRegistryItemsToProcess(context, sourceQ.value);
+  if (!itemsQ.ok) return err(itemsQ.error);
+
+  for (const depName of itemsQ.value.missingRegistryDeps) {
+    context.runtime.prompt.warn(`Registry dependency "${depName}" not found in current registry.`);
+  }
+
+  // 3. Plan & Interaction State Computation
+  const planStateQ = await queryInstallPlanState(
+    context,
+    configQ.value.config,
+    itemsQ.value.selectedItems,
+  );
+  if (!planStateQ.ok) return err(planStateQ.error);
+
+  // 4. Resolve conflicts / prompts via User Interactions
+  const approvedPlan = await interactApprovalPhase(context, configQ.value.config, planStateQ.value);
+  if (!approvedPlan.ok) return err(approvedPlan.error);
+
+  // 5. Hydrate Plan (Fetch network contents dynamically to avoid interrupting Saga runtime)
+  const hydratedPlan = await queryHydrateContents(
+    context,
+    configQ.value.config,
+    approvedPlan.value,
+  );
+  if (!hydratedPlan.ok) return err(hydratedPlan.error);
+
+  // 6. Assemble Transactions
+  const sagaSteps = buildTransactionsCommand(context, hydratedPlan.value);
+
+  // 7. Execute!
   const runRes = await runSaga(sagaSteps, (stepName, status) => {
     if (status === "executing") {
-      // Opt in context.runtime.prompt.info(`[Executing] ${stepName}`);
+      // Option to print executing
     } else if (status === "completed") {
       context.runtime.prompt.success(`[Success] ${stepName}`);
     } else if (status === "failed") {
@@ -321,15 +465,13 @@ export async function runAddCommand(
     }
   });
 
-  if (!runRes.ok) {
-    return runRes;
-  }
+  if (!runRes.ok) return runRes;
 
   context.runtime.prompt.info(
-    `Installed ${selectedItems.length} item(s), wrote ${writtenFiles} file(s).`,
+    `Installed ${hydratedPlan.value.selectedItems.length} item(s), wrote ${hydratedPlan.value.hydratedWrites.length} file(s).`,
   );
   return ok({
     kind: "success",
-    message: `Installed ${selectedItems.length} item(s), wrote ${writtenFiles} file(s).`,
+    message: `Installed ${hydratedPlan.value.selectedItems.length} item(s), wrote ${hydratedPlan.value.hydratedWrites.length} file(s).`,
   });
 }

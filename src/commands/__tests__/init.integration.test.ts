@@ -146,7 +146,7 @@ describe("init integration", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error).toMatchObject({ kind: "RuntimeError" });
-      expect(result.error.message).toContain("Failed to write config file");
+      expect(result.error.message).toContain("Failed to write file");
     }
 
     expect(mockPrompt.error).toHaveBeenCalledWith(
