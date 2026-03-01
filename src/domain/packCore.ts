@@ -1,12 +1,12 @@
-import path from "node:path";
 import type { RegistryItem } from "@/types.js";
+import path from "node:path";
 
 export function extractDependencies(content: string): string[] {
   const importRegex = /import\s+[\s\S]*?from\s+["']([^"']+)["']/g;
   const dynamicImportRegex = /import\(["']([^"']+)["']\)/g;
-  
+
   const deps = new Set<string>();
-  
+
   let match;
   while ((match = importRegex.exec(content)) !== null) {
     const specifier = match[1];
@@ -46,9 +46,15 @@ export function extractDependencies(content: string): string[] {
   return Array.from(deps);
 }
 
-export function buildRegistryItemFromFile(file: { path: string; content: string; targetDir: string }): RegistryItem {
+export function buildRegistryItemFromFile(file: {
+  path: string;
+  content: string;
+  targetDir: string;
+}): RegistryItem {
   const dependencies = extractDependencies(file.content);
-  const relativePath = path.relative(file.targetDir, file.path).replace(/\\/g, "/");
+  const relativePath = path
+    .relative(file.targetDir, file.path)
+    .replace(/\\/g, "/");
   const name = path.basename(file.path, path.extname(file.path));
 
   return {
