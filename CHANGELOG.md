@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.6.8](https://github.com/wojtowicz-artur/regpick/compare/v0.6.7...v0.6.8) (2026-03-01)
+
+### Code Refactoring
+
+* streamline prompt handling and improve code formatting in init and list commands ([1dd154b](https://github.com/wojtowicz-artur/regpick/commit/1dd154b51d7c890f627cd49787f5bf12e4b173d2))
+
 ## [0.6.7](https://github.com/wojtowicz-artur/regpick/compare/v0.6.6...v0.6.7) (2026-03-01)
 
 ### Code Refactoring
