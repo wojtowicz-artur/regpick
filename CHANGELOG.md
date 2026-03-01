@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.9.0](https://github.com/wojtowicz-artur/regpick/compare/v0.8.0...v0.9.0) (2026-03-01)
+
+### Features
+
+* add valibot for schema validation and enhance registry dependency resolution ([eba8c20](https://github.com/wojtowicz-artur/regpick/commit/eba8c2095019c437fef171eba42a161b3e74dd28))
+
+### Styles
+
+* format code for consistency and readability ([cdf79f7](https://github.com/wojtowicz-artur/regpick/commit/cdf79f70e5121287a69ede7dffca4c67f6aea579))
+
 ## [0.8.0](https://github.com/wojtowicz-artur/regpick/compare/v0.7.0...v0.8.0) (2026-03-01)
 
 ### Features
