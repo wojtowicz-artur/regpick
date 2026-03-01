@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.6.7](https://github.com/wojtowicz-artur/regpick/compare/v0.6.6...v0.6.7) (2026-03-01)
+
+### Code Refactoring
+
+* improve user cancellation handling in prompt functions ([561b440](https://github.com/wojtowicz-artur/regpick/commit/561b440c73990daad0f34a24ae09495d92eae1fa))
+
 ## [0.6.6](https://github.com/wojtowicz-artur/regpick/compare/v0.6.5...v0.6.6) (2026-02-28)
 
 ### Code Refactoring
