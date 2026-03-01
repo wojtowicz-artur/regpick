@@ -1,77 +1,62 @@
 import { appError, type AppError } from "@/core/errors.js";
 import { err, ok, type Result } from "@/core/result.js";
-import type {
-  RegistryFile,
-  RegistryItem,
-  RegistrySourceMeta,
-} from "@/types.js";
+import type { RegistryItem, RegistrySourceMeta } from "@/types.js";
+import * as v from "valibot";
 
 type JsonRecord = Record<string, unknown>;
 
-function asStringArray(value: unknown): string[] {
-  if (!value) {
-    return [];
-  }
-  if (Array.isArray(value)) {
-    return value.filter((entry): entry is string => typeof entry === "string");
-  }
-  if (typeof value === "string") {
-    return [value];
-  }
-  return [];
-}
+export const RegistryFileSchema = v.object({
+  path: v.optional(v.string()),
+  target: v.optional(v.string()),
+  type: v.optional(v.string(), "registry:file"),
+  content: v.optional(v.string()),
+  url: v.optional(v.string()),
+});
 
-function asObjectArray<T extends JsonRecord>(value: unknown): T[] {
-  if (!Array.isArray(value)) {
-    return [];
-  }
-  return value.filter((entry): entry is T =>
-    Boolean(entry && typeof entry === "object"),
-  );
-}
+export const RegistryItemSchema = v.object({
+  name: v.optional(v.string(), "unnamed-item"),
+  title: v.optional(v.string()),
+  description: v.optional(v.string(), ""),
+  type: v.optional(v.string(), "registry:file"),
+  dependencies: v.optional(v.array(v.string()), []),
+  devDependencies: v.optional(v.array(v.string()), []),
+  registryDependencies: v.optional(v.array(v.string()), []),
+  files: v.optional(v.array(RegistryFileSchema), []),
+});
 
 export function normalizeItem(
   rawItem: JsonRecord,
   sourceMeta: RegistrySourceMeta,
 ): RegistryItem {
-  const rawFiles = asObjectArray<JsonRecord>(rawItem.files);
-  const files: RegistryFile[] = rawFiles.map((file) => ({
-    path: typeof file.path === "string" ? file.path : undefined,
-    target: typeof file.target === "string" ? file.target : undefined,
-    type:
-      typeof file.type === "string"
-        ? file.type
-        : typeof rawItem.type === "string"
-          ? rawItem.type
-          : "registry:file",
-    content: typeof file.content === "string" ? file.content : undefined,
-    url: typeof file.url === "string" ? file.url : undefined,
-  }));
+  const parsed = v.parse(RegistryItemSchema, rawItem);
 
   const name =
-    typeof rawItem.name === "string"
-      ? rawItem.name
-      : typeof rawItem.title === "string"
-        ? rawItem.title
-        : "unnamed-item";
+    parsed.name === "unnamed-item" && parsed.title ? parsed.title : parsed.name;
+  const title = parsed.title ?? name;
+  const files = parsed.files.map((file) => ({
+    ...file,
+    type:
+      file.type === "registry:file" && parsed.type !== "registry:file"
+        ? parsed.type
+        : file.type,
+  }));
 
   return {
+    ...parsed,
     name,
-    title: typeof rawItem.title === "string" ? rawItem.title : name,
-    description:
-      typeof rawItem.description === "string" ? rawItem.description : "",
-    type: typeof rawItem.type === "string" ? rawItem.type : "registry:file",
-    dependencies: asStringArray(rawItem.dependencies),
-    devDependencies: asStringArray(rawItem.devDependencies),
-    registryDependencies: asStringArray(rawItem.registryDependencies),
+    title,
     files,
     sourceMeta,
   };
 }
 
 export function extractItemReferences(payload: JsonRecord): string[] {
-  const items = asObjectArray<JsonRecord>(payload.items);
-  return items
+  if (!payload || !Array.isArray(payload.items)) return [];
+
+  return payload.items
+    .filter((entry): entry is JsonRecord =>
+      Boolean(entry && typeof entry === "object"),
+    )
     .map((entry) => {
       if (Array.isArray(entry.files)) {
         return null;
@@ -91,33 +76,43 @@ export function normalizeManifestInline(
   data: unknown,
   sourceMeta: RegistrySourceMeta,
 ): Result<RegistryItem[], AppError> {
-  if (Array.isArray(data)) {
-    const items = data
-      .filter((entry): entry is JsonRecord =>
-        Boolean(entry && typeof entry === "object"),
-      )
-      .map((entry) => normalizeItem(entry, sourceMeta));
-    return ok(items);
-  }
+  try {
+    if (Array.isArray(data)) {
+      const items = data
+        .filter((entry): entry is JsonRecord =>
+          Boolean(entry && typeof entry === "object"),
+        )
+        .map((entry) => normalizeItem(entry, sourceMeta));
+      return ok(items);
+    }
 
-  if (
-    data &&
-    typeof data === "object" &&
-    Array.isArray((data as JsonRecord).items)
-  ) {
-    const entries = asObjectArray<JsonRecord>(
-      (data as JsonRecord).items,
-    ).filter((entry) => Array.isArray(entry.files));
-    return ok(entries.map((entry) => normalizeItem(entry, sourceMeta)));
-  }
+    if (
+      data &&
+      typeof data === "object" &&
+      Array.isArray((data as JsonRecord).items)
+    ) {
+      const entries = ((data as JsonRecord).items as JsonRecord[]).filter(
+        (entry) =>
+          entry && typeof entry === "object" && Array.isArray(entry.files),
+      );
+      return ok(entries.map((entry) => normalizeItem(entry, sourceMeta)));
+    }
 
-  if (
-    data &&
-    typeof data === "object" &&
-    Array.isArray((data as JsonRecord).files)
-  ) {
-    return ok([normalizeItem(data as JsonRecord, sourceMeta)]);
-  }
+    if (
+      data &&
+      typeof data === "object" &&
+      Array.isArray((data as JsonRecord).files)
+    ) {
+      return ok([normalizeItem(data as JsonRecord, sourceMeta)]);
+    }
 
-  return err(appError("RegistryError", "Unsupported manifest structure."));
+    return err(appError("RegistryError", "Unsupported manifest structure."));
+  } catch (e) {
+    if (v.isValiError(e)) {
+      return err(
+        appError("ValidationError", `Manifest validation failed: ${e.message}`),
+      );
+    }
+    return err(appError("RegistryError", "Failed to parse manifest"));
+  }
 }

@@ -25,6 +25,41 @@ function buildDependencyPlan(
   };
 }
 
+export function resolveRegistryDependencies(
+  selectedItems: RegistryItem[],
+  allItems: RegistryItem[],
+): { resolvedItems: RegistryItem[]; missingDependencies: string[] } {
+  const allResolvedItems = new Map<string, RegistryItem>();
+  const toResolve = [...selectedItems];
+  const missingDependencies: string[] = [];
+
+  while (toResolve.length > 0) {
+    const current = toResolve.shift()!;
+    if (allResolvedItems.has(current.name)) continue;
+    allResolvedItems.set(current.name, current);
+
+    if (
+      current.registryDependencies &&
+      current.registryDependencies.length > 0
+    ) {
+      for (const depName of current.registryDependencies) {
+        if (allResolvedItems.has(depName)) continue;
+        const found = allItems.find((i) => i.name === depName);
+        if (found) {
+          toResolve.push(found);
+        } else {
+          missingDependencies.push(depName);
+        }
+      }
+    }
+  }
+
+  return {
+    resolvedItems: Array.from(allResolvedItems.values()),
+    missingDependencies: unique(missingDependencies),
+  };
+}
+
 export function buildInstallPlan(
   selectedItems: RegistryItem[],
   cwd: string,

@@ -2,8 +2,20 @@ import type { RuntimePorts } from "@/shell/runtime/ports.js";
 import type { RegpickLockfile } from "@/types.js";
 import crypto from "node:crypto";
 import path from "node:path";
+import * as v from "valibot";
 
 const LOCKFILE_NAME = "regpick-lock.json";
+
+export const RegpickLockfileSchema = v.object({
+  components: v.record(
+    v.string(),
+    v.object({
+      version: v.optional(v.string()),
+      source: v.optional(v.string()),
+      hash: v.string(),
+    }),
+  ),
+});
 
 export function getLockfilePath(cwd: string): string {
   return path.join(cwd, LOCKFILE_NAME);
@@ -20,12 +32,17 @@ export async function readLockfile(
     return { components: {} };
   }
 
-  const readRes = runtime.fs.readJsonSync<RegpickLockfile>(lockfilePath);
+  const readRes = runtime.fs.readJsonSync<unknown>(lockfilePath);
   if (!readRes.ok) {
     return { components: {} };
   }
 
-  return readRes.value;
+  try {
+    const parsed = v.parse(RegpickLockfileSchema, readRes.value);
+    return parsed as RegpickLockfile;
+  } catch {
+    return { components: {} };
+  }
 }
 
 export async function writeLockfile(

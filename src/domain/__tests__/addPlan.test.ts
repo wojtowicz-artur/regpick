@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { buildInstallPlan } from "@/domain/addPlan.js";
+import {
+  buildInstallPlan,
+  resolveRegistryDependencies,
+} from "@/domain/addPlan.js";
 import type { RegistryItem, RegpickConfig } from "@/types.js";
 
 const config: RegpickConfig = {
@@ -72,5 +75,66 @@ describe("add plan core", () => {
     if (!planWithConflictsRes.ok) return;
     expect(planWithConflictsRes.value.conflicts).toHaveLength(1);
     expect(planWithConflictsRes.value.conflicts[0].itemName).toBe("check");
+  });
+
+  describe("resolveRegistryDependencies", () => {
+    it("resolves all registry dependencies", () => {
+      const itemWithDeps: RegistryItem = {
+        name: "button",
+        title: "Button",
+        description: "",
+        type: "registry:component",
+        dependencies: [],
+        devDependencies: [],
+        registryDependencies: ["icon", "utils"],
+        files: [],
+        sourceMeta: { type: "directory", baseDir: "/registry" },
+      };
+      const iconItem: RegistryItem = {
+        ...itemWithDeps,
+        name: "icon",
+        registryDependencies: [],
+      };
+      const utilsItem: RegistryItem = {
+        ...itemWithDeps,
+        name: "utils",
+        registryDependencies: [],
+      };
+
+      const allItems = [itemWithDeps, iconItem, utilsItem];
+      const { resolvedItems, missingDependencies } =
+        resolveRegistryDependencies([itemWithDeps], allItems);
+
+      expect(missingDependencies).toHaveLength(0);
+      expect(resolvedItems).toHaveLength(3);
+      expect(resolvedItems.map((i) => i.name)).toEqual(
+        expect.arrayContaining(["button", "icon", "utils"]),
+      );
+    });
+
+    it("returns missing dependencies", () => {
+      const itemWithDeps: RegistryItem = {
+        name: "button",
+        title: "Button",
+        description: "",
+        type: "registry:component",
+        dependencies: [],
+        devDependencies: [],
+        registryDependencies: ["icon", "utils"],
+        files: [],
+        sourceMeta: { type: "directory", baseDir: "/registry" },
+      };
+
+      const allItems = [itemWithDeps];
+      const { resolvedItems, missingDependencies } =
+        resolveRegistryDependencies([itemWithDeps], allItems);
+
+      expect(missingDependencies).toHaveLength(2);
+      expect(missingDependencies).toEqual(
+        expect.arrayContaining(["icon", "utils"]),
+      );
+      expect(resolvedItems).toHaveLength(1);
+      expect(resolvedItems[0].name).toBe("button");
+    });
   });
 });

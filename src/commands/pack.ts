@@ -2,7 +2,7 @@ import path from "node:path";
 
 import { appError, type AppError } from "@/core/errors.js";
 import { err, ok, type Result } from "@/core/result.js";
-import { extractDependencies } from "@/domain/packCore.js";
+import { buildRegistryItemFromFile } from "@/domain/packCore.js";
 import type { CommandContext, CommandOutcome, RegistryItem } from "@/types.js";
 
 async function getFilesRecursive(
@@ -67,25 +67,13 @@ export async function runPackCommand(
     const contentRes = await context.runtime.fs.readFile(file, "utf8");
     if (!contentRes.ok) return err(contentRes.error);
 
-    const dependencies = extractDependencies(contentRes.value);
-    const relativePath = path.relative(targetDir, file).replace(/\\/g, "/");
-    const name = path.basename(file, path.extname(file));
-
-    items.push({
-      name,
-      title: name,
-      description: "Packed component",
-      type: "registry:component",
-      dependencies,
-      devDependencies: [],
-      registryDependencies: [],
-      files: [
-        {
-          path: relativePath,
-          type: "registry:component",
-        },
-      ],
-    } as any);
+    items.push(
+      buildRegistryItemFromFile({
+        path: file,
+        content: contentRes.value,
+        targetDir,
+      }),
+    );
   }
 
   const registry = { items };

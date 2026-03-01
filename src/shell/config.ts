@@ -1,8 +1,32 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { loadConfig } from "unconfig";
+import * as v from "valibot";
 
 import type { RegpickConfig } from "@/types.js";
+
+const OverwritePolicySchema = v.union([
+  v.literal("prompt"),
+  v.literal("overwrite"),
+  v.literal("skip"),
+]);
+
+const PackageManagerSchema = v.union([
+  v.literal("auto"),
+  v.literal("npm"),
+  v.literal("yarn"),
+  v.literal("pnpm"),
+]);
+
+export const RegpickConfigSchema = v.object({
+  registries: v.record(v.string(), v.string()),
+  targetsByType: v.record(v.string(), v.string()),
+  aliases: v.optional(v.record(v.string(), v.string()), {}),
+  overwritePolicy: OverwritePolicySchema,
+  packageManager: PackageManagerSchema,
+  preferManifestTarget: v.boolean(),
+  allowOutsideProject: v.boolean(),
+});
 
 const DEFAULT_CONFIG: RegpickConfig = {
   registries: {
@@ -28,7 +52,7 @@ export async function readConfig(cwd: string): Promise<{
   config: RegpickConfig;
   configPath: string | null;
 }> {
-  const { config, sources } = await loadConfig<RegpickConfig>({
+  const { config: loadedConfig, sources } = await loadConfig<unknown>({
     sources: [
       {
         files: ["regpick", ".regpickrc", "regpickrc"],
@@ -47,8 +71,10 @@ export async function readConfig(cwd: string): Promise<{
     cwd,
   });
 
+  const validConfig = v.parse(RegpickConfigSchema, loadedConfig);
+
   return {
-    config,
+    config: validConfig as RegpickConfig,
     configPath: sources[0] || null,
   };
 }

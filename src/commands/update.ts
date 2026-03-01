@@ -3,12 +3,11 @@ import { styleText } from "node:util";
 
 import { type AppError } from "@/core/errors.js";
 import { ok, type Result } from "@/core/result.js";
-import { applyAliases } from "@/domain/aliasCore.js";
-import { resolveOutputPathFromPolicy } from "@/domain/pathPolicy.js";
+import { buildUpdatePlanForItem, groupBySource } from "@/domain/updatePlan.js";
 import { readConfig } from "@/shell/config.js";
-import { computeHash, readLockfile, writeLockfile } from "@/shell/lockfile.js";
+import { readLockfile, writeLockfile } from "@/shell/lockfile.js";
 import { loadRegistry, resolveFileContent } from "@/shell/registry.js";
-import type { CommandContext, CommandOutcome } from "@/types.js";
+import type { CommandContext, CommandOutcome, RegistryFile } from "@/types.js";
 
 async function printDiff(oldContent: string, newContent: string) {
   // TODO: Use a native diff implementation to avoid the dependency. This is a temporary solution. WHEN: implement when ecosystem will move further from Node 20, because native diff landad in Node 22.15
@@ -39,15 +38,7 @@ export async function runUpdateCommand(
 
   const { config } = await readConfig(context.cwd);
 
-  // Group by source
-  const bySource: Record<string, string[]> = {};
-  for (const name of componentNames) {
-    const source = lockfile.components[name].source;
-    if (source) {
-      if (!bySource[source]) bySource[source] = [];
-      bySource[source].push(name);
-    }
-  }
+  const bySource = groupBySource(lockfile);
 
   let updatedCount = 0;
 
@@ -68,9 +59,7 @@ export async function runUpdateCommand(
       const registryItem = registryItems.find((i) => i.name === itemName);
       if (!registryItem) continue;
 
-      // Get remote contents
-      const remoteContents: string[] = [];
-      const remoteFiles: { target: string; content: string }[] = [];
+      const resolvedFiles: { file: RegistryFile; content: string }[] = [];
 
       for (const file of registryItem.files) {
         const contentRes = await resolveFileContent(
@@ -81,27 +70,24 @@ export async function runUpdateCommand(
         );
         if (!contentRes.ok) continue;
 
-        let content = applyAliases(contentRes.value, config);
-        remoteContents.push(content);
-
-        const outputRes = resolveOutputPathFromPolicy(
-          registryItem,
-          file,
-          context.cwd,
-          config,
-        );
-        if (outputRes.ok) {
-          remoteFiles.push({
-            target: outputRes.value.absoluteTarget,
-            content: content,
-          });
-        }
+        resolvedFiles.push({ file, content: contentRes.value });
       }
 
-      const newHash = computeHash(remoteContents.sort().join(""));
       const currentHash = lockfile.components[itemName].hash;
+      const updatePlanRes = buildUpdatePlanForItem(
+        itemName,
+        registryItem,
+        resolvedFiles,
+        currentHash,
+        context.cwd,
+        config,
+      );
 
-      if (newHash !== currentHash) {
+      if (!updatePlanRes.ok) continue;
+
+      const updateAction = updatePlanRes.value;
+
+      if (updateAction.status === "requires-diff-prompt") {
         context.runtime.prompt.info(`Update available for ${itemName}`);
 
         const action = await context.runtime.prompt.select({
@@ -119,7 +105,7 @@ export async function runUpdateCommand(
         }
 
         if (action === "diff") {
-          for (const rf of remoteFiles) {
+          for (const rf of updateAction.files) {
             const localContentRes = await context.runtime.fs.readFile(
               rf.target,
               "utf8",
@@ -144,7 +130,7 @@ export async function runUpdateCommand(
         }
 
         // Apply update
-        for (const rf of remoteFiles) {
+        for (const rf of updateAction.files) {
           const ensureRes = await context.runtime.fs.ensureDir(
             path.dirname(rf.target),
           );
@@ -157,7 +143,7 @@ export async function runUpdateCommand(
           if (!writeRes.ok) return writeRes;
         }
 
-        lockfile.components[itemName].hash = newHash;
+        lockfile.components[itemName].hash = updateAction.newHash;
         updatedCount++;
         context.runtime.prompt.success(`Updated ${itemName}`);
       }

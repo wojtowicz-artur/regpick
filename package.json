@@ -60,7 +60,8 @@
   "dependencies": {
     "@clack/prompts": "^1.0.1",
     "diff": "^8.0.3",
-    "unconfig": "^7.5.0"
+    "unconfig": "^7.5.0",
+    "valibot": "^1.2.0"
   },
   "devDependencies": {
     "@commitlint/cli": "^20.4.2",
@@ -69,13 +70,13 @@
     "@types/diff": "^7.0.2",
     "@types/node": "^24.3.0",
     "@vitest/coverage-v8": "^4.0.18",
-    "vite-tsconfig-paths": "^6.1.1",
     "husky": "^9.1.7",
     "oxlint": "^1.50.0",
     "release-it": "^19.2.4",
     "tsdown": "^0.21.0-beta.2",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2",
+    "vite-tsconfig-paths": "^6.1.1",
     "vitest": "^4.0.18"
   }
 }

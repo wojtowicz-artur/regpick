@@ -2,7 +2,10 @@ import path from "node:path";
 
 import { appError, type AppError } from "@/core/errors.js";
 import { err, ok, type Result } from "@/core/result.js";
-import { buildInstallPlan } from "@/domain/addPlan.js";
+import {
+  buildInstallPlan,
+  resolveRegistryDependencies,
+} from "@/domain/addPlan.js";
 import { applyAliases } from "@/domain/aliasCore.js";
 import { selectItemsFromFlags } from "@/domain/selection.js";
 import { readConfig, resolveRegistrySource } from "@/shell/config.js";
@@ -166,33 +169,15 @@ export async function runAddCommand(
   }
   let selectedItems = promptedSelectionResult.value;
 
-  // --- RESOLVE REGISTRY DEPENDENCIES ---
-  const allResolvedItems = new Map<string, RegistryItem>();
-  const toResolve = [...selectedItems];
+  const { resolvedItems, missingDependencies: missingRegistryDeps } =
+    resolveRegistryDependencies(selectedItems, items);
+  selectedItems = resolvedItems;
 
-  while (toResolve.length > 0) {
-    const current = toResolve.shift()!;
-    if (allResolvedItems.has(current.name)) continue;
-    allResolvedItems.set(current.name, current);
-
-    if (
-      current.registryDependencies &&
-      current.registryDependencies.length > 0
-    ) {
-      for (const depName of current.registryDependencies) {
-        if (allResolvedItems.has(depName)) continue;
-        const found = items.find((i) => i.name === depName);
-        if (found) {
-          toResolve.push(found);
-        } else {
-          context.runtime.prompt.warn(
-            `Registry dependency "${depName}" not found in current registry.`,
-          );
-        }
-      }
-    }
+  for (const depName of missingRegistryDeps) {
+    context.runtime.prompt.warn(
+      `Registry dependency "${depName}" not found in current registry.`,
+    );
   }
-  selectedItems = Array.from(allResolvedItems.values());
 
   if (!selectedItems || !selectedItems.length) {
     context.runtime.prompt.warn("No items selected.");
