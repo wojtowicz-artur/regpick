@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.3](https://github.com/wojtowicz-artur/regpick/compare/v0.9.2...v0.9.3) (2026-03-01)
+
+### Code Refactoring
+
+* optimize file handling and error management in command execution ([e23b715](https://github.com/wojtowicz-artur/regpick/commit/e23b7156ad22afa0bfe6b4a6eae0cdd7e7d21a2e))
+
 ## [0.9.2](https://github.com/wojtowicz-artur/regpick/compare/v0.9.1...v0.9.2) (2026-03-01)
 
 ### Code Refactoring
