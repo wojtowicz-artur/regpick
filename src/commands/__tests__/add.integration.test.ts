@@ -1,8 +1,8 @@
-import mockRegistry from "@/__tests__/fixtures/shadcn-registry.json";
-import { createMockHttp, createMockPrompt } from "@/__tests__/helpers/integration";
-import { runAddCommand } from "@/commands/add";
-import { ok } from "@/core/result";
-import { createRuntimePorts, type RuntimePorts } from "@/shell/runtime/ports";
+import mockRegistry from "@/__tests__/fixtures/shadcn-registry.json" with { type: "json" };
+import { createMockHttp, createMockPrompt } from "@/__tests__/helpers/integration.ts";
+import { runAddCommand } from "@/commands/add.ts";
+import { ok } from "@/core/result.ts";
+import { createRuntimePorts, type RuntimePorts } from "@/shell/runtime/ports.ts";
 import * as fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
@@ -28,8 +28,8 @@ describe("add integration with shadcn compatibility", () => {
 
     runtime = {
       ...baseRuntime,
-      http: mockHttp,
-      prompt: mockPrompt,
+      http: mockHttp as any,
+      prompt: mockPrompt as any,
     };
   });
 

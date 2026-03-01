@@ -1,3 +1,13 @@
+import type {
+  RegistryFile as ValibotRegistryFile,
+  RegistryItem as ValibotRegistryItem,
+  RegistrySourceMeta as ValibotRegistrySourceMeta,
+} from "@/domain/registryModel.js";
+import type { RegpickConfig as ValibotRegpickConfig } from "@/shell/config.js";
+import type {
+  LockfileItem as ValibotLockfileItem,
+  RegpickLockfile as ValibotRegpickLockfile,
+} from "@/shell/lockfile.js";
 import type { RuntimePorts } from "@/shell/runtime/ports.js";
 
 export type FlagValue = string | boolean;
@@ -16,41 +26,10 @@ export type CommandContext = {
 export type OverwritePolicy = "prompt" | "overwrite" | "skip";
 export type PackageManager = "auto" | "npm" | "yarn" | "pnpm";
 
-export type RegpickConfig = {
-  registries: Record<string, string>;
-  targetsByType: Record<string, string>;
-  aliases?: Record<string, string>;
-  overwritePolicy: OverwritePolicy;
-  packageManager: PackageManager;
-  preferManifestTarget: boolean;
-  allowOutsideProject: boolean;
-};
-
-export type RegistrySourceMeta = {
-  type: "http" | "file" | "directory";
-  baseUrl?: string;
-  baseDir?: string;
-};
-
-export type RegistryFile = {
-  path?: string;
-  target?: string;
-  type: string;
-  content?: string;
-  url?: string;
-};
-
-export type RegistryItem = {
-  name: string;
-  title: string;
-  description: string;
-  type: string;
-  dependencies: string[];
-  devDependencies: string[];
-  registryDependencies: string[];
-  files: RegistryFile[];
-  sourceMeta: RegistrySourceMeta;
-};
+export type RegpickConfig = ValibotRegpickConfig;
+export type RegistrySourceMeta = ValibotRegistrySourceMeta;
+export type RegistryFile = ValibotRegistryFile;
+export type RegistryItem = ValibotRegistryItem;
 
 export type PlannedWrite = {
   itemName: string;
@@ -71,15 +50,8 @@ export type InstallPlan = {
   conflicts: PlannedWrite[];
 };
 
-export type LockfileItem = {
-  version?: string;
-  source?: string;
-  hash: string;
-};
-
-export type RegpickLockfile = {
-  components: Record<string, LockfileItem>;
-};
+export type LockfileItem = ValibotLockfileItem;
+export type RegpickLockfile = ValibotRegpickLockfile;
 
 export type CommandOutcome =
   | {

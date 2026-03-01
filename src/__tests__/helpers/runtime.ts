@@ -1,5 +1,6 @@
-import { ok } from "@/core/result";
-import { type RuntimePorts } from "@/shell/runtime/ports";
+import { appError } from "@/core/errors.js";
+import { err, ok } from "@/core/result.js";
+import { type RuntimePorts, HttpPort } from "@/shell/runtime/ports.js";
 import * as path from "path";
 import { type Mock, vi } from "vitest";
 
@@ -39,10 +40,8 @@ export function createMockRuntime(initialFiles: Record<string, string> = {}): {
   }
 
   const mockHttp = {
-    getJson: vi.fn(async (_url: string) => {
-      return ok({});
-    }),
-    getText: vi.fn(async (_url: string) => {
+    getJson: vi.fn<HttpPort["getJson"]>(async () => ok({} as any)),
+    getText: vi.fn<HttpPort["getText"]>(async (_url: string) => {
       return ok("");
     }),
   };
@@ -60,20 +59,15 @@ export function createMockRuntime(initialFiles: Record<string, string> = {}): {
         const content = fileSystem.readFile(filePath);
         return content !== null
           ? ok(content)
-          : {
-              error: { message: `File not found: ${filePath}`, code: "ENOENT" },
-            };
+          : err(appError("RuntimeError", `File not found: ${filePath}`));
       },
       readJsonSync: (filePath: string) => {
         const content = fileSystem.readFile(filePath);
-        if (content === null)
-          return {
-            error: { message: `File not found: ${filePath}`, code: "ENOENT" },
-          };
+        if (content === null) return err(appError("RuntimeError", `File not found: ${filePath}`));
         try {
           return ok(JSON.parse(content));
         } catch {
-          return { error: { message: "Invalid JSON", code: "JSON_ERR" } };
+          return err(appError("RuntimeError", "Invalid JSON"));
         }
       },
       writeJson: async (filePath: string, value: unknown) => {
@@ -81,8 +75,7 @@ export function createMockRuntime(initialFiles: Record<string, string> = {}): {
         return ok(undefined);
       },
       stat: async (filePath: string) => {
-        if (!fileSystem.exists(filePath))
-          return { error: { message: "Not found", code: "ENOENT" } };
+        if (!fileSystem.exists(filePath)) return err(appError("RuntimeError", "Not found"));
         return ok({
           isDirectory: () => false,
           isFile: () => true,
@@ -91,12 +84,12 @@ export function createMockRuntime(initialFiles: Record<string, string> = {}): {
       },
       readdir: async () => ok([]),
     },
-    http: mockHttp,
+    http: mockHttp as unknown as HttpPort,
     prompt: {
       intro: async () => {},
       outro: async () => {},
       cancel: async () => {},
-      isCancel: async (v) => v === Symbol.for("cancel"),
+      isCancel: async (v: unknown) => v === Symbol.for("cancel"),
       info: async () => {},
       warn: async () => {},
       error: async () => {},
@@ -133,4 +126,4 @@ export function createMockRuntime(initialFiles: Record<string, string> = {}): {
 
   return { runtime, fs: fileSystem, mockHttp };
 }
-export { ok };
+export { err, ok };

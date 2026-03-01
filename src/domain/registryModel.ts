@@ -1,6 +1,5 @@
 import { appError, type AppError } from "@/core/errors.js";
 import { err, ok, type Result } from "@/core/result.js";
-import type { RegistryItem, RegistrySourceMeta } from "@/types.js";
 import * as v from "valibot";
 
 export const RegistryFileSchema = v.object({
@@ -22,6 +21,18 @@ export const RegistryItemSchema = v.object({
   files: v.optional(v.array(RegistryFileSchema), []),
 });
 
+export const RegistrySourceMetaSchema = v.object({
+  type: v.union([v.literal("http"), v.literal("file"), v.literal("directory")]),
+  baseUrl: v.optional(v.string()),
+  baseDir: v.optional(v.string()),
+});
+
+export type RegistryFile = v.InferOutput<typeof RegistryFileSchema>;
+export type RegistrySourceMeta = v.InferOutput<typeof RegistrySourceMetaSchema>;
+export type RegistryItem = v.InferOutput<typeof RegistryItemSchema> & {
+  sourceMeta: RegistrySourceMeta;
+};
+
 export function normalizeItem(rawItem: unknown, sourceMeta: RegistrySourceMeta): RegistryItem {
   const parsed = v.parse(RegistryItemSchema, rawItem);
 
@@ -42,6 +53,17 @@ export function normalizeItem(rawItem: unknown, sourceMeta: RegistrySourceMeta):
   };
 }
 
+const ReferenceItemSchema = v.object({
+  url: v.optional(v.string()),
+  href: v.optional(v.string()),
+  path: v.optional(v.string()),
+  files: v.optional(v.unknown()),
+});
+
+const ManifestItemsSchema = v.object({
+  items: v.array(v.union([v.record(v.string(), v.unknown()), ReferenceItemSchema])),
+});
+
 export function extractItemReferences(payload: unknown): string[] {
   const result = v.safeParse(ManifestItemsSchema, payload);
   if (!result.success) {
@@ -50,23 +72,20 @@ export function extractItemReferences(payload: unknown): string[] {
 
   return result.output.items
     .map((entry) => {
-      if (Array.isArray(entry.files)) {
+      const safeEntry = entry as Record<string, unknown>;
+      if ("files" in safeEntry && Array.isArray(safeEntry.files)) {
         return null; // inline item, not a reference
       }
-      return typeof entry.url === "string"
-        ? entry.url
-        : typeof entry.href === "string"
-          ? entry.href
-          : typeof entry.path === "string"
-            ? entry.path
+      return typeof safeEntry.url === "string"
+        ? safeEntry.url
+        : typeof safeEntry.href === "string"
+          ? safeEntry.href
+          : typeof safeEntry.path === "string"
+            ? safeEntry.path
             : null;
     })
     .filter((value): value is string => Boolean(value));
 }
-
-const ManifestItemsSchema = v.object({
-  items: v.array(v.record(v.string(), v.unknown())),
-});
 
 const SingleItemManifestSchema = v.object({
   files: v.array(v.unknown()),
@@ -86,7 +105,11 @@ export function normalizeManifestInline(
 
     const hasItemsRes = v.safeParse(ManifestItemsSchema, data);
     if (hasItemsRes.success) {
-      const entries = hasItemsRes.output.items.filter((entry) => Array.isArray(entry.files));
+      const entries = hasItemsRes.output.items.filter(
+        (entry) =>
+          "files" in (entry as Record<string, unknown>) &&
+          Array.isArray((entry as Record<string, unknown>).files),
+      );
       return ok(entries.map((entry) => normalizeItem(entry, sourceMeta)));
     }
 

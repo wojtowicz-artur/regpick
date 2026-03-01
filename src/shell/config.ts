@@ -3,8 +3,6 @@ import path from "node:path";
 import { loadConfig } from "unconfig";
 import * as v from "valibot";
 
-import type { RegpickConfig } from "@/types.js";
-
 const OverwritePolicySchema = v.union([
   v.literal("prompt"),
   v.literal("overwrite"),
@@ -27,6 +25,8 @@ export const RegpickConfigSchema = v.object({
   preferManifestTarget: v.boolean(),
   allowOutsideProject: v.boolean(),
 });
+
+export type RegpickConfig = v.InferOutput<typeof RegpickConfigSchema>;
 
 const DEFAULT_CONFIG: RegpickConfig = {
   registries: {
@@ -74,7 +74,7 @@ export async function readConfig(cwd: string): Promise<{
   const validConfig = v.parse(RegpickConfigSchema, loadedConfig);
 
   return {
-    config: validConfig as RegpickConfig,
+    config: validConfig,
     configPath: sources[0] || null,
   };
 }

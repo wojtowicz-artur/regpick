@@ -5,6 +5,7 @@ import type { RegistryItem, RegpickConfig } from "@/types.js";
 
 const config: RegpickConfig = {
   registries: {},
+  aliases: {},
   targetsByType: {
     "registry:icon": "src/components/ui/icons",
     "registry:file": "src/components/ui",

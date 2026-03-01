@@ -1,4 +1,4 @@
-import type { HttpPort, PromptPort } from "@/shell/runtime/ports";
+import type { HttpPort, PromptPort } from "@/shell/runtime/ports.js";
 import { type Mock, vi } from "vitest";
 
 export const createMockHttp = (): {

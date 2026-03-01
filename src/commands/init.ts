@@ -1,9 +1,9 @@
 import * as v from "valibot";
-import { appError, type AppError } from "../core/errors.js";
-import { err, ok, type Result } from "../core/result.js";
-import { decideInitAfterOverwritePrompt } from "../domain/initCore.js";
-import { getConfigPath, readConfig, RegpickConfigSchema, writeConfig } from "../shell/config.js";
-import type { CommandContext, CommandOutcome } from "../types.js";
+import { appError, type AppError } from "@/core/errors.ts";
+import { err, ok, type Result } from "@/core/result.ts";
+import { decideInitAfterOverwritePrompt } from "@/domain/initCore.ts";
+import { getConfigPath, readConfig, RegpickConfigSchema, writeConfig } from "@/shell/config.ts";
+import type { CommandContext, CommandOutcome } from "@/types.ts";
 
 export async function runInitCommand(
   context: CommandContext,

@@ -138,12 +138,18 @@ export async function runAddCommand(
 
   const preselected = selectItemsFromFlags(items, context);
 
-  const promptedSelectionResult =
-    preselected.ok && preselected.value ? preselected : await promptForItems(context, items);
-  if (!promptedSelectionResult.ok) {
-    return promptedSelectionResult;
+  let selectedItems: RegistryItem[];
+  if (preselected.ok && preselected.value) {
+    selectedItems = preselected.value;
+  } else if (!preselected.ok) {
+    return preselected;
+  } else {
+    const promptedSelectionResult = await promptForItems(context, items);
+    if (!promptedSelectionResult.ok) {
+      return promptedSelectionResult;
+    }
+    selectedItems = promptedSelectionResult.value;
   }
-  let selectedItems = promptedSelectionResult.value;
 
   const { resolvedItems, missingDependencies: missingRegistryDeps } = resolveRegistryDependencies(
     selectedItems,

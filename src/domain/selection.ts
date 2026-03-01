@@ -22,7 +22,7 @@ export function filterItemsByQuery(items: RegistryItem[], query: string): Regist
   return items.filter((item) => {
     return (
       item.name.toLowerCase().includes(lowered) ||
-      item.title.toLowerCase().includes(lowered) ||
+      (item.title || "").toLowerCase().includes(lowered) ||
       (item.description || "").toLowerCase().includes(lowered)
     );
   });

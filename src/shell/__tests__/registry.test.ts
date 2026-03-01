@@ -1,6 +1,6 @@
-import { ok } from "@/core/result";
-import { loadRegistry, resolveFileContent } from "@/shell/registry";
-import { createRuntimePorts } from "@/shell/runtime/ports";
+import { ok } from "@/core/result.js";
+import { loadRegistry, resolveFileContent } from "@/shell/registry.js";
+import { createRuntimePorts } from "@/shell/runtime/ports.js";
 import * as path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -108,9 +108,9 @@ describe("registry loader", () => {
       },
     };
 
-    const file = { path: "utils.ts" };
+    const file = { path: "utils.ts", type: "registry:file" };
 
-    const result = await resolveFileContent(file, item, "/test", mockRuntime);
+    const result = await resolveFileContent(file, item as any, "/test", mockRuntime);
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value).toBe("remote-content");
 

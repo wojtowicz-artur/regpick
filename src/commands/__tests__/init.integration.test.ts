@@ -1,6 +1,6 @@
-import { createMockPrompt } from "@/__tests__/helpers/integration";
-import { runInitCommand } from "@/commands/init";
-import { createRuntimePorts, type RuntimePorts } from "@/shell/runtime/ports";
+import { createMockPrompt } from "@/__tests__/helpers/integration.ts";
+import { runInitCommand } from "@/commands/init.ts";
+import { createRuntimePorts, type RuntimePorts } from "@/shell/runtime/ports.ts";
 import * as fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
@@ -81,7 +81,7 @@ describe("init integration", () => {
   it("should fail gracefully if user cancels the prompt", async () => {
     // Simulate cancelling the package manager prompt
     mockPrompt.isCancel.mockImplementation(
-      async (v) => v === Symbol.for("cancel") || v === "cancelled",
+      async (v: unknown) => v === Symbol.for("cancel") || v === "cancelled",
     );
     mockPrompt.select.mockResolvedValueOnce("cancelled");
 

@@ -5,6 +5,7 @@
     "node_modules",
     "regpick-lock.json",
     "CHANGELOG.md",
+    "release.yml",
     "release-it.json",
     "regpick.config.schema.json"
   ]
