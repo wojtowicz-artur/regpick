@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.1](https://github.com/wojtowicz-artur/regpick/compare/v0.9.0...v0.9.1) (2026-03-01)
+
+### Code Refactoring
+
+* enforce strict runtime type boundaries with valibot and format codebase ([1a20bd5](https://github.com/wojtowicz-artur/regpick/commit/1a20bd57d6e621455a37c0815536c6c2f7a498c6))
+
 ## [0.9.0](https://github.com/wojtowicz-artur/regpick/compare/v0.8.0...v0.9.0) (2026-03-01)
 
 ### Features
