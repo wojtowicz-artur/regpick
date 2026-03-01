@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.2](https://github.com/wojtowicz-artur/regpick/compare/v0.9.1...v0.9.2) (2026-03-01)
+
+### Code Refactoring
+
+* update import paths to use .js extensions and enhance type definitions ([9485387](https://github.com/wojtowicz-artur/regpick/commit/94853874fa5105a55dde0b28aedc58a6cb5ff52b))
+
 ## [0.9.1](https://github.com/wojtowicz-artur/regpick/compare/v0.9.0...v0.9.1) (2026-03-01)
 
 ### Code Refactoring
