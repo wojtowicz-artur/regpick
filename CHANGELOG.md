@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.1](https://github.com/wojtowicz-artur/regpick/compare/v0.10.0...v0.10.1) (2026-03-01)
+
+### Code Refactoring
+
+* refactor command implementations to utilize a CQS pattern ([31ab07c](https://github.com/wojtowicz-artur/regpick/commit/31ab07cb91208673980d702f09b0ad5f6f286b88))
+* streamline error handling in queryInstallPlanState function ([e0b2792](https://github.com/wojtowicz-artur/regpick/commit/e0b279242c806ea35e1c5312861d747e2da945c5))
+
 ## [0.10.0](https://github.com/wojtowicz-artur/regpick/compare/v0.9.4...v0.10.0) (2026-03-01)
 
 ### Features
