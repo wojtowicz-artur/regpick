@@ -11,6 +11,7 @@ function runtimeWithLockfiles(lockfiles: string[]): RuntimePorts {
       existsSync: (filePath: string) => lockfiles.some((lock) => filePath.endsWith(lock)),
       pathExists: async () => false,
       ensureDir: async () => ok(undefined),
+      remove: async () => ok(undefined),
       writeFile: async () => ok(undefined),
       readFile: async () => ok(""),
       readJsonSync: <T>() => ok({} as T),

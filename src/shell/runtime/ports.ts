@@ -8,6 +8,7 @@ export type FileSystemPort = {
   existsSync(path: string): boolean;
   pathExists(path: string): Promise<boolean>;
   ensureDir(path: string): Promise<Result<void, AppError>>;
+  remove(path: string): Promise<Result<void, AppError>>;
   writeFile(
     path: string,
     content: string,
@@ -82,6 +83,14 @@ export const createRuntimePorts = (options?: { signal?: AbortSignal }): RuntimeP
         return true;
       } catch {
         return false;
+      }
+    },
+    remove: async (path) => {
+      try {
+        await fsPromises.rm(path, { recursive: true, force: true });
+        return ok(undefined);
+      } catch (cause) {
+        return err(appError("RuntimeError", `Failed to remove ${path}`, cause));
       }
     },
     ensureDir: async (path) => {

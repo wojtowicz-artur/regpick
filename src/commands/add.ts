@@ -1,13 +1,12 @@
-import path from "node:path";
-
 import { appError, type AppError } from "@/core/errors.js";
 import { err, ok, type Result } from "@/core/result.js";
+import { runSaga, type TransactionStep } from "@/core/saga.js";
 import { buildInstallPlan, resolveRegistryDependencies } from "@/domain/addPlan.js";
 import { applyAliases } from "@/domain/aliasCore.js";
+import { InstallDependenciesStep, UpdateLockfileStep, WriteFileStep } from "@/domain/saga/index.js";
 import { selectItemsFromFlags } from "@/domain/selection.js";
 import { readConfig, resolveRegistrySource } from "@/shell/config.js";
-import { collectMissingDependencies, installDependencies } from "@/shell/installer.js";
-import { computeHash, readLockfile, writeLockfile } from "@/shell/lockfile.js";
+import { collectMissingDependencies } from "@/shell/installer.js";
 import { resolvePackageManager } from "@/shell/packageManagers/resolver.js";
 import { loadRegistry, resolveFileContent } from "@/shell/registry.js";
 import type {
@@ -268,78 +267,62 @@ export async function runAddCommand(
   }
 
   // --- EXECUTION PHASE: Pure IO without UI interruptions ---
-  const lockfile = await readLockfile(context.cwd, context.runtime);
-  const hashesAcc: Record<string, string[]> = {};
-
-  const writeResults = await Promise.all(
-    finalWrites.map(async (write) => {
-      const item = selectedItems.find((entry) => entry.name === write.itemName);
-      if (!item) return ok({ ignored: true } as const);
-
-      const contentResult = await resolveFileContent(
-        write.sourceFile,
-        item,
-        context.cwd,
-        context.runtime,
-      );
-      if (!contentResult.ok) return contentResult;
-
-      let content = applyAliases(contentResult.value, config);
-
-      const ensureRes = await context.runtime.fs.ensureDir(path.dirname(write.absoluteTarget));
-      if (!ensureRes.ok) return ensureRes;
-
-      const writeRes = await context.runtime.fs.writeFile(write.absoluteTarget, content, "utf8");
-      if (!writeRes.ok) return writeRes;
-
-      const contentHash = computeHash(content);
-      return ok({
-        ignored: false,
-        itemName: item.name,
-        relativeTarget: write.relativeTarget,
-        contentHash,
-      } as const);
-    }),
-  );
-
+  const sagaSteps: TransactionStep<any>[] = [];
+  const installedItemsInfo: RegistryItem[] = [];
   let writtenFiles = 0;
-  for (const res of writeResults) {
-    if (!res.ok) return res;
-    if (res.value.ignored) continue;
 
-    const { itemName, relativeTarget, contentHash } = res.value;
-    if (!hashesAcc[itemName]) hashesAcc[itemName] = [];
-    hashesAcc[itemName].push(contentHash);
+  for (const write of finalWrites) {
+    const item = selectedItems.find((entry) => entry.name === write.itemName);
+    if (!item) continue;
 
-    writtenFiles += 1;
-    context.runtime.prompt.success(`Wrote ${relativeTarget}`);
+    const contentResult = await resolveFileContent(
+      write.sourceFile,
+      item,
+      context.cwd,
+      context.runtime,
+    );
+    if (!contentResult.ok) return contentResult;
+
+    const finalContent = applyAliases(contentResult.value, config);
+
+    sagaSteps.push(new WriteFileStep(write.absoluteTarget, finalContent, context.runtime));
+
+    if (!installedItemsInfo.some((i) => i.name === item.name)) {
+      installedItemsInfo.push(item);
+    }
+    writtenFiles++;
   }
 
-  if (writtenFiles > 0) {
-    for (const [itemName, fileHashes] of Object.entries(hashesAcc)) {
-      const combinedHash = computeHash(fileHashes.sort().join(""));
-      lockfile.components[itemName] = {
-        source: source,
-        hash: combinedHash,
-      };
-    }
-    await writeLockfile(context.cwd, lockfile, context.runtime);
+  if (installedItemsInfo.length > 0) {
+    sagaSteps.push(new UpdateLockfileStep(installedItemsInfo, context.cwd, context.runtime));
   }
 
   if (shouldInstallDeps) {
-    const packageManager = resolvePackageManager(
-      context.cwd,
-      config.packageManager,
-      context.runtime,
+    sagaSteps.push(
+      new InstallDependenciesStep(
+        installPlanRes.value.dependencyPlan,
+        context.cwd,
+        context.runtime,
+      ),
     );
-    const depsRes = installDependencies(
-      context.cwd,
-      packageManager,
-      missingDependencies,
-      missingDevDependencies,
-      context.runtime,
-    );
-    if (!depsRes.ok) return depsRes;
+  }
+
+  const runRes = await runSaga(sagaSteps, (stepName, status) => {
+    if (status === "executing") {
+      // Opt in context.runtime.prompt.info(`[Executing] ${stepName}`);
+    } else if (status === "completed") {
+      context.runtime.prompt.success(`[Success] ${stepName}`);
+    } else if (status === "failed") {
+      context.runtime.prompt.error(`[Failed] ${stepName}`);
+    } else if (status === "compensating") {
+      context.runtime.prompt.warn(`[Rollback] ${stepName}`);
+    } else if (status === "interrupted") {
+      context.runtime.prompt.error(`[Interrupted] Rolling back ${stepName}`);
+    }
+  });
+
+  if (!runRes.ok) {
+    return runRes;
   }
 
   context.runtime.prompt.info(

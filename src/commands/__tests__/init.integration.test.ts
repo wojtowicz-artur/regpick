@@ -1,6 +1,6 @@
-import { createMockPrompt } from "@/__tests__/helpers/integration.ts";
-import { runInitCommand } from "@/commands/init.ts";
-import { createRuntimePorts, type RuntimePorts } from "@/shell/runtime/ports.ts";
+import { createMockPrompt } from "@/__tests__/helpers/integration.js";
+import { runInitCommand } from "@/commands/init.js";
+import { createRuntimePorts, type RuntimePorts } from "@/shell/runtime/ports.js";
 import * as fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import * as path from "node:path";

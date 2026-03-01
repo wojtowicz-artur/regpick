@@ -18,6 +18,10 @@ class MemoryFileSystem {
     const absPath = path.resolve(filePath);
     return this.files.has(absPath);
   }
+  removeFile(filePath: string): void {
+    const absPath = path.resolve(filePath);
+    this.files.delete(absPath);
+  }
   clear() {
     this.files.clear();
   }
@@ -51,6 +55,10 @@ export function createMockRuntime(initialFiles: Record<string, string> = {}): {
       existsSync: (filePath: string) => fileSystem.exists(filePath),
       pathExists: async (filePath: string) => fileSystem.exists(filePath),
       ensureDir: async () => ok(undefined),
+      remove: async (filePath: string) => {
+        fileSystem.removeFile(filePath);
+        return ok(undefined);
+      },
       writeFile: async (filePath: string, content: string) => {
         fileSystem.writeFile(filePath, content);
         return ok(undefined);

@@ -1,11 +1,13 @@
-import path from "node:path";
 import { styleText } from "node:util";
 
 import { type AppError } from "@/core/errors.js";
 import { ok, type Result } from "@/core/result.js";
+import { runSaga, type TransactionStep } from "@/core/saga.js";
+import { SaveLockfileStep } from "@/domain/saga/saveLockfileStep.js";
+import { UpdateFileStep } from "@/domain/saga/updateFileStep.js";
 import { buildUpdatePlanForItem, groupBySource } from "@/domain/updatePlan.js";
 import { readConfig } from "@/shell/config.js";
-import { readLockfile, writeLockfile } from "@/shell/lockfile.js";
+import { readLockfile } from "@/shell/lockfile.js";
 import { loadRegistry, resolveFileContent } from "@/shell/registry.js";
 import type { CommandContext, CommandOutcome } from "@/types.js";
 
@@ -41,6 +43,8 @@ export async function runUpdateCommand(
   const bySource = groupBySource(lockfile);
 
   let updatedCount = 0;
+  const sagaSteps: TransactionStep<void>[] = [];
+  const updatedLockfile = JSON.parse(JSON.stringify(lockfile));
 
   for (const [source, itemsToUpdate] of Object.entries(bySource)) {
     const registryRes = await loadRegistry(source, context.cwd, context.runtime);
@@ -120,27 +124,37 @@ export async function runUpdateCommand(
           }
         }
 
-        // Apply update
-        const writeResults = await Promise.all(
-          updateAction.files.map(async (rf) => {
-            const ensureRes = await context.runtime.fs.ensureDir(path.dirname(rf.target));
-            if (!ensureRes.ok) return ensureRes;
-            return await context.runtime.fs.writeFile(rf.target, rf.content, "utf8");
-          }),
-        );
-        for (const writeRes of writeResults) {
-          if (!writeRes.ok) return writeRes;
+        // Defer applying update to Saga
+        for (const rf of updateAction.files) {
+          sagaSteps.push(new UpdateFileStep(rf.target, rf.content, context.runtime));
         }
 
-        lockfile.components[itemName].hash = updateAction.newHash;
+        updatedLockfile.components[itemName].hash = updateAction.newHash;
         updatedCount++;
-        context.runtime.prompt.success(`Updated ${itemName}`);
       }
     }
   }
 
   if (updatedCount > 0) {
-    await writeLockfile(context.cwd, lockfile, context.runtime);
+    sagaSteps.push(new SaveLockfileStep(context.cwd, updatedLockfile, context.runtime));
+
+    const runRes = await runSaga(sagaSteps, (stepName, status) => {
+      if (status === "executing") {
+      } else if (status === "completed") {
+        context.runtime.prompt.success(`[Success] ${stepName}`);
+      } else if (status === "failed") {
+        context.runtime.prompt.error(`[Failed] ${stepName}`);
+      } else if (status === "compensating") {
+        context.runtime.prompt.warn(`[Rollback] ${stepName}`);
+      } else if (status === "interrupted") {
+        context.runtime.prompt.error(`[Interrupted] Rolling back ${stepName}`);
+      }
+    });
+
+    if (!runRes.ok) {
+      return runRes;
+    }
+
     return ok({
       kind: "success",
       message: `Updated ${updatedCount} components.`,
