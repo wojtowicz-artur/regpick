@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.7.0](https://github.com/wojtowicz-artur/regpick/compare/v0.6.8...v0.7.0) (2026-03-01)
+
+### Features
+
+* add Vercel Analytics integration and update Hero component version ([d199ab3](https://github.com/wojtowicz-artur/regpick/commit/d199ab3f4d59dd0efcb29891e64d4ce234fa08b4))
+
 ## [0.6.8](https://github.com/wojtowicz-artur/regpick/compare/v0.6.7...v0.6.8) (2026-03-01)
 
 ### Code Refactoring
