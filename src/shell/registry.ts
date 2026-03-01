@@ -51,41 +51,49 @@ async function normalizeManifest(
 
   const inlineItems = inlineItemsRes.ok ? inlineItemsRes.value : [];
 
-  const resolvedItems: RegistryItem[] = [];
-  for (const itemRef of references) {
-    let itemData: unknown;
-    if (isHttpUrl(itemRef)) {
-      const res = await runtime.http.getJson(itemRef);
-      if (!res.ok) return err(res.error);
-      itemData = res.value;
-    } else if (sourceMeta.type === "http" && sourceMeta.baseUrl) {
-      const res = await runtime.http.getJson(joinUrl(sourceMeta.baseUrl, itemRef));
-      if (!res.ok) return err(res.error);
-      itemData = res.value;
-    } else if (
-      (sourceMeta.type === "file" || sourceMeta.type === "directory") &&
-      sourceMeta.baseDir
-    ) {
-      const res = await runtime.fs.readFile(path.resolve(sourceMeta.baseDir, itemRef), "utf8");
-      if (!res.ok) return err(res.error);
-      try {
-        itemData = JSON.parse(res.value);
-      } catch {
-        return err(appError("RegistryError", `Invalid JSON: ${itemRef}`));
+  const resolvedItemResults = await Promise.all(
+    references.map(async (itemRef) => {
+      let itemData: unknown;
+      if (isHttpUrl(itemRef)) {
+        const res = await runtime.http.getJson(itemRef);
+        if (!res.ok) return err(res.error);
+        itemData = res.value;
+      } else if (sourceMeta.type === "http" && sourceMeta.baseUrl) {
+        const res = await runtime.http.getJson(joinUrl(sourceMeta.baseUrl, itemRef));
+        if (!res.ok) return err(res.error);
+        itemData = res.value;
+      } else if (
+        (sourceMeta.type === "file" || sourceMeta.type === "directory") &&
+        sourceMeta.baseDir
+      ) {
+        const res = await runtime.fs.readFile(path.resolve(sourceMeta.baseDir, itemRef), "utf8");
+        if (!res.ok) return err(res.error);
+        try {
+          itemData = JSON.parse(res.value);
+        } catch {
+          return err(appError("RegistryError", `Invalid JSON: ${itemRef}`));
+        }
+      } else {
+        const res = await runtime.fs.readFile(path.resolve(itemRef), "utf8");
+        if (!res.ok) return err(res.error);
+        try {
+          itemData = JSON.parse(res.value);
+        } catch {
+          return err(appError("RegistryError", `Invalid JSON: ${itemRef}`));
+        }
       }
-    } else {
-      const res = await runtime.fs.readFile(path.resolve(itemRef), "utf8");
-      if (!res.ok) return err(res.error);
-      try {
-        itemData = JSON.parse(res.value);
-      } catch {
-        return err(appError("RegistryError", `Invalid JSON: ${itemRef}`));
-      }
-    }
 
-    if (itemData && typeof itemData === "object") {
-      resolvedItems.push(normalizeItem(itemData, sourceMeta));
-    }
+      if (itemData && typeof itemData === "object") {
+        return ok(normalizeItem(itemData, sourceMeta));
+      }
+      return ok(null);
+    }),
+  );
+
+  const resolvedItems: RegistryItem[] = [];
+  for (const res of resolvedItemResults) {
+    if (!res.ok) return res;
+    if (res.value) resolvedItems.push(res.value);
   }
 
   return ok([...inlineItems, ...resolvedItems]);
@@ -102,33 +110,41 @@ async function loadDirectoryRegistry(
   const files = dirRes.value;
   const jsonFiles = files.filter((file) => file.endsWith(".json"));
 
+  const fileResults = await Promise.all(
+    jsonFiles.map(async (fileName) => {
+      const fullPath = path.join(absoluteDir, fileName);
+      const readRes = await runtime.fs.readFile(fullPath, "utf8");
+      if (!readRes.ok) return readRes; // Bubble error up
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(readRes.value);
+      } catch {
+        return ok(null);
+      }
+
+      if (
+        !parsed ||
+        typeof parsed !== "object" ||
+        !("files" in parsed) ||
+        !Array.isArray(parsed.files)
+      ) {
+        return ok(null);
+      }
+
+      return ok(
+        normalizeItem(parsed, {
+          type: "directory",
+          baseDir: absoluteDir,
+        }),
+      );
+    }),
+  );
+
   const items: RegistryItem[] = [];
-  for (const fileName of jsonFiles) {
-    const fullPath = path.join(absoluteDir, fileName);
-    const readRes = await runtime.fs.readFile(fullPath, "utf8");
-    if (!readRes.ok) return err(readRes.error);
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(readRes.value);
-    } catch {
-      continue;
-    }
-
-    if (
-      !parsed ||
-      typeof parsed !== "object" ||
-      !("files" in parsed) ||
-      !Array.isArray(parsed.files)
-    ) {
-      continue;
-    }
-    items.push(
-      normalizeItem(parsed, {
-        type: "directory",
-        baseDir: absoluteDir,
-      }),
-    );
+  for (const res of fileResults) {
+    if (!res.ok) return err(res.error);
+    if (res.value) items.push(res.value);
   }
 
   return ok(items);

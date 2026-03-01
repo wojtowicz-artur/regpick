@@ -7,7 +7,7 @@ import { buildUpdatePlanForItem, groupBySource } from "@/domain/updatePlan.js";
 import { readConfig } from "@/shell/config.js";
 import { readLockfile, writeLockfile } from "@/shell/lockfile.js";
 import { loadRegistry, resolveFileContent } from "@/shell/registry.js";
-import type { CommandContext, CommandOutcome, RegistryFile } from "@/types.js";
+import type { CommandContext, CommandOutcome } from "@/types.js";
 
 async function printDiff(oldContent: string, newContent: string) {
   // TODO: Use a native diff implementation to avoid the dependency. This is a temporary solution. WHEN: implement when ecosystem will move further from Node 20, because native diff landad in Node 22.15
@@ -55,19 +55,20 @@ export async function runUpdateCommand(
       const registryItem = registryItems.find((i) => i.name === itemName);
       if (!registryItem) continue;
 
-      const resolvedFiles: { file: RegistryFile; content: string }[] = [];
+      const fileContentResults = await Promise.all(
+        registryItem.files.map(async (file) => {
+          const contentRes = await resolveFileContent(
+            file,
+            registryItem,
+            context.cwd,
+            context.runtime,
+          );
+          if (!contentRes.ok) return null;
+          return { file, content: contentRes.value };
+        }),
+      );
 
-      for (const file of registryItem.files) {
-        const contentRes = await resolveFileContent(
-          file,
-          registryItem,
-          context.cwd,
-          context.runtime,
-        );
-        if (!contentRes.ok) continue;
-
-        resolvedFiles.push({ file, content: contentRes.value });
-      }
+      const resolvedFiles = fileContentResults.filter((r) => r !== null);
 
       const currentHash = lockfile.components[itemName].hash;
       const updatePlanRes = buildUpdatePlanForItem(
@@ -120,10 +121,14 @@ export async function runUpdateCommand(
         }
 
         // Apply update
-        for (const rf of updateAction.files) {
-          const ensureRes = await context.runtime.fs.ensureDir(path.dirname(rf.target));
-          if (!ensureRes.ok) return ensureRes;
-          const writeRes = await context.runtime.fs.writeFile(rf.target, rf.content, "utf8");
+        const writeResults = await Promise.all(
+          updateAction.files.map(async (rf) => {
+            const ensureRes = await context.runtime.fs.ensureDir(path.dirname(rf.target));
+            if (!ensureRes.ok) return ensureRes;
+            return await context.runtime.fs.writeFile(rf.target, rf.content, "utf8");
+          }),
+        );
+        for (const writeRes of writeResults) {
           if (!writeRes.ok) return writeRes;
         }
 

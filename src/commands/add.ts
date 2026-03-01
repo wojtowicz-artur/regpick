@@ -183,10 +183,15 @@ export async function runAddCommand(
   if (!installPlanProbeRes.ok) return installPlanProbeRes;
   const installPlanProbe = installPlanProbeRes.value;
 
-  for (const write of installPlanProbe.plannedWrites) {
-    if (await context.runtime.fs.pathExists(write.absoluteTarget)) {
-      existingTargets.add(write.absoluteTarget);
-    }
+  const existingTargetsArray = await Promise.all(
+    installPlanProbe.plannedWrites.map(async (write) => {
+      const exists = await context.runtime.fs.pathExists(write.absoluteTarget);
+      return exists ? write.absoluteTarget : null;
+    }),
+  );
+
+  for (const target of existingTargetsArray) {
+    if (target) existingTargets.add(target);
   }
 
   const installPlanRes = buildInstallPlan(selectedItems, context.cwd, config, existingTargets);
@@ -263,38 +268,51 @@ export async function runAddCommand(
   }
 
   // --- EXECUTION PHASE: Pure IO without UI interruptions ---
-  let writtenFiles = 0;
   const lockfile = await readLockfile(context.cwd, context.runtime);
   const hashesAcc: Record<string, string[]> = {};
 
-  for (const write of finalWrites) {
-    const item = selectedItems.find((entry) => entry.name === write.itemName);
-    if (!item) continue;
+  const writeResults = await Promise.all(
+    finalWrites.map(async (write) => {
+      const item = selectedItems.find((entry) => entry.name === write.itemName);
+      if (!item) return ok({ ignored: true } as const);
 
-    const contentResult = await resolveFileContent(
-      write.sourceFile,
-      item,
-      context.cwd,
-      context.runtime,
-    );
-    if (!contentResult.ok) {
-      return contentResult;
-    }
+      const contentResult = await resolveFileContent(
+        write.sourceFile,
+        item,
+        context.cwd,
+        context.runtime,
+      );
+      if (!contentResult.ok) return contentResult;
 
-    let content = applyAliases(contentResult.value, config);
+      let content = applyAliases(contentResult.value, config);
 
-    const ensureRes = await context.runtime.fs.ensureDir(path.dirname(write.absoluteTarget));
-    if (!ensureRes.ok) return ensureRes;
-    const writeRes = await context.runtime.fs.writeFile(write.absoluteTarget, content, "utf8");
-    if (!writeRes.ok) return writeRes;
+      const ensureRes = await context.runtime.fs.ensureDir(path.dirname(write.absoluteTarget));
+      if (!ensureRes.ok) return ensureRes;
 
-    // Update lockfile
-    const contentHash = computeHash(content);
-    if (!hashesAcc[item.name]) hashesAcc[item.name] = [];
-    hashesAcc[item.name].push(contentHash);
+      const writeRes = await context.runtime.fs.writeFile(write.absoluteTarget, content, "utf8");
+      if (!writeRes.ok) return writeRes;
+
+      const contentHash = computeHash(content);
+      return ok({
+        ignored: false,
+        itemName: item.name,
+        relativeTarget: write.relativeTarget,
+        contentHash,
+      } as const);
+    }),
+  );
+
+  let writtenFiles = 0;
+  for (const res of writeResults) {
+    if (!res.ok) return res;
+    if (res.value.ignored) continue;
+
+    const { itemName, relativeTarget, contentHash } = res.value;
+    if (!hashesAcc[itemName]) hashesAcc[itemName] = [];
+    hashesAcc[itemName].push(contentHash);
 
     writtenFiles += 1;
-    context.runtime.prompt.success(`Wrote ${write.relativeTarget}`);
+    context.runtime.prompt.success(`Wrote ${relativeTarget}`);
   }
 
   if (writtenFiles > 0) {

@@ -15,19 +15,26 @@ async function getFilesRecursive(
     const dirRes = await context.runtime.fs.readdir(currentDir);
     if (!dirRes.ok) return dirRes;
 
-    for (const file of dirRes.value) {
-      const fullPath = path.join(currentDir, file);
-      const statRes = await context.runtime.fs.stat(fullPath);
-      if (!statRes.ok) return statRes;
+    const fileChecks = await Promise.all(
+      dirRes.value.map(async (file) => {
+        const fullPath = path.join(currentDir, file);
+        const statRes = await context.runtime.fs.stat(fullPath);
+        if (!statRes.ok) return statRes;
 
-      if (statRes.value.isDirectory()) {
-        const scanRes = await scan(fullPath);
-        if (!scanRes.ok) return scanRes;
-      } else {
-        if (fullPath.endsWith(".ts") || fullPath.endsWith(".tsx")) {
-          result.push(fullPath);
+        if (statRes.value.isDirectory()) {
+          const scanRes = await scan(fullPath);
+          if (!scanRes.ok) return scanRes;
+        } else {
+          if (fullPath.endsWith(".ts") || fullPath.endsWith(".tsx")) {
+            result.push(fullPath);
+          }
         }
-      }
+        return ok(undefined);
+      }),
+    );
+
+    for (const check of fileChecks) {
+      if (!check.ok) return check;
     }
     return ok(undefined);
   }
@@ -61,17 +68,24 @@ export async function runPackCommand(
 
   const items: RegistryItem[] = [];
 
-  for (const file of files) {
-    const contentRes = await context.runtime.fs.readFile(file, "utf8");
-    if (!contentRes.ok) return err(contentRes.error);
+  const fileResults = await Promise.all(
+    files.map(async (file) => {
+      const contentRes = await context.runtime.fs.readFile(file, "utf8");
+      if (!contentRes.ok) return contentRes;
 
-    items.push(
-      buildRegistryItemFromFile({
-        path: file,
-        content: contentRes.value,
-        targetDir,
-      }),
-    );
+      return ok(
+        buildRegistryItemFromFile({
+          path: file,
+          content: contentRes.value,
+          targetDir,
+        }),
+      );
+    }),
+  );
+
+  for (const res of fileResults) {
+    if (!res.ok) return err(res.error);
+    items.push(res.value);
   }
 
   const registry = { items };
