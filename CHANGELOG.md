@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.4](https://github.com/wojtowicz-artur/regpick/compare/v0.9.3...v0.9.4) (2026-03-01)
+
+### Code Refactoring
+
+* add formatting step to pre-commit hook ([bb67973](https://github.com/wojtowicz-artur/regpick/commit/bb679734de36cf34cfdea2ca0a1ca7ff564e643c))
+
 ## [0.9.3](https://github.com/wojtowicz-artur/regpick/compare/v0.9.2...v0.9.3) (2026-03-01)
 
 ### Code Refactoring
