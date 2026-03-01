@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.10.0](https://github.com/wojtowicz-artur/regpick/compare/v0.9.4...v0.10.0) (2026-03-01)
+
+### Features
+
+* implement graceful rollbacks (SIGINT) and migrate update command to Saga ([ef7d3db](https://github.com/wojtowicz-artur/regpick/commit/ef7d3db159b515755b6abb9b77003421011f77fc))
+
 ## [0.9.4](https://github.com/wojtowicz-artur/regpick/compare/v0.9.3...v0.9.4) (2026-03-01)
 
 ### Code Refactoring
