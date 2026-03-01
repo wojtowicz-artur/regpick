@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.8.0](https://github.com/wojtowicz-artur/regpick/compare/v0.7.0...v0.8.0) (2026-03-01)
+
+### Features
+
+* use absolute paths with aliases and add e2e tests ([9b75766](https://github.com/wojtowicz-artur/regpick/commit/9b75766b2965b2d5f15704575b55025b6c0a021f))
+
 ## [0.7.0](https://github.com/wojtowicz-artur/regpick/compare/v0.6.8...v0.7.0) (2026-03-01)
 
 ### Features
