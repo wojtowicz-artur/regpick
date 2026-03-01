@@ -1,9 +1,9 @@
 import { appError, type AppError } from "../core/errors.js";
 import { err, ok, type Result } from "../core/result.js";
-import type { CommandContext, CommandOutcome, RegistryItem } from "../types.js";
 import { resolveListSourceDecision } from "../domain/listCore.js";
 import { readConfig } from "../shell/config.js";
 import { loadRegistry } from "../shell/registry.js";
+import type { CommandContext, CommandOutcome, RegistryItem } from "../types.js";
 
 function formatItemLabel(item: RegistryItem): string {
   const type = item.type || "registry:file";
@@ -15,7 +15,10 @@ export async function runListCommand(
   context: CommandContext,
 ): Promise<Result<CommandOutcome, AppError>> {
   const { config } = await readConfig(context.cwd);
-  const sourceDecision = resolveListSourceDecision(context.args.positionals[1], config.registries);
+  const sourceDecision = resolveListSourceDecision(
+    context.args.positionals[1],
+    config.registries,
+  );
 
   let source = sourceDecision.source;
   if (sourceDecision.requiresPrompt) {
@@ -24,7 +27,8 @@ export async function runListCommand(
       placeholder: "https://example.com/registry.json",
     });
 
-    if (context.runtime.prompt.isCancel(response)) {
+    const isCancel = await context.runtime.prompt.isCancel(response);
+    if (isCancel) {
       return err(appError("UserCancelled", "Operation cancelled."));
     }
 
@@ -35,7 +39,11 @@ export async function runListCommand(
     return ok({ kind: "noop", message: "No registry source provided." });
   }
 
-  const registryResult = await loadRegistry(source, context.cwd, context.runtime);
+  const registryResult = await loadRegistry(
+    source,
+    context.cwd,
+    context.runtime,
+  );
   if (!registryResult.ok) {
     return registryResult;
   }

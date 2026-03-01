@@ -1,18 +1,15 @@
 import { appError, type AppError } from "../core/errors.js";
 import { err, ok, type Result } from "../core/result.js";
+import { decideInitAfterOverwritePrompt } from "../domain/initCore.js";
+import { getConfigPath, readConfig, writeConfig } from "../shell/config.js";
 import type { CommandContext, CommandOutcome } from "../types.js";
-import {
-  decideInitAfterFirstWrite,
-  decideInitAfterOverwritePrompt,
-} from "../domain/initCore.js";
-import { getConfigPath, writeConfig, readConfig } from "../shell/config.js";
 
 export async function runInitCommand(
   context: CommandContext,
 ): Promise<Result<CommandOutcome, AppError>> {
   const outputPath = getConfigPath(context.cwd);
   const existsRes = await context.runtime.fs.stat(outputPath);
-  
+
   if (existsRes.ok) {
     const shouldOverwrite = await context.runtime.prompt.confirm({
       message: `${outputPath} already exists. Overwrite?`,
@@ -20,7 +17,7 @@ export async function runInitCommand(
     });
 
     const secondDecision = decideInitAfterOverwritePrompt(
-      context.runtime.prompt.isCancel(shouldOverwrite),
+      await context.runtime.prompt.isCancel(shouldOverwrite),
       Boolean(shouldOverwrite),
     );
     if (secondDecision === "cancelled") {
@@ -41,11 +38,13 @@ export async function runInitCommand(
       { value: "auto", label: "Auto (wykrywanie)" },
       { value: "npm", label: "npm" },
       { value: "yarn", label: "yarn" },
-      { value: "pnpm", label: "pnpm" }
+      { value: "pnpm", label: "pnpm" },
     ],
   });
 
-  if (context.runtime.prompt.isCancel(packageManager)) {
+  const isPackageManagerCancel =
+    await context.runtime.prompt.isCancel(packageManager);
+  if (isPackageManagerCancel) {
     return err(appError("UserCancelled", "Operation cancelled."));
   }
 
@@ -54,20 +53,25 @@ export async function runInitCommand(
     placeholder: "src/components/ui",
   });
 
-  if (context.runtime.prompt.isCancel(componentsFolder)) {
+  const isComponentsFolderCancel =
+    await context.runtime.prompt.isCancel(componentsFolder);
+  if (isComponentsFolderCancel) {
     return err(appError("UserCancelled", "Operation cancelled."));
   }
 
   const overwritePolicy = await context.runtime.prompt.select({
-    message: "Czy chcesz nadpisywać pliki automatycznie, czy wolisz być pytany?",
+    message:
+      "Czy chcesz nadpisywać pliki automatycznie, czy wolisz być pytany?",
     options: [
       { value: "prompt", label: "Pytaj (prompt)" },
       { value: "overwrite", label: "Zawsze nadpisuj (overwrite)" },
-      { value: "skip", label: "Pomijaj nadpisywanie (skip)" }
+      { value: "skip", label: "Pomijaj nadpisywanie (skip)" },
     ],
   });
 
-  if (context.runtime.prompt.isCancel(overwritePolicy)) {
+  const isOverwritePolicyCancel =
+    await context.runtime.prompt.isCancel(overwritePolicy);
+  if (isOverwritePolicyCancel) {
     return err(appError("UserCancelled", "Operation cancelled."));
   }
 
@@ -80,10 +84,15 @@ export async function runInitCommand(
       "registry:component": String(componentsFolder || "src/components/ui"),
       "registry:file": String(componentsFolder || "src/components/ui"),
       "registry:icon": `${String(componentsFolder || "src/components/ui")}/icons`,
-    }
+    },
   };
 
   await writeConfig(context.cwd, newConfig, { overwrite: true });
-  context.runtime.prompt.success(`${existsRes.ok ? "Overwrote" : "Created"} ${outputPath}`);
-  return ok({ kind: "success", message: `${existsRes.ok ? "Overwrote" : "Created"} ${outputPath}` });
+  context.runtime.prompt.success(
+    `${existsRes.ok ? "Overwrote" : "Created"} ${outputPath}`,
+  );
+  return ok({
+    kind: "success",
+    message: `${existsRes.ok ? "Overwrote" : "Created"} ${outputPath}`,
+  });
 }
