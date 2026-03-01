@@ -194,8 +194,7 @@ async function queryInstallPlanState(
   selectedItems: RegistryItem[],
 ): Promise<Result<AddPlanInteractionState, AppError>> {
   const installPlanProbeRes = buildInstallPlan(selectedItems, context.cwd, config);
-  if (!installPlanProbeRes.ok)
-    return err(installPlanProbeRes.error);
+  if (!installPlanProbeRes.ok) return err(installPlanProbeRes.error);
 
   const existingTargets = new Set<string>();
   const probeWrites = installPlanProbeRes.value.plannedWrites;
@@ -206,8 +205,7 @@ async function queryInstallPlanState(
   }
 
   const finalInstallPlanRes = buildInstallPlan(selectedItems, context.cwd, config, existingTargets);
-  if (!finalInstallPlanRes.ok)
-    return err(finalInstallPlanRes.error);
+  if (!finalInstallPlanRes.ok) return err(finalInstallPlanRes.error);
 
   const { missingDependencies, missingDevDependencies } = collectMissingDependencies(
     selectedItems,
