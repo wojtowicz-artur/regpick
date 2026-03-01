@@ -46,7 +46,8 @@ async function promptForSource(
       required: false,
     });
 
-    if (context.runtime.prompt.isCancel(picked)) {
+    const isCancel = await context.runtime.prompt.isCancel(picked);
+    if (isCancel) {
       return err(appError("UserCancelled", "Operation cancelled."));
     }
 
@@ -60,7 +61,8 @@ async function promptForSource(
     placeholder: "https://example.com/registry.json",
   });
 
-  if (context.runtime.prompt.isCancel(manual)) {
+  const isManualCancel = await context.runtime.prompt.isCancel(manual);
+  if (isManualCancel) {
     return err(appError("UserCancelled", "Operation cancelled."));
   }
 
@@ -92,7 +94,8 @@ async function promptForItems(
     required: true,
   });
 
-  if (context.runtime.prompt.isCancel(selectedNames)) {
+  const isCancel = await context.runtime.prompt.isCancel(selectedNames);
+  if (isCancel) {
     return err(appError("UserCancelled", "Operation cancelled."));
   }
 
@@ -156,7 +159,8 @@ export async function runAddCommand(
       initialValue: true,
     });
 
-    if (context.runtime.prompt.isCancel(proceed) || !proceed) {
+    const isProceedCancel = await context.runtime.prompt.isCancel(proceed);
+    if (isProceedCancel || !proceed) {
       return err(appError("UserCancelled", "Operation cancelled."));
     }
   }
@@ -204,7 +208,9 @@ export async function runAddCommand(
             { value: "abort", label: "Abort installation" },
           ],
         });
-        if (context.runtime.prompt.isCancel(answer) || answer === "abort") {
+
+        const isAnswerCancel = await context.runtime.prompt.isCancel(answer);
+        if (isAnswerCancel || answer === "abort") {
           return err(
             appError("UserCancelled", "Installation aborted by user."),
           );
@@ -244,7 +250,8 @@ export async function runAddCommand(
         initialValue: true,
       });
 
-      if (context.runtime.prompt.isCancel(proceed)) {
+      const isProceedCancel = await context.runtime.prompt.isCancel(proceed);
+      if (isProceedCancel) {
         return err(
           appError(
             "UserCancelled",

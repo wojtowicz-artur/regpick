@@ -113,7 +113,8 @@ export async function runUpdateCommand(
           ],
         });
 
-        if (context.runtime.prompt.isCancel(action) || action === "skip") {
+        const isActionCancel = await context.runtime.prompt.isCancel(action);
+        if (isActionCancel || action === "skip") {
           continue;
         }
 
@@ -135,7 +136,9 @@ export async function runUpdateCommand(
             initialValue: true,
           });
 
-          if (context.runtime.prompt.isCancel(confirm) || !confirm) {
+          const isConfirmCancel =
+            await context.runtime.prompt.isCancel(confirm);
+          if (isConfirmCancel || !confirm) {
             continue;
           }
         }
