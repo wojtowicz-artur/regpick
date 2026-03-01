@@ -1,0 +1,11 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "ignorePatterns": [
+    "dist",
+    "node_modules",
+    "regpick-lock.json",
+    "CHANGELOG.md",
+    "release-it.json",
+    "regpick.config.schema.json"
+  ]
+}

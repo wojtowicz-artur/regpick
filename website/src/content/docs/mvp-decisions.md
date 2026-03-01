@@ -28,6 +28,7 @@ This file closes the open items from the implementation plan for prototype scope
 ## 3) Target path priority
 
 Order used by installer:
+
 1. `file.target` from manifest if `preferManifestTarget = true`,
 2. `targetsByType[itemType] + basename(file.path)` if mapped,
 3. `file.target` if present and not already used,

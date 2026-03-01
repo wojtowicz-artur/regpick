@@ -1,4 +1,5 @@
 import path from "node:path";
+import * as v from "valibot";
 
 import { appError, type AppError } from "@/core/errors.js";
 import { err, ok, type Result } from "@/core/result.js";
@@ -8,6 +9,12 @@ import {
 } from "@/shell/packageManagers/strategy.js";
 import type { RuntimePorts } from "@/shell/runtime/ports.js";
 import type { RegistryItem } from "@/types.js";
+
+const PackageJsonSchema = v.object({
+  dependencies: v.optional(v.record(v.string(), v.string()), {}),
+  devDependencies: v.optional(v.record(v.string(), v.string()), {}),
+  peerDependencies: v.optional(v.record(v.string(), v.string()), {}),
+});
 
 function unique(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))];
@@ -23,22 +30,22 @@ export function collectMissingDependencies(
     return { missingDependencies: [], missingDevDependencies: [] };
   }
 
-  const packageJsonResult = runtime.fs.readJsonSync<{
-    dependencies?: Record<string, string>;
-    devDependencies?: Record<string, string>;
-    peerDependencies?: Record<string, string>;
-  }>(packageJsonPath);
-  const packageJson = packageJsonResult.ok ? packageJsonResult.value : {};
+  const packageJsonResult = runtime.fs.readJsonSync<unknown>(packageJsonPath);
+  const parsed = packageJsonResult.ok ? packageJsonResult.value : {};
+
+  const safeParseResult = v.safeParse(PackageJsonSchema, parsed);
+  const packageJson = safeParseResult.success
+    ? safeParseResult.output
+    : { dependencies: {}, devDependencies: {}, peerDependencies: {} };
+
   const declared = {
-    ...(packageJson.dependencies || {}),
-    ...(packageJson.devDependencies || {}),
-    ...(packageJson.peerDependencies || {}),
+    ...packageJson.dependencies,
+    ...packageJson.devDependencies,
+    ...packageJson.peerDependencies,
   };
 
   const allDeps = unique(items.flatMap((item) => item.dependencies || []));
-  const allDevDeps = unique(
-    items.flatMap((item) => item.devDependencies || []),
-  );
+  const allDevDeps = unique(items.flatMap((item) => item.devDependencies || []));
 
   const missingDependencies = allDeps.filter((dep) => !declared[dep]);
   const missingDevDependencies = allDevDeps.filter((dep) => !declared[dep]);

@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  extractItemReferences,
-  normalizeManifestInline,
-} from "@/domain/registryModel.js";
+import { extractItemReferences, normalizeManifestInline } from "@/domain/registryModel.js";
 
 describe("registry model core", () => {
   it("normalizes inline items from registry.json", () => {
@@ -37,10 +34,6 @@ describe("registry model core", () => {
         { name: "c", path: "./c.json" },
       ],
     };
-    expect(extractItemReferences(payload)).toEqual([
-      "./a.json",
-      "./b.json",
-      "./c.json",
-    ]);
+    expect(extractItemReferences(payload)).toEqual(["./a.json", "./b.json", "./c.json"]);
   });
 });

@@ -52,9 +52,7 @@ export function buildRegistryItemFromFile(file: {
   targetDir: string;
 }): RegistryItem {
   const dependencies = extractDependencies(file.content);
-  const relativePath = path
-    .relative(file.targetDir, file.path)
-    .replace(/\\/g, "/");
+  const relativePath = path.relative(file.targetDir, file.path).replace(/\\/g, "/");
   const name = path.basename(file.path, path.extname(file.path));
 
   return {

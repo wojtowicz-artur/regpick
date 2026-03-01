@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  buildInstallPlan,
-  resolveRegistryDependencies,
-} from "@/domain/addPlan.js";
+import { buildInstallPlan, resolveRegistryDependencies } from "@/domain/addPlan.js";
 import type { RegistryItem, RegpickConfig } from "@/types.js";
 
 const config: RegpickConfig = {
@@ -48,13 +45,8 @@ describe("add plan core", () => {
     const planRes = buildInstallPlan(items, "/tmp/project", config);
     expect(planRes.ok).toBe(true);
     if (planRes.ok) {
-      expect(planRes.value.dependencyPlan.dependencies).toEqual([
-        "react",
-        "clsx",
-      ]);
-      expect(planRes.value.dependencyPlan.devDependencies).toEqual([
-        "@types/react",
-      ]);
+      expect(planRes.value.dependencyPlan.dependencies).toEqual(["react", "clsx"]);
+      expect(planRes.value.dependencyPlan.devDependencies).toEqual(["@types/react"]);
     }
   });
 
@@ -62,15 +54,8 @@ describe("add plan core", () => {
     const firstPlanRes = buildInstallPlan(items, "/tmp/project", config);
     expect(firstPlanRes.ok).toBe(true);
     if (!firstPlanRes.ok) return;
-    const existingTargets = new Set([
-      firstPlanRes.value.plannedWrites[0].absoluteTarget,
-    ]);
-    const planWithConflictsRes = buildInstallPlan(
-      items,
-      "/tmp/project",
-      config,
-      existingTargets,
-    );
+    const existingTargets = new Set([firstPlanRes.value.plannedWrites[0].absoluteTarget]);
+    const planWithConflictsRes = buildInstallPlan(items, "/tmp/project", config, existingTargets);
     expect(planWithConflictsRes.ok).toBe(true);
     if (!planWithConflictsRes.ok) return;
     expect(planWithConflictsRes.value.conflicts).toHaveLength(1);
@@ -102,8 +87,10 @@ describe("add plan core", () => {
       };
 
       const allItems = [itemWithDeps, iconItem, utilsItem];
-      const { resolvedItems, missingDependencies } =
-        resolveRegistryDependencies([itemWithDeps], allItems);
+      const { resolvedItems, missingDependencies } = resolveRegistryDependencies(
+        [itemWithDeps],
+        allItems,
+      );
 
       expect(missingDependencies).toHaveLength(0);
       expect(resolvedItems).toHaveLength(3);
@@ -126,13 +113,13 @@ describe("add plan core", () => {
       };
 
       const allItems = [itemWithDeps];
-      const { resolvedItems, missingDependencies } =
-        resolveRegistryDependencies([itemWithDeps], allItems);
+      const { resolvedItems, missingDependencies } = resolveRegistryDependencies(
+        [itemWithDeps],
+        allItems,
+      );
 
       expect(missingDependencies).toHaveLength(2);
-      expect(missingDependencies).toEqual(
-        expect.arrayContaining(["icon", "utils"]),
-      );
+      expect(missingDependencies).toEqual(expect.arrayContaining(["icon", "utils"]));
       expect(resolvedItems).toHaveLength(1);
       expect(resolvedItems[0].name).toBe("button");
     });

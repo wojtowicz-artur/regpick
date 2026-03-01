@@ -35,12 +35,7 @@ const item: RegistryItem = {
 
 describe("path policy core", () => {
   it("prefers manifest target by default", () => {
-    const outputRes = resolveOutputPathFromPolicy(
-      item,
-      item.files[0],
-      "/tmp/project",
-      baseConfig,
-    );
+    const outputRes = resolveOutputPathFromPolicy(item, item.files[0], "/tmp/project", baseConfig);
     expect(outputRes.ok).toBe(true);
     if (outputRes.ok) {
       expect(outputRes.value.relativeTarget).toBe("src/custom/check.tsx");
@@ -48,17 +43,13 @@ describe("path policy core", () => {
   });
 
   it("uses mapped type target when preferManifestTarget is false", () => {
-    const outputRes = resolveOutputPathFromPolicy(
-      item,
-      item.files[0],
-      "/tmp/project",
-      { ...baseConfig, preferManifestTarget: false },
-    );
+    const outputRes = resolveOutputPathFromPolicy(item, item.files[0], "/tmp/project", {
+      ...baseConfig,
+      preferManifestTarget: false,
+    });
     expect(outputRes.ok).toBe(true);
     if (outputRes.ok) {
-      expect(outputRes.value.relativeTarget).toBe(
-        "src/components/ui/check.tsx",
-      );
+      expect(outputRes.value.relativeTarget).toBe("src/components/ui/check.tsx");
     }
   });
 
@@ -71,9 +62,7 @@ describe("path policy core", () => {
     );
     expect(outputRes.ok).toBe(false);
     if (!outputRes.ok) {
-      expect(outputRes.error.message).toMatch(
-        /Refusing to write outside project/,
-      );
+      expect(outputRes.error.message).toMatch(/Refusing to write outside project/);
     }
   });
 });

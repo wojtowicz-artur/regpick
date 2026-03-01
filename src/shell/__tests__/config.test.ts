@@ -27,11 +27,7 @@ describe("readConfig", () => {
         registries: { testreg: "./r" },
         overwritePolicy: "overwrite",
       };
-      await fs.writeFile(
-        path.join(tmp, "regpick.json"),
-        JSON.stringify(custom),
-        "utf8",
-      );
+      await fs.writeFile(path.join(tmp, "regpick.json"), JSON.stringify(custom), "utf8");
 
       const { config, configPath } = await readConfig(tmp);
 
@@ -50,11 +46,7 @@ describe("readConfig", () => {
     try {
       // write config in parent
       const custom = { registries: { parentreg: "./pr" } };
-      await fs.writeFile(
-        path.join(tmp, "regpick.json"),
-        JSON.stringify(custom),
-        "utf8",
-      );
+      await fs.writeFile(path.join(tmp, "regpick.json"), JSON.stringify(custom), "utf8");
 
       // create nested folder and run readConfig from there
       const nested = path.join(tmp, "a", "b", "c");

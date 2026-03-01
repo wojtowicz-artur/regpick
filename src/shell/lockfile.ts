@@ -21,10 +21,7 @@ export function getLockfilePath(cwd: string): string {
   return path.join(cwd, LOCKFILE_NAME);
 }
 
-export async function readLockfile(
-  cwd: string,
-  runtime: RuntimePorts,
-): Promise<RegpickLockfile> {
+export async function readLockfile(cwd: string, runtime: RuntimePorts): Promise<RegpickLockfile> {
   const lockfilePath = getLockfilePath(cwd);
   const exists = await runtime.fs.pathExists(lockfilePath);
 

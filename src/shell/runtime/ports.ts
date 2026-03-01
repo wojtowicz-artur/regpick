@@ -13,10 +13,7 @@ export type FileSystemPort = {
     content: string,
     encoding: BufferEncoding,
   ): Promise<Result<void, AppError>>;
-  readFile(
-    path: string,
-    encoding: BufferEncoding,
-  ): Promise<Result<string, AppError>>;
+  readFile(path: string, encoding: BufferEncoding): Promise<Result<string, AppError>>;
   readJsonSync<T = unknown>(path: string): Result<T, AppError>;
   writeJson(
     path: string,
@@ -28,10 +25,7 @@ export type FileSystemPort = {
 };
 
 export type HttpPort = {
-  getJson<T = unknown>(
-    url: string,
-    timeoutMs?: number,
-  ): Promise<Result<T, AppError>>;
+  getJson<T = unknown>(url: string, timeoutMs?: number): Promise<Result<T, AppError>>;
   getText(url: string, timeoutMs?: number): Promise<Result<string, AppError>>;
 };
 
@@ -49,10 +43,7 @@ export type PromptPort = {
     placeholder?: string;
     defaultValue?: string;
   }): Promise<string | symbol>;
-  confirm(options: {
-    message: string;
-    initialValue?: boolean;
-  }): Promise<boolean | symbol>;
+  confirm(options: { message: string; initialValue?: boolean }): Promise<boolean | symbol>;
   select(options: {
     message: string;
     options: Array<{ value: string; label: string; hint?: string }>;
@@ -82,9 +73,7 @@ export type RuntimePorts = {
   process: ProcessPort;
 };
 
-export const createRuntimePorts = (options?: {
-  signal?: AbortSignal;
-}): RuntimePorts => ({
+export const createRuntimePorts = (options?: { signal?: AbortSignal }): RuntimePorts => ({
   fs: {
     existsSync: (path) => fs.existsSync(path),
     pathExists: async (path) => {
@@ -100,13 +89,7 @@ export const createRuntimePorts = (options?: {
         await fsPromises.mkdir(path, { recursive: true });
         return ok(undefined);
       } catch (cause) {
-        return err(
-          appError(
-            "RuntimeError",
-            `Failed to ensure directory: ${path}`,
-            cause,
-          ),
-        );
+        return err(appError("RuntimeError", `Failed to ensure directory: ${path}`, cause));
       }
     },
     writeFile: async (path, content, encoding) => {
@@ -114,9 +97,7 @@ export const createRuntimePorts = (options?: {
         await fsPromises.writeFile(path, content, encoding);
         return ok(undefined);
       } catch (cause) {
-        return err(
-          appError("RuntimeError", `Failed to write file: ${path}`, cause),
-        );
+        return err(appError("RuntimeError", `Failed to write file: ${path}`, cause));
       }
     },
     readFile: async (path, encoding) => {
@@ -124,9 +105,7 @@ export const createRuntimePorts = (options?: {
         const content = await fsPromises.readFile(path, encoding);
         return ok(content);
       } catch (cause) {
-        return err(
-          appError("RuntimeError", `Failed to read file: ${path}`, cause),
-        );
+        return err(appError("RuntimeError", `Failed to read file: ${path}`, cause));
       }
     },
     readJsonSync: <T = unknown>(path: string) => {
@@ -134,9 +113,7 @@ export const createRuntimePorts = (options?: {
         const content = fs.readFileSync(path, "utf8");
         return ok(JSON.parse(content) as T);
       } catch (cause) {
-        return err(
-          appError("RuntimeError", `Failed to read JSON: ${path}`, cause),
-        );
+        return err(appError("RuntimeError", `Failed to read JSON: ${path}`, cause));
       }
     },
     writeJson: async (path, value, opts) => {
@@ -145,9 +122,7 @@ export const createRuntimePorts = (options?: {
         await fsPromises.writeFile(path, content, "utf8");
         return ok(undefined);
       } catch (cause) {
-        return err(
-          appError("RuntimeError", `Failed to write JSON: ${path}`, cause),
-        );
+        return err(appError("RuntimeError", `Failed to write JSON: ${path}`, cause));
       }
     },
     stat: async (path) => {
@@ -155,9 +130,7 @@ export const createRuntimePorts = (options?: {
         const stats = await fsPromises.stat(path);
         return ok(stats);
       } catch (cause) {
-        return err(
-          appError("RuntimeError", `Failed to stat path: ${path}`, cause),
-        );
+        return err(appError("RuntimeError", `Failed to stat path: ${path}`, cause));
       }
     },
     readdir: async (path) => {
@@ -165,17 +138,12 @@ export const createRuntimePorts = (options?: {
         const files = await fsPromises.readdir(path);
         return ok(files);
       } catch (cause) {
-        return err(
-          appError("RuntimeError", `Failed to read directory: ${path}`, cause),
-        );
+        return err(appError("RuntimeError", `Failed to read directory: ${path}`, cause));
       }
     },
   },
   http: {
-    getJson: async <T>(
-      url: string,
-      timeoutMs = 15000,
-    ): Promise<Result<T, AppError>> => {
+    getJson: async <T>(url: string, timeoutMs = 15000): Promise<Result<T, AppError>> => {
       try {
         const response = await fetch(url, {
           signal: AbortSignal.timeout(timeoutMs),
@@ -193,15 +161,10 @@ export const createRuntimePorts = (options?: {
         const data = await response.json();
         return ok(data as T);
       } catch (cause) {
-        return err(
-          appError("RuntimeError", `Failed to fetch JSON from: ${url}`, cause),
-        );
+        return err(appError("RuntimeError", `Failed to fetch JSON from: ${url}`, cause));
       }
     },
-    getText: async (
-      url: string,
-      timeoutMs = 15000,
-    ): Promise<Result<string, AppError>> => {
+    getText: async (url: string, timeoutMs = 15000): Promise<Result<string, AppError>> => {
       try {
         const response = await fetch(url, {
           signal: AbortSignal.timeout(timeoutMs),
@@ -219,9 +182,7 @@ export const createRuntimePorts = (options?: {
         const data = await response.text();
         return ok(data);
       } catch (cause) {
-        return err(
-          appError("RuntimeError", `Failed to fetch text from: ${url}`, cause),
-        );
+        return err(appError("RuntimeError", `Failed to fetch text from: ${url}`, cause));
       }
     },
   },

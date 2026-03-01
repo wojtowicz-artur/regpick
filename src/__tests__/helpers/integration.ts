@@ -23,26 +23,22 @@ export const createMockPrompt = (): {
   text: vi
     .fn()
     .mockImplementation(
-      async (options: Parameters<PromptPort["text"]>[0]) =>
-        options.defaultValue || "",
+      async (options: Parameters<PromptPort["text"]>[0]) => options.defaultValue || "",
     ),
   confirm: vi.fn().mockImplementation(async () => true),
   select: vi
     .fn()
     .mockImplementation(
-      async (options: Parameters<PromptPort["select"]>[0]) =>
-        options.options[0].value,
+      async (options: Parameters<PromptPort["select"]>[0]) => options.options[0].value,
     ),
   multiselect: vi
     .fn()
-    .mockImplementation(
-      async (options: Parameters<PromptPort["multiselect"]>[0]) =>
-        options.options.map((o) => o.value),
+    .mockImplementation(async (options: Parameters<PromptPort["multiselect"]>[0]) =>
+      options.options.map((o) => o.value),
     ),
   autocompleteMultiselect: vi
     .fn()
-    .mockImplementation(
-      async (options: Parameters<PromptPort["autocompleteMultiselect"]>[0]) =>
-        options.options.map((o) => o.value),
+    .mockImplementation(async (options: Parameters<PromptPort["autocompleteMultiselect"]>[0]) =>
+      options.options.map((o) => o.value),
     ),
 });

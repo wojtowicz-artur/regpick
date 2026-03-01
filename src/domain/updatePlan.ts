@@ -3,12 +3,7 @@ import { ok, type Result } from "@/core/result.js";
 import { applyAliases } from "@/domain/aliasCore.js";
 import { resolveOutputPathFromPolicy } from "@/domain/pathPolicy.js";
 import { computeHash } from "@/shell/lockfile.js";
-import type {
-  RegistryFile,
-  RegistryItem,
-  RegpickConfig,
-  RegpickLockfile,
-} from "@/types.js";
+import type { RegistryFile, RegistryItem, RegpickConfig, RegpickLockfile } from "@/types.js";
 
 export type UpdateFile = {
   target: string;
@@ -22,9 +17,7 @@ export type UpdateAction = {
   files: UpdateFile[];
 };
 
-export function groupBySource(
-  lockfile: RegpickLockfile,
-): Record<string, string[]> {
+export function groupBySource(lockfile: RegpickLockfile): Record<string, string[]> {
   const bySource: Record<string, string[]> = {};
   for (const name of Object.keys(lockfile.components)) {
     const source = lockfile.components[name].source;
@@ -51,14 +44,8 @@ export function buildUpdatePlanForItem(
     const content = applyAliases(rawContent, config);
     remoteContents.push(content);
 
-    const outputRes = resolveOutputPathFromPolicy(
-      registryItem,
-      file,
-      cwd,
-      config,
-    );
-    if (!outputRes.ok)
-      return outputRes as unknown as Result<UpdateAction, AppError>;
+    const outputRes = resolveOutputPathFromPolicy(registryItem, file, cwd, config);
+    if (!outputRes.ok) return outputRes as unknown as Result<UpdateAction, AppError>;
 
     remoteFiles.push({
       target: outputRes.value.absoluteTarget,
@@ -67,8 +54,7 @@ export function buildUpdatePlanForItem(
   }
 
   const newHash = computeHash(remoteContents.sort().join(""));
-  const status =
-    newHash !== currentHash ? "requires-diff-prompt" : "up-to-date";
+  const status = newHash !== currentHash ? "requires-diff-prompt" : "up-to-date";
 
   return ok({
     itemName,

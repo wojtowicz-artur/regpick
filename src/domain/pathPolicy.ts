@@ -23,12 +23,7 @@ function assertInsideProject(
     resolvedOutput !== path.resolve(projectRoot) &&
     !resolvedOutput.startsWith(projectRootWithSep)
   ) {
-    return err(
-      appError(
-        "ValidationError",
-        `Refusing to write outside project: ${resolvedOutput}`,
-      ),
-    );
+    return err(appError("ValidationError", `Refusing to write outside project: ${resolvedOutput}`));
   }
   return ok(undefined);
 }
@@ -56,11 +51,7 @@ export function resolveOutputPathFromPolicy(
   }
 
   const absoluteTarget = path.resolve(cwd, relativeTarget);
-  const assertRes = assertInsideProject(
-    cwd,
-    absoluteTarget,
-    Boolean(config.allowOutsideProject),
-  );
+  const assertRes = assertInsideProject(cwd, absoluteTarget, Boolean(config.allowOutsideProject));
   if (!assertRes.ok) return assertRes;
 
   return ok({

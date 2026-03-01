@@ -9,11 +9,7 @@ import {
   normalizeManifestInline,
 } from "@/domain/registryModel.js";
 import type { RuntimePorts } from "@/shell/runtime/ports.js";
-import type {
-  RegistryFile,
-  RegistryItem,
-  RegistrySourceMeta,
-} from "@/types.js";
+import type { RegistryFile, RegistryItem, RegistrySourceMeta } from "@/types.js";
 
 function isHttpUrl(value: string): boolean {
   return /^https?:\/\//i.test(value);
@@ -48,7 +44,7 @@ async function normalizeManifest(
     return inlineItemsRes;
   }
 
-  const references = extractItemReferences(data as Record<string, unknown>);
+  const references = extractItemReferences(data);
   if (!references.length) {
     return inlineItemsRes;
   }
@@ -63,19 +59,14 @@ async function normalizeManifest(
       if (!res.ok) return err(res.error);
       itemData = res.value;
     } else if (sourceMeta.type === "http" && sourceMeta.baseUrl) {
-      const res = await runtime.http.getJson(
-        joinUrl(sourceMeta.baseUrl, itemRef),
-      );
+      const res = await runtime.http.getJson(joinUrl(sourceMeta.baseUrl, itemRef));
       if (!res.ok) return err(res.error);
       itemData = res.value;
     } else if (
       (sourceMeta.type === "file" || sourceMeta.type === "directory") &&
       sourceMeta.baseDir
     ) {
-      const res = await runtime.fs.readFile(
-        path.resolve(sourceMeta.baseDir, itemRef),
-        "utf8",
-      );
+      const res = await runtime.fs.readFile(path.resolve(sourceMeta.baseDir, itemRef), "utf8");
       if (!res.ok) return err(res.error);
       try {
         itemData = JSON.parse(res.value);
@@ -93,9 +84,7 @@ async function normalizeManifest(
     }
 
     if (itemData && typeof itemData === "object") {
-      resolvedItems.push(
-        normalizeItem(itemData as Record<string, unknown>, sourceMeta),
-      );
+      resolvedItems.push(normalizeItem(itemData, sourceMeta));
     }
   }
 
@@ -129,12 +118,13 @@ async function loadDirectoryRegistry(
     if (
       !parsed ||
       typeof parsed !== "object" ||
-      !Array.isArray((parsed as Record<string, unknown>).files)
+      !("files" in parsed) ||
+      !Array.isArray(parsed.files)
     ) {
       continue;
     }
     items.push(
-      normalizeItem(parsed as Record<string, unknown>, {
+      normalizeItem(parsed, {
         type: "directory",
         baseDir: absoluteDir,
       }),
@@ -154,21 +144,13 @@ export async function loadRegistry(
   }
 
   const resolved =
-    isHttpUrl(source) || isFileUrl(source)
-      ? normalizeGitHubUrl(source)
-      : path.resolve(cwd, source);
+    isHttpUrl(source) || isFileUrl(source) ? normalizeGitHubUrl(source) : path.resolve(cwd, source);
 
   if (isHttpUrl(resolved)) {
     const dataRes = await runtime.http.getJson(resolved);
     if (!dataRes.ok) return err(dataRes.error);
-    const baseUrl = resolved.endsWith("/")
-      ? resolved
-      : resolved.replace(/[^/]*$/, "");
-    const itemsRes = await normalizeManifest(
-      dataRes.value,
-      { type: "http", baseUrl },
-      runtime,
-    );
+    const baseUrl = resolved.endsWith("/") ? resolved : resolved.replace(/[^/]*$/, "");
+    const itemsRes = await normalizeManifest(dataRes.value, { type: "http", baseUrl }, runtime);
     if (!itemsRes.ok) return err(itemsRes.error);
     return ok({ items: itemsRes.value, source: resolved });
   }
@@ -178,9 +160,7 @@ export async function loadRegistry(
     : path.resolve(resolved);
   const statsRes = await runtime.fs.stat(fileSystemPath);
   if (!statsRes.ok) {
-    return err(
-      appError("RegistryError", `Registry source not found: ${source}`),
-    );
+    return err(appError("RegistryError", `Registry source not found: ${source}`));
   }
   const stats = statsRes.value;
 
@@ -197,9 +177,7 @@ export async function loadRegistry(
   try {
     parsed = JSON.parse(readRes.value);
   } catch (cause) {
-    return err(
-      appError("RegistryError", "Failed to parse registry JSON.", cause),
-    );
+    return err(appError("RegistryError", "Failed to parse registry JSON.", cause));
   }
 
   const itemsRes = await normalizeManifest(

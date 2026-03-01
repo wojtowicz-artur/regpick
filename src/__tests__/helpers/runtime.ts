@@ -116,19 +116,14 @@ export function createMockRuntime(initialFiles: Record<string, string> = {}): {
         ),
       multiselect: vi
         .fn()
-        .mockImplementation(
-          async (
-            options: Parameters<RuntimePorts["prompt"]["multiselect"]>[0],
-          ) => options.options.map((o) => o.value),
+        .mockImplementation(async (options: Parameters<RuntimePorts["prompt"]["multiselect"]>[0]) =>
+          options.options.map((o) => o.value),
         ),
       autocompleteMultiselect: vi
         .fn()
         .mockImplementation(
-          async (
-            options: Parameters<
-              RuntimePorts["prompt"]["autocompleteMultiselect"]
-            >[0],
-          ) => options.options.map((o) => o.value),
+          async (options: Parameters<RuntimePorts["prompt"]["autocompleteMultiselect"]>[0]) =>
+            options.options.map((o) => o.value),
         ),
     },
     process: {

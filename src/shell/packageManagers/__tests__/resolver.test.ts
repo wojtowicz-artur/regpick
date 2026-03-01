@@ -8,8 +8,7 @@ import type { RuntimePorts } from "@/shell/runtime/ports.js";
 function runtimeWithLockfiles(lockfiles: string[]): RuntimePorts {
   return {
     fs: {
-      existsSync: (filePath: string) =>
-        lockfiles.some((lock) => filePath.endsWith(lock)),
+      existsSync: (filePath: string) => lockfiles.some((lock) => filePath.endsWith(lock)),
       pathExists: async () => false,
       ensureDir: async () => ok(undefined),
       writeFile: async () => ok(undefined),
@@ -52,31 +51,17 @@ describe("package manager resolver", () => {
 
   it("resolves lockfile-based manager", () => {
     expect(
-      resolvePackageManager(
-        "/tmp/project",
-        "auto",
-        runtimeWithLockfiles(["pnpm-lock.yaml"]),
-      ),
+      resolvePackageManager("/tmp/project", "auto", runtimeWithLockfiles(["pnpm-lock.yaml"])),
     ).toBe("pnpm");
+    expect(resolvePackageManager("/tmp/project", "auto", runtimeWithLockfiles(["yarn.lock"]))).toBe(
+      "yarn",
+    );
     expect(
-      resolvePackageManager(
-        "/tmp/project",
-        "auto",
-        runtimeWithLockfiles(["yarn.lock"]),
-      ),
-    ).toBe("yarn");
-    expect(
-      resolvePackageManager(
-        "/tmp/project",
-        "auto",
-        runtimeWithLockfiles(["package-lock.json"]),
-      ),
+      resolvePackageManager("/tmp/project", "auto", runtimeWithLockfiles(["package-lock.json"])),
     ).toBe("npm");
   });
 
   it("falls back to npm when no lockfile exists", () => {
-    expect(
-      resolvePackageManager("/tmp/project", "auto", runtimeWithLockfiles([])),
-    ).toBe("npm");
+    expect(resolvePackageManager("/tmp/project", "auto", runtimeWithLockfiles([]))).toBe("npm");
   });
 });

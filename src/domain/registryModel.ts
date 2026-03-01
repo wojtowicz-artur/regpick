@@ -3,8 +3,6 @@ import { err, ok, type Result } from "@/core/result.js";
 import type { RegistryItem, RegistrySourceMeta } from "@/types.js";
 import * as v from "valibot";
 
-type JsonRecord = Record<string, unknown>;
-
 export const RegistryFileSchema = v.object({
   path: v.optional(v.string()),
   target: v.optional(v.string()),
@@ -24,21 +22,15 @@ export const RegistryItemSchema = v.object({
   files: v.optional(v.array(RegistryFileSchema), []),
 });
 
-export function normalizeItem(
-  rawItem: JsonRecord,
-  sourceMeta: RegistrySourceMeta,
-): RegistryItem {
+export function normalizeItem(rawItem: unknown, sourceMeta: RegistrySourceMeta): RegistryItem {
   const parsed = v.parse(RegistryItemSchema, rawItem);
 
-  const name =
-    parsed.name === "unnamed-item" && parsed.title ? parsed.title : parsed.name;
+  const name = parsed.name === "unnamed-item" && parsed.title ? parsed.title : parsed.name;
   const title = parsed.title ?? name;
   const files = parsed.files.map((file) => ({
     ...file,
     type:
-      file.type === "registry:file" && parsed.type !== "registry:file"
-        ? parsed.type
-        : file.type,
+      file.type === "registry:file" && parsed.type !== "registry:file" ? parsed.type : file.type,
   }));
 
   return {
@@ -50,16 +42,16 @@ export function normalizeItem(
   };
 }
 
-export function extractItemReferences(payload: JsonRecord): string[] {
-  if (!payload || !Array.isArray(payload.items)) return [];
+export function extractItemReferences(payload: unknown): string[] {
+  const result = v.safeParse(ManifestItemsSchema, payload);
+  if (!result.success) {
+    return [];
+  }
 
-  return payload.items
-    .filter((entry): entry is JsonRecord =>
-      Boolean(entry && typeof entry === "object"),
-    )
+  return result.output.items
     .map((entry) => {
       if (Array.isArray(entry.files)) {
-        return null;
+        return null; // inline item, not a reference
       }
       return typeof entry.url === "string"
         ? entry.url
@@ -72,6 +64,14 @@ export function extractItemReferences(payload: JsonRecord): string[] {
     .filter((value): value is string => Boolean(value));
 }
 
+const ManifestItemsSchema = v.object({
+  items: v.array(v.record(v.string(), v.unknown())),
+});
+
+const SingleItemManifestSchema = v.object({
+  files: v.array(v.unknown()),
+});
+
 export function normalizeManifestInline(
   data: unknown,
   sourceMeta: RegistrySourceMeta,
@@ -79,39 +79,26 @@ export function normalizeManifestInline(
   try {
     if (Array.isArray(data)) {
       const items = data
-        .filter((entry): entry is JsonRecord =>
-          Boolean(entry && typeof entry === "object"),
-        )
+        .filter((entry) => Boolean(entry && typeof entry === "object"))
         .map((entry) => normalizeItem(entry, sourceMeta));
       return ok(items);
     }
 
-    if (
-      data &&
-      typeof data === "object" &&
-      Array.isArray((data as JsonRecord).items)
-    ) {
-      const entries = ((data as JsonRecord).items as JsonRecord[]).filter(
-        (entry) =>
-          entry && typeof entry === "object" && Array.isArray(entry.files),
-      );
+    const hasItemsRes = v.safeParse(ManifestItemsSchema, data);
+    if (hasItemsRes.success) {
+      const entries = hasItemsRes.output.items.filter((entry) => Array.isArray(entry.files));
       return ok(entries.map((entry) => normalizeItem(entry, sourceMeta)));
     }
 
-    if (
-      data &&
-      typeof data === "object" &&
-      Array.isArray((data as JsonRecord).files)
-    ) {
-      return ok([normalizeItem(data as JsonRecord, sourceMeta)]);
+    const hasFilesRes = v.safeParse(SingleItemManifestSchema, data);
+    if (hasFilesRes.success) {
+      return ok([normalizeItem(data, sourceMeta)]);
     }
 
     return err(appError("RegistryError", "Unsupported manifest structure."));
   } catch (e) {
     if (v.isValiError(e)) {
-      return err(
-        appError("ValidationError", `Manifest validation failed: ${e.message}`),
-      );
+      return err(appError("ValidationError", `Manifest validation failed: ${e.message}`));
     }
     return err(appError("RegistryError", "Failed to parse manifest"));
   }

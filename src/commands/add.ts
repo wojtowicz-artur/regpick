@@ -2,17 +2,11 @@ import path from "node:path";
 
 import { appError, type AppError } from "@/core/errors.js";
 import { err, ok, type Result } from "@/core/result.js";
-import {
-  buildInstallPlan,
-  resolveRegistryDependencies,
-} from "@/domain/addPlan.js";
+import { buildInstallPlan, resolveRegistryDependencies } from "@/domain/addPlan.js";
 import { applyAliases } from "@/domain/aliasCore.js";
 import { selectItemsFromFlags } from "@/domain/selection.js";
 import { readConfig, resolveRegistrySource } from "@/shell/config.js";
-import {
-  collectMissingDependencies,
-  installDependencies,
-} from "@/shell/installer.js";
+import { collectMissingDependencies, installDependencies } from "@/shell/installer.js";
 import { computeHash, readLockfile, writeLockfile } from "@/shell/lockfile.js";
 import { resolvePackageManager } from "@/shell/packageManagers/resolver.js";
 import { loadRegistry, resolveFileContent } from "@/shell/registry.js";
@@ -34,12 +28,10 @@ async function promptForSource(
     return ok(resolveRegistrySource(argValue, config));
   }
 
-  const aliases = Object.entries(config.registries || {}).map(
-    ([alias, value]) => ({
-      label: `${alias} -> ${value}`,
-      value: alias,
-    }),
-  );
+  const aliases = Object.entries(config.registries || {}).map(([alias, value]) => ({
+    label: `${alias} -> ${value}`,
+    value: alias,
+  }));
 
   if (aliases.length) {
     const picked = await context.runtime.prompt.multiselect({
@@ -72,9 +64,7 @@ async function promptForSource(
   return ok(String(manual));
 }
 
-function mapOptions(
-  items: RegistryItem[],
-): Array<{ value: string; label: string; hint: string }> {
+function mapOptions(items: RegistryItem[]): Array<{ value: string; label: string; hint: string }> {
   return items.map((item) => ({
     value: item.name,
     label: `${item.name} (${item.type || "registry:file"})`,
@@ -103,9 +93,7 @@ async function promptForItems(
   }
 
   const selectedValues = Array.isArray(selectedNames) ? selectedNames : [];
-  const selectedSet = new Set(
-    selectedValues.map((entry: string) => String(entry)),
-  );
+  const selectedSet = new Set(selectedValues.map((entry: string) => String(entry)));
   return ok(items.filter((item) => selectedSet.has(item.name)));
 }
 
@@ -116,20 +104,14 @@ export async function runAddCommand(
   const { config, configPath } = await readConfig(context.cwd);
 
   if (!configPath) {
-    context.runtime.prompt.error(
-      "No regpick.json configuration found. Please run 'init' first.",
-    );
+    context.runtime.prompt.error("No regpick.json configuration found. Please run 'init' first.");
     return err(appError("ValidationError", "No config file found"));
   }
 
   const sourcePosIdx = context.args.positionals[0] === "add" ? 1 : 0;
   const itemPosIdx = sourcePosIdx + 1;
 
-  const sourceResult = await promptForSource(
-    context,
-    config,
-    context.args.positionals,
-  );
+  const sourceResult = await promptForSource(context, config, context.args.positionals);
   if (!sourceResult.ok) {
     return sourceResult;
   }
@@ -138,11 +120,7 @@ export async function runAddCommand(
     return ok({ kind: "noop", message: "No registry source provided." });
   }
 
-  const registryResult = await loadRegistry(
-    source,
-    context.cwd,
-    context.runtime,
-  );
+  const registryResult = await loadRegistry(source, context.cwd, context.runtime);
   if (!registryResult.ok) {
     return registryResult;
   }
@@ -161,22 +139,20 @@ export async function runAddCommand(
   const preselected = selectItemsFromFlags(items, context);
 
   const promptedSelectionResult =
-    preselected.ok && preselected.value
-      ? preselected
-      : await promptForItems(context, items);
+    preselected.ok && preselected.value ? preselected : await promptForItems(context, items);
   if (!promptedSelectionResult.ok) {
     return promptedSelectionResult;
   }
   let selectedItems = promptedSelectionResult.value;
 
-  const { resolvedItems, missingDependencies: missingRegistryDeps } =
-    resolveRegistryDependencies(selectedItems, items);
+  const { resolvedItems, missingDependencies: missingRegistryDeps } = resolveRegistryDependencies(
+    selectedItems,
+    items,
+  );
   selectedItems = resolvedItems;
 
   for (const depName of missingRegistryDeps) {
-    context.runtime.prompt.warn(
-      `Registry dependency "${depName}" not found in current registry.`,
-    );
+    context.runtime.prompt.warn(`Registry dependency "${depName}" not found in current registry.`);
   }
 
   if (!selectedItems || !selectedItems.length) {
@@ -197,11 +173,7 @@ export async function runAddCommand(
   }
 
   const existingTargets = new Set<string>();
-  const installPlanProbeRes = buildInstallPlan(
-    selectedItems,
-    context.cwd,
-    config,
-  );
+  const installPlanProbeRes = buildInstallPlan(selectedItems, context.cwd, config);
   if (!installPlanProbeRes.ok) return installPlanProbeRes;
   const installPlanProbe = installPlanProbeRes.value;
 
@@ -211,12 +183,7 @@ export async function runAddCommand(
     }
   }
 
-  const installPlanRes = buildInstallPlan(
-    selectedItems,
-    context.cwd,
-    config,
-    existingTargets,
-  );
+  const installPlanRes = buildInstallPlan(selectedItems, context.cwd, config, existingTargets);
   if (!installPlanRes.ok) return installPlanRes;
   const installPlan = installPlanRes.value;
 
@@ -227,9 +194,7 @@ export async function runAddCommand(
       if (assumeYes || config.overwritePolicy === "overwrite") {
         finalWrites.push(write);
       } else if (config.overwritePolicy === "skip") {
-        context.runtime.prompt.warn(
-          `Skipped existing file: ${write.absoluteTarget}`,
-        );
+        context.runtime.prompt.warn(`Skipped existing file: ${write.absoluteTarget}`);
       } else {
         const answer = await context.runtime.prompt.select({
           message: `File exists: ${write.absoluteTarget}`,
@@ -242,9 +207,7 @@ export async function runAddCommand(
 
         const isAnswerCancel = await context.runtime.prompt.isCancel(answer);
         if (isAnswerCancel || answer === "abort") {
-          return err(
-            appError("UserCancelled", "Installation aborted by user."),
-          );
+          return err(appError("UserCancelled", "Installation aborted by user."));
         }
         if (answer === "overwrite") {
           finalWrites.push(write);
@@ -256,8 +219,11 @@ export async function runAddCommand(
   }
 
   // --- UI INTERACTION PHASE: Gather Dependency Decisions ---
-  const { missingDependencies, missingDevDependencies } =
-    collectMissingDependencies(selectedItems, context.cwd, context.runtime);
+  const { missingDependencies, missingDevDependencies } = collectMissingDependencies(
+    selectedItems,
+    context.cwd,
+    context.runtime,
+  );
   let shouldInstallDeps = false;
   if (missingDependencies.length || missingDevDependencies.length) {
     if (assumeYes) {
@@ -272,9 +238,7 @@ export async function runAddCommand(
       if (missingDependencies.length)
         messageParts.push(`dependencies: ${missingDependencies.join(", ")}`);
       if (missingDevDependencies.length)
-        messageParts.push(
-          `devDependencies: ${missingDevDependencies.join(", ")}`,
-        );
+        messageParts.push(`devDependencies: ${missingDevDependencies.join(", ")}`);
 
       const proceed = await context.runtime.prompt.confirm({
         message: `Install missing packages with ${packageManager}? (${messageParts.join(" | ")})`,
@@ -283,12 +247,7 @@ export async function runAddCommand(
 
       const isProceedCancel = await context.runtime.prompt.isCancel(proceed);
       if (isProceedCancel) {
-        return err(
-          appError(
-            "UserCancelled",
-            "Dependency installation cancelled by user.",
-          ),
-        );
+        return err(appError("UserCancelled", "Dependency installation cancelled by user."));
       }
       shouldInstallDeps = Boolean(proceed);
       if (!shouldInstallDeps) {
@@ -318,15 +277,9 @@ export async function runAddCommand(
 
     let content = applyAliases(contentResult.value, config);
 
-    const ensureRes = await context.runtime.fs.ensureDir(
-      path.dirname(write.absoluteTarget),
-    );
+    const ensureRes = await context.runtime.fs.ensureDir(path.dirname(write.absoluteTarget));
     if (!ensureRes.ok) return ensureRes;
-    const writeRes = await context.runtime.fs.writeFile(
-      write.absoluteTarget,
-      content,
-      "utf8",
-    );
+    const writeRes = await context.runtime.fs.writeFile(write.absoluteTarget, content, "utf8");
     if (!writeRes.ok) return writeRes;
 
     // Update lockfile

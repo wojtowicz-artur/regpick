@@ -15,10 +15,7 @@ export async function runListCommand(
   context: CommandContext,
 ): Promise<Result<CommandOutcome, AppError>> {
   const { config } = await readConfig(context.cwd);
-  const sourceDecision = resolveListSourceDecision(
-    context.args.positionals[1],
-    config.registries,
-  );
+  const sourceDecision = resolveListSourceDecision(context.args.positionals[1], config.registries);
 
   let source = sourceDecision.source;
   if (sourceDecision.requiresPrompt) {
@@ -39,11 +36,7 @@ export async function runListCommand(
     return ok({ kind: "noop", message: "No registry source provided." });
   }
 
-  const registryResult = await loadRegistry(
-    source,
-    context.cwd,
-    context.runtime,
-  );
+  const registryResult = await loadRegistry(source, context.cwd, context.runtime);
   if (!registryResult.ok) {
     return registryResult;
   }

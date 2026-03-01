@@ -2,44 +2,45 @@
   "name": "regpick",
   "version": "0.9.0",
   "description": "Lightweight CLI for selecting and installing registry entries.",
-  "type": "module",
-  "main": "./dist/index.mjs",
-  "exports": {
-    ".": "./dist/index.mjs"
+  "keywords": [
+    "cli",
+    "component-library",
+    "component-registry",
+    "components",
+    "copy",
+    "design-system",
+    "developer-tool",
+    "frontend-tooling",
+    "icon-registry",
+    "package-installer",
+    "react-components",
+    "registry",
+    "shadcn",
+    "shadcn-ui",
+    "svg-icons",
+    "tailwind",
+    "ui-components"
+  ],
+  "license": "MIT",
+  "author": "",
+  "bin": {
+    "regpick": "./bin/regpick.js"
   },
   "files": [
     "dist",
     "bin",
     "regpick.config.schema.json"
   ],
-  "keywords": [
-    "cli",
-    "component-registry",
-    "component-library",
-    "developer-tool",
-    "design-system",
-    "frontend-tooling",
-    "icon-registry",
-    "react-components",
-    "shadcn",
-    "shadcn-ui",
-    "svg-icons",
-    "tailwind",
-    "ui-components",
-    "package-installer",
-    "registry",
-    "components",
-    "copy"
-  ],
-  "author": "",
-  "license": "MIT",
-  "bin": {
-    "regpick": "./bin/regpick.js"
+  "type": "module",
+  "main": "./dist/index.mjs",
+  "exports": {
+    ".": "./dist/index.mjs"
   },
   "scripts": {
     "docs:dev": "npm run dev --prefix website",
     "docs:build": "npm run build --prefix website",
     "build": "tsdown",
+    "fmt": "oxfmt",
     "lint": "oxlint src",
     "test": "vitest run",
     "test:ui": "vitest --ui",
@@ -53,9 +54,6 @@
     "add": "node ./dist/index.mjs add",
     "validate:tebra": "node ./dist/index.mjs list ../../tebra-icon-registry/registry",
     "prepare": "husky"
-  },
-  "engines": {
-    "node": ">=20.12.0"
   },
   "dependencies": {
     "@clack/prompts": "^1.0.1",
@@ -71,6 +69,7 @@
     "@types/node": "^24.3.0",
     "@vitest/coverage-v8": "^4.0.18",
     "husky": "^9.1.7",
+    "oxfmt": "^0.35.0",
     "oxlint": "^1.50.0",
     "release-it": "^19.2.4",
     "tsdown": "^0.21.0-beta.2",
@@ -78,5 +77,8 @@
     "typescript": "^5.9.2",
     "vite-tsconfig-paths": "^6.1.1",
     "vitest": "^4.0.18"
+  },
+  "engines": {
+    "node": ">=20.12.0"
   }
 }

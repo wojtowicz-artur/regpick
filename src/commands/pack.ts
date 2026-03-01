@@ -45,9 +45,7 @@ export async function runPackCommand(
 
   const statRes = await context.runtime.fs.stat(targetDir);
   if (!statRes.ok || !statRes.value.isDirectory()) {
-    return err(
-      appError("ValidationError", `Target is not a directory: ${targetDir}`),
-    );
+    return err(appError("ValidationError", `Target is not a directory: ${targetDir}`));
   }
 
   context.runtime.prompt.info(`Scanning ${targetDir} for components...`);
@@ -83,8 +81,6 @@ export async function runPackCommand(
   });
   if (!writeRes.ok) return err(writeRes.error);
 
-  context.runtime.prompt.success(
-    `Packed ${items.length} components into registry.json`,
-  );
+  context.runtime.prompt.success(`Packed ${items.length} components into registry.json`);
   return ok({ kind: "success", message: `Generated registry.json` });
 }

@@ -39,9 +39,7 @@ describe("registry loader", () => {
   });
 
   it("should load a registry from a local json file", async () => {
-    vi.mocked(mockRuntime.fs.stat).mockResolvedValue(
-      ok({ isDirectory: () => false } as any),
-    );
+    vi.mocked(mockRuntime.fs.stat).mockResolvedValue(ok({ isDirectory: () => false } as any));
     vi.mocked(mockRuntime.fs.readFile).mockResolvedValue(
       ok(
         JSON.stringify({
@@ -56,11 +54,7 @@ describe("registry loader", () => {
       ),
     );
 
-    const result = await loadRegistry(
-      "/abs/path/local.json",
-      "/test",
-      mockRuntime,
-    );
+    const result = await loadRegistry("/abs/path/local.json", "/test", mockRuntime);
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.items[0].name).toBe("local-comp");
@@ -68,41 +62,34 @@ describe("registry loader", () => {
   });
 
   it("should resolve a directory registry containing multiple json files", async () => {
-    vi.mocked(mockRuntime.fs.stat).mockResolvedValue(
-      ok({ isDirectory: () => true } as any),
-    );
+    vi.mocked(mockRuntime.fs.stat).mockResolvedValue(ok({ isDirectory: () => true } as any));
     vi.mocked(mockRuntime.fs.readdir).mockResolvedValue(
       ok(["button.json", "input.json", "not.txt"]),
     );
 
-    vi.mocked(mockRuntime.fs.readFile).mockImplementation(
-      async (filePath: any) => {
-        if (filePath.endsWith("button.json")) {
-          return ok(
-            JSON.stringify({
-              name: "button",
-              files: [{ path: "b.ts", content: "b" }],
-            }),
-          );
-        }
+    vi.mocked(mockRuntime.fs.readFile).mockImplementation(async (filePath: any) => {
+      if (filePath.endsWith("button.json")) {
         return ok(
           JSON.stringify({
-            name: "input",
-            files: [{ path: "i.ts", content: "i" }],
+            name: "button",
+            files: [{ path: "b.ts", content: "b" }],
           }),
         );
-      },
-    );
+      }
+      return ok(
+        JSON.stringify({
+          name: "input",
+          files: [{ path: "i.ts", content: "i" }],
+        }),
+      );
+    });
 
     const result = await loadRegistry("/abs/dir", "/test", mockRuntime);
 
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.items).toHaveLength(2);
-      expect(result.value.items.map((i) => i.name).sort()).toEqual([
-        "button",
-        "input",
-      ]);
+      expect(result.value.items.map((i) => i.name).sort()).toEqual(["button", "input"]);
       expect(result.value.source).toBe(path.resolve("/abs/dir"));
     }
   });
@@ -127,8 +114,6 @@ describe("registry loader", () => {
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value).toBe("remote-content");
 
-    expect(mockRuntime.http.getText).toHaveBeenCalledWith(
-      "https://example.com/registry/utils.ts",
-    );
+    expect(mockRuntime.http.getText).toHaveBeenCalledWith("https://example.com/registry/utils.ts");
   });
 });

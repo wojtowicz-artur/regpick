@@ -34,11 +34,7 @@ describe("init integration", () => {
 
   it("should create regpick.json in a new project", async () => {
     // 1. Setup environment with a package.json
-    const packageJsonContent = JSON.stringify(
-      { name: "test-project", dependencies: {} },
-      null,
-      2,
-    );
+    const packageJsonContent = JSON.stringify({ name: "test-project", dependencies: {} }, null, 2);
     await fs.writeFile(path.join(testDir, "package.json"), packageJsonContent);
 
     // 2. Run the command
@@ -110,11 +106,7 @@ describe("init integration", () => {
   });
 
   it("should complete initialization by following prompts when yes is false", async () => {
-    const packageJsonContent = JSON.stringify(
-      { name: "test-project", dependencies: {} },
-      null,
-      2,
-    );
+    const packageJsonContent = JSON.stringify({ name: "test-project", dependencies: {} }, null, 2);
     await fs.writeFile(path.join(testDir, "package.json"), packageJsonContent);
 
     mockPrompt.select.mockResolvedValueOnce("npm");

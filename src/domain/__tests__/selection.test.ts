@@ -60,8 +60,6 @@ describe("selection core", () => {
 
   it("selects explicit items when --select is set", () => {
     const result = selectItemsFromFlags(items, context({ select: "check" }));
-    expect(result.ok && result.value?.map((item) => item.name)).toEqual([
-      "check",
-    ]);
+    expect(result.ok && result.value?.map((item) => item.name)).toEqual(["check"]);
   });
 });

@@ -55,9 +55,7 @@ describe("regpick e2e (local file network)", () => {
         expect(exists).toBe(true);
 
         const lockfilePath = path.join(testDir, "regpick-lock.json");
-        const lockfileContent = JSON.parse(
-          await fs.readFile(lockfilePath, "utf8"),
-        );
+        const lockfileContent = JSON.parse(await fs.readFile(lockfilePath, "utf8"));
         expect(lockfileContent.components["format-date"]).toBeDefined();
       } finally {
         await fs.rm(testDir, { recursive: true, force: true });

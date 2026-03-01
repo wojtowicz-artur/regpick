@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  decideInitAfterFirstWrite,
-  decideInitAfterOverwritePrompt,
-} from "@/domain/initCore.js";
+import { decideInitAfterFirstWrite, decideInitAfterOverwritePrompt } from "@/domain/initCore.js";
 
 describe("init core", () => {
   it("returns created when first write succeeds", () => {

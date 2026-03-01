@@ -1,27 +1,16 @@
 import type { AppError } from "@/core/errors.js";
 import { ok, type Result } from "@/core/result.js";
 import { resolveOutputPathFromPolicy } from "@/domain/pathPolicy.js";
-import type {
-  InstallPlan,
-  PlannedWrite,
-  RegistryItem,
-  RegpickConfig,
-} from "@/types.js";
+import type { InstallPlan, PlannedWrite, RegistryItem, RegpickConfig } from "@/types.js";
 
 function unique(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))];
 }
 
-function buildDependencyPlan(
-  selectedItems: RegistryItem[],
-): InstallPlan["dependencyPlan"] {
+function buildDependencyPlan(selectedItems: RegistryItem[]): InstallPlan["dependencyPlan"] {
   return {
-    dependencies: unique(
-      selectedItems.flatMap((item) => item.dependencies || []),
-    ),
-    devDependencies: unique(
-      selectedItems.flatMap((item) => item.devDependencies || []),
-    ),
+    dependencies: unique(selectedItems.flatMap((item) => item.dependencies || [])),
+    devDependencies: unique(selectedItems.flatMap((item) => item.devDependencies || [])),
   };
 }
 
@@ -38,10 +27,7 @@ export function resolveRegistryDependencies(
     if (allResolvedItems.has(current.name)) continue;
     allResolvedItems.set(current.name, current);
 
-    if (
-      current.registryDependencies &&
-      current.registryDependencies.length > 0
-    ) {
+    if (current.registryDependencies && current.registryDependencies.length > 0) {
       for (const depName of current.registryDependencies) {
         if (allResolvedItems.has(depName)) continue;
         const found = allItems.find((i) => i.name === depName);

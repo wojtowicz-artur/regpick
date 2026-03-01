@@ -9,16 +9,10 @@ type InstallCommand = {
 
 type PackageManagerStrategy = {
   manager: RuntimePackageManager;
-  buildInstallCommands: (
-    dependencies: string[],
-    devDependencies: string[],
-  ) => InstallCommand[];
+  buildInstallCommands: (dependencies: string[], devDependencies: string[]) => InstallCommand[];
 };
 
-function buildNpmCommands(
-  dependencies: string[],
-  devDependencies: string[],
-): InstallCommand[] {
+function buildNpmCommands(dependencies: string[], devDependencies: string[]): InstallCommand[] {
   const commands: InstallCommand[] = [];
   if (dependencies.length) {
     commands.push({ command: "npm", args: ["install", ...dependencies] });
@@ -32,10 +26,7 @@ function buildNpmCommands(
   return commands;
 }
 
-function buildYarnCommands(
-  dependencies: string[],
-  devDependencies: string[],
-): InstallCommand[] {
+function buildYarnCommands(dependencies: string[], devDependencies: string[]): InstallCommand[] {
   const commands: InstallCommand[] = [];
   if (dependencies.length) {
     commands.push({ command: "yarn", args: ["add", ...dependencies] });
@@ -46,10 +37,7 @@ function buildYarnCommands(
   return commands;
 }
 
-function buildPnpmCommands(
-  dependencies: string[],
-  devDependencies: string[],
-): InstallCommand[] {
+function buildPnpmCommands(dependencies: string[], devDependencies: string[]): InstallCommand[] {
   const commands: InstallCommand[] = [];
   if (dependencies.length) {
     commands.push({ command: "pnpm", args: ["add", ...dependencies] });
@@ -75,8 +63,6 @@ const strategyMap: Record<RuntimePackageManager, PackageManagerStrategy> = {
   },
 };
 
-export function getPackageManagerStrategy(
-  manager: RuntimePackageManager,
-): PackageManagerStrategy {
+export function getPackageManagerStrategy(manager: RuntimePackageManager): PackageManagerStrategy {
   return strategyMap[manager];
 }

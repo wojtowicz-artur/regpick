@@ -1,7 +1,8 @@
+import * as v from "valibot";
 import { appError, type AppError } from "../core/errors.js";
 import { err, ok, type Result } from "../core/result.js";
 import { decideInitAfterOverwritePrompt } from "../domain/initCore.js";
-import { getConfigPath, readConfig, writeConfig } from "../shell/config.js";
+import { getConfigPath, readConfig, RegpickConfigSchema, writeConfig } from "../shell/config.js";
 import type { CommandContext, CommandOutcome } from "../types.js";
 
 export async function runInitCommand(
@@ -45,8 +46,7 @@ export async function runInitCommand(
         ],
       });
 
-  const isPackageManagerCancel =
-    await context.runtime.prompt.isCancel(packageManager);
+  const isPackageManagerCancel = await context.runtime.prompt.isCancel(packageManager);
   if (!assumeYes && isPackageManagerCancel) {
     return err(appError("UserCancelled", "Operation cancelled."));
   }
@@ -58,8 +58,7 @@ export async function runInitCommand(
         placeholder: "src/components/ui",
       });
 
-  const isComponentsFolderCancel =
-    await context.runtime.prompt.isCancel(componentsFolder);
+  const isComponentsFolderCancel = await context.runtime.prompt.isCancel(componentsFolder);
   if (!assumeYes && isComponentsFolderCancel) {
     return err(appError("UserCancelled", "Operation cancelled."));
   }
@@ -67,8 +66,7 @@ export async function runInitCommand(
   const overwritePolicy = assumeYes
     ? "prompt"
     : await context.runtime.prompt.select({
-        message:
-          "Czy chcesz nadpisywać pliki automatycznie, czy wolisz być pytany?",
+        message: "Czy chcesz nadpisywać pliki automatycznie, czy wolisz być pytany?",
         options: [
           { value: "prompt", label: "Pytaj (prompt)" },
           { value: "overwrite", label: "Zawsze nadpisuj (overwrite)" },
@@ -76,16 +74,15 @@ export async function runInitCommand(
         ],
       });
 
-  const isOverwritePolicyCancel =
-    await context.runtime.prompt.isCancel(overwritePolicy);
+  const isOverwritePolicyCancel = await context.runtime.prompt.isCancel(overwritePolicy);
   if (!assumeYes && isOverwritePolicyCancel) {
     return err(appError("UserCancelled", "Operation cancelled."));
   }
 
-  const newConfig = {
+  const newConfigRaw = {
     ...existingConfig,
-    packageManager: String(packageManager) as any,
-    overwritePolicy: String(overwritePolicy) as any,
+    packageManager: String(packageManager),
+    overwritePolicy: String(overwritePolicy),
     targetsByType: {
       ...existingConfig.targetsByType,
       "registry:component": String(componentsFolder || "src/components/ui"),
@@ -93,6 +90,8 @@ export async function runInitCommand(
       "registry:icon": `${String(componentsFolder || "src/components/ui")}/icons`,
     },
   };
+
+  const newConfig = v.parse(RegpickConfigSchema, newConfigRaw);
 
   try {
     await writeConfig(context.cwd, newConfig, { overwrite: true });
@@ -102,9 +101,7 @@ export async function runInitCommand(
     return err(appError("RuntimeError", errorMsg));
   }
 
-  context.runtime.prompt.success(
-    `${existsRes.ok ? "Overwrote" : "Created"} ${outputPath}`,
-  );
+  context.runtime.prompt.success(`${existsRes.ok ? "Overwrote" : "Created"} ${outputPath}`);
   return ok({
     kind: "success",
     message: `${existsRes.ok ? "Overwrote" : "Created"} ${outputPath}`,

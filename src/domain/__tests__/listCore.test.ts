@@ -1,15 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  resolveListSourceDecision,
-  resolveRegistrySourceFromAliases,
-} from "@/domain/listCore.js";
+import { resolveListSourceDecision, resolveRegistrySourceFromAliases } from "@/domain/listCore.js";
 
 describe("list core", () => {
   it("resolves alias to configured source", () => {
-    expect(
-      resolveRegistrySourceFromAliases("tebra", { tebra: "./registry" }),
-    ).toBe("./registry");
+    expect(resolveRegistrySourceFromAliases("tebra", { tebra: "./registry" })).toBe("./registry");
   });
 
   it("uses provided input first", () => {

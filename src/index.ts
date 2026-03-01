@@ -42,9 +42,7 @@ async function run(): Promise<void> {
   process.on("SIGTERM", () => handleTerminate());
   process.on("uncaughtException", handleTerminate);
   process.on("unhandledRejection", (reason) =>
-    handleTerminate(
-      reason instanceof Error ? reason : new Error(String(reason)),
-    ),
+    handleTerminate(reason instanceof Error ? reason : new Error(String(reason))),
   );
 
   const parsed = parseCliArgs(process.argv.slice(2));
@@ -64,9 +62,7 @@ async function run(): Promise<void> {
   }
 
   const context: CommandContext = {
-    cwd: parsed.flags.cwd
-      ? path.resolve(process.cwd(), String(parsed.flags.cwd))
-      : process.cwd(),
+    cwd: parsed.flags.cwd ? path.resolve(process.cwd(), String(parsed.flags.cwd)) : process.cwd(),
     args: parsed,
     runtime,
   };
@@ -76,25 +72,15 @@ async function run(): Promise<void> {
   try {
     let result: Result<CommandOutcome, AppError>;
     if (command === "init") {
-      result = await import("@/commands/init.js").then((mod) =>
-        mod.runInitCommand(context),
-      );
+      result = await import("@/commands/init.js").then((mod) => mod.runInitCommand(context));
     } else if (command === "list") {
-      result = await import("@/commands/list.js").then((mod) =>
-        mod.runListCommand(context),
-      );
+      result = await import("@/commands/list.js").then((mod) => mod.runListCommand(context));
     } else if (command === "add") {
-      result = await import("@/commands/add.js").then((mod) =>
-        mod.runAddCommand(context),
-      );
+      result = await import("@/commands/add.js").then((mod) => mod.runAddCommand(context));
     } else if (command === "update") {
-      result = await import("@/commands/update.js").then((mod) =>
-        mod.runUpdateCommand(context),
-      );
+      result = await import("@/commands/update.js").then((mod) => mod.runUpdateCommand(context));
     } else if (command === "pack") {
-      result = await import("@/commands/pack.js").then((mod) =>
-        mod.runPackCommand(context),
-      );
+      result = await import("@/commands/pack.js").then((mod) => mod.runPackCommand(context));
     } else {
       runtime.prompt.error(`Unknown command: ${command}`);
       printHelp();
@@ -123,10 +109,7 @@ async function run(): Promise<void> {
   }
 }
 
-function handleAppError(
-  error: AppError,
-  write: (message: string) => void,
-): void {
+function handleAppError(error: AppError, write: (message: string) => void): void {
   if (error.kind === "UserCancelled") {
     write(error.message);
     return;

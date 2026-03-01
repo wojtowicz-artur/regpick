@@ -43,11 +43,7 @@ export async function runUpdateCommand(
   let updatedCount = 0;
 
   for (const [source, itemsToUpdate] of Object.entries(bySource)) {
-    const registryRes = await loadRegistry(
-      source,
-      context.cwd,
-      context.runtime,
-    );
+    const registryRes = await loadRegistry(source, context.cwd, context.runtime);
     if (!registryRes.ok) {
       context.runtime.prompt.warn(`Failed to load registry ${source}`);
       continue;
@@ -106,13 +102,8 @@ export async function runUpdateCommand(
 
         if (action === "diff") {
           for (const rf of updateAction.files) {
-            const localContentRes = await context.runtime.fs.readFile(
-              rf.target,
-              "utf8",
-            );
-            const localContent = localContentRes.ok
-              ? localContentRes.value
-              : "";
+            const localContentRes = await context.runtime.fs.readFile(rf.target, "utf8");
+            const localContent = localContentRes.ok ? localContentRes.value : "";
             console.log(styleText("bold", `\nDiff for ${rf.target}:`));
             await printDiff(localContent, rf.content);
           }
@@ -122,8 +113,7 @@ export async function runUpdateCommand(
             initialValue: true,
           });
 
-          const isConfirmCancel =
-            await context.runtime.prompt.isCancel(confirm);
+          const isConfirmCancel = await context.runtime.prompt.isCancel(confirm);
           if (isConfirmCancel || !confirm) {
             continue;
           }
@@ -131,15 +121,9 @@ export async function runUpdateCommand(
 
         // Apply update
         for (const rf of updateAction.files) {
-          const ensureRes = await context.runtime.fs.ensureDir(
-            path.dirname(rf.target),
-          );
+          const ensureRes = await context.runtime.fs.ensureDir(path.dirname(rf.target));
           if (!ensureRes.ok) return ensureRes;
-          const writeRes = await context.runtime.fs.writeFile(
-            rf.target,
-            rf.content,
-            "utf8",
-          );
+          const writeRes = await context.runtime.fs.writeFile(rf.target, rf.content, "utf8");
           if (!writeRes.ok) return writeRes;
         }
 

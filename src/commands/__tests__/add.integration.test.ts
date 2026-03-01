@@ -1,8 +1,5 @@
 import mockRegistry from "@/__tests__/fixtures/shadcn-registry.json";
-import {
-  createMockHttp,
-  createMockPrompt,
-} from "@/__tests__/helpers/integration";
+import { createMockHttp, createMockPrompt } from "@/__tests__/helpers/integration";
 import { runAddCommand } from "@/commands/add";
 import { ok } from "@/core/result";
 import { createRuntimePorts, type RuntimePorts } from "@/shell/runtime/ports";
@@ -43,10 +40,7 @@ describe("add integration with shadcn compatibility", () => {
 
   it("should install a component from a shadcn-compatible registry", async () => {
     // 1. Setup environment
-    await fs.writeFile(
-      path.join(testDir, "package.json"),
-      JSON.stringify({ dependencies: {} }),
-    );
+    await fs.writeFile(path.join(testDir, "package.json"), JSON.stringify({ dependencies: {} }));
     await fs.writeFile(
       path.join(testDir, "regpick.json"),
       JSON.stringify({ targetsByType: { "registry:ui": "components/ui" } }),
@@ -107,20 +101,13 @@ describe("add integration with shadcn compatibility", () => {
     );
 
     // Verify network calls
-    expect(mockHttp.getJson).toHaveBeenCalledWith(
-      "https://example.com/registry.json",
-    );
-    expect(mockHttp.getText).toHaveBeenCalledWith(
-      expect.stringContaining("button.tsx"),
-    );
+    expect(mockHttp.getJson).toHaveBeenCalledWith("https://example.com/registry.json");
+    expect(mockHttp.getText).toHaveBeenCalledWith(expect.stringContaining("button.tsx"));
   });
 
   it("should resolve registry dependencies (chained installation)", async () => {
     // 1. Setup environment
-    await fs.writeFile(
-      path.join(testDir, "package.json"),
-      JSON.stringify({ dependencies: {} }),
-    );
+    await fs.writeFile(path.join(testDir, "package.json"), JSON.stringify({ dependencies: {} }));
     await fs.writeFile(
       path.join(testDir, "regpick.json"),
       JSON.stringify({ targetsByType: { "registry:ui": "components/ui" } }),
@@ -163,22 +150,13 @@ describe("add integration with shadcn compatibility", () => {
     ).toBe(true);
 
     // Verify network calls
-    expect(mockHttp.getJson).toHaveBeenCalledWith(
-      "https://example.com/registry.json",
-    );
-    expect(mockHttp.getText).toHaveBeenCalledWith(
-      expect.stringContaining("card.tsx"),
-    );
-    expect(mockHttp.getText).toHaveBeenCalledWith(
-      expect.stringContaining("button.tsx"),
-    );
+    expect(mockHttp.getJson).toHaveBeenCalledWith("https://example.com/registry.json");
+    expect(mockHttp.getText).toHaveBeenCalledWith(expect.stringContaining("card.tsx"));
+    expect(mockHttp.getText).toHaveBeenCalledWith(expect.stringContaining("button.tsx"));
   });
 
   it("should prompt for dependency installation and handle cancellation when yes is false", async () => {
-    await fs.writeFile(
-      path.join(testDir, "package.json"),
-      JSON.stringify({ dependencies: {} }),
-    );
+    await fs.writeFile(path.join(testDir, "package.json"), JSON.stringify({ dependencies: {} }));
     await fs.writeFile(
       path.join(testDir, "regpick.json"),
       JSON.stringify({
@@ -193,9 +171,7 @@ describe("add integration with shadcn compatibility", () => {
         {
           name: "button",
           dependencies: ["clsx", "tailwind-merge"],
-          files: [
-            { path: "ui/button.tsx", content: "export function Button() {}" },
-          ],
+          files: [{ path: "ui/button.tsx", content: "export function Button() {}" }],
         },
       ],
     };
@@ -228,10 +204,7 @@ describe("add integration with shadcn compatibility", () => {
 
   it("should exit when regpick config is missing", async () => {
     // missing regpick.json
-    await fs.writeFile(
-      path.join(testDir, "package.json"),
-      JSON.stringify({ dependencies: {} }),
-    );
+    await fs.writeFile(path.join(testDir, "package.json"), JSON.stringify({ dependencies: {} }));
 
     const result = await runAddCommand({
       cwd: testDir,
@@ -252,10 +225,7 @@ describe("add integration with shadcn compatibility", () => {
   });
 
   it("should handle network errors during registry fetch", async () => {
-    await fs.writeFile(
-      path.join(testDir, "package.json"),
-      JSON.stringify({ dependencies: {} }),
-    );
+    await fs.writeFile(path.join(testDir, "package.json"), JSON.stringify({ dependencies: {} }));
     await fs.writeFile(
       path.join(testDir, "regpick.json"),
       JSON.stringify({ targetsByType: { "registry:ui": "components/ui" } }),
@@ -286,10 +256,7 @@ describe("add integration with shadcn compatibility", () => {
   });
 
   it("should handle file write errors correctly and abort multi-component installs", async () => {
-    await fs.writeFile(
-      path.join(testDir, "package.json"),
-      JSON.stringify({ dependencies: {} }),
-    );
+    await fs.writeFile(path.join(testDir, "package.json"), JSON.stringify({ dependencies: {} }));
     await fs.writeFile(
       path.join(testDir, "regpick.json"),
       JSON.stringify({ targetsByType: { "registry:ui": "components/ui" } }),
@@ -326,19 +293,14 @@ describe("add integration with shadcn compatibility", () => {
   });
 
   it("should abort if registry manifest is corrupted or has unsupported structure", async () => {
-    await fs.writeFile(
-      path.join(testDir, "package.json"),
-      JSON.stringify({ dependencies: {} }),
-    );
+    await fs.writeFile(path.join(testDir, "package.json"), JSON.stringify({ dependencies: {} }));
     await fs.writeFile(
       path.join(testDir, "regpick.json"),
       JSON.stringify({ targetsByType: { "registry:ui": "components/ui" } }),
     );
 
     // Send malformed data that isn't an array of items or proper registry object
-    mockHttp.getJson.mockResolvedValue(
-      ok({ unexpectedField: "invalid dataset" }),
-    );
+    mockHttp.getJson.mockResolvedValue(ok({ unexpectedField: "invalid dataset" }));
 
     const result = await runAddCommand({
       cwd: testDir,
