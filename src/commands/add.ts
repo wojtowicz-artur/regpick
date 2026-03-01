@@ -1,25 +1,25 @@
 import path from "node:path";
 
-import { appError, type AppError } from "../core/errors.js";
-import { err, ok, type Result } from "../core/result.js";
-import { buildInstallPlan } from "../domain/addPlan.js";
-import { applyAliases } from "../domain/aliasCore.js";
-import { selectItemsFromFlags } from "../domain/selection.js";
-import { readConfig, resolveRegistrySource } from "../shell/config.js";
+import { appError, type AppError } from "@/core/errors.js";
+import { err, ok, type Result } from "@/core/result.js";
+import { buildInstallPlan } from "@/domain/addPlan.js";
+import { applyAliases } from "@/domain/aliasCore.js";
+import { selectItemsFromFlags } from "@/domain/selection.js";
+import { readConfig, resolveRegistrySource } from "@/shell/config.js";
 import {
   collectMissingDependencies,
   installDependencies,
-} from "../shell/installer.js";
-import { computeHash, readLockfile, writeLockfile } from "../shell/lockfile.js";
-import { resolvePackageManager } from "../shell/packageManagers/resolver.js";
-import { loadRegistry, resolveFileContent } from "../shell/registry.js";
+} from "@/shell/installer.js";
+import { computeHash, readLockfile, writeLockfile } from "@/shell/lockfile.js";
+import { resolvePackageManager } from "@/shell/packageManagers/resolver.js";
+import { loadRegistry, resolveFileContent } from "@/shell/registry.js";
 import type {
   CommandContext,
   CommandOutcome,
   PlannedWrite,
   RegistryItem,
   RegpickConfig,
-} from "../types.js";
+} from "@/types.js";
 
 async function promptForSource(
   context: CommandContext,
@@ -110,7 +110,18 @@ export async function runAddCommand(
   context: CommandContext,
 ): Promise<Result<CommandOutcome, AppError>> {
   const assumeYes = Boolean(context.args.flags.yes);
-  const { config } = await readConfig(context.cwd);
+  const { config, configPath } = await readConfig(context.cwd);
+
+  if (!configPath) {
+    context.runtime.prompt.error(
+      "No regpick.json configuration found. Please run 'init' first.",
+    );
+    return err(appError("ValidationError", "No config file found"));
+  }
+
+  const sourcePosIdx = context.args.positionals[0] === "add" ? 1 : 0;
+  const itemPosIdx = sourcePosIdx + 1;
+
   const sourceResult = await promptForSource(
     context,
     config,
@@ -132,13 +143,20 @@ export async function runAddCommand(
   if (!registryResult.ok) {
     return registryResult;
   }
-  const { items } = registryResult.value;
+  let { items } = registryResult.value;
   if (!items.length) {
     context.runtime.prompt.warn("No installable items in registry.");
     return ok({ kind: "noop", message: "No installable items in registry." });
   }
 
+  // If item name is passed as positional, pre-select it
+  const itemName = context.args.positionals[itemPosIdx];
+  if (itemName && !context.args.flags.select) {
+    context.args.flags.select = itemName;
+  }
+
   const preselected = selectItemsFromFlags(items, context);
+
   const promptedSelectionResult =
     preselected.ok && preselected.value
       ? preselected
@@ -146,7 +164,35 @@ export async function runAddCommand(
   if (!promptedSelectionResult.ok) {
     return promptedSelectionResult;
   }
-  const selectedItems = promptedSelectionResult.value;
+  let selectedItems = promptedSelectionResult.value;
+
+  // --- RESOLVE REGISTRY DEPENDENCIES ---
+  const allResolvedItems = new Map<string, RegistryItem>();
+  const toResolve = [...selectedItems];
+
+  while (toResolve.length > 0) {
+    const current = toResolve.shift()!;
+    if (allResolvedItems.has(current.name)) continue;
+    allResolvedItems.set(current.name, current);
+
+    if (
+      current.registryDependencies &&
+      current.registryDependencies.length > 0
+    ) {
+      for (const depName of current.registryDependencies) {
+        if (allResolvedItems.has(depName)) continue;
+        const found = items.find((i) => i.name === depName);
+        if (found) {
+          toResolve.push(found);
+        } else {
+          context.runtime.prompt.warn(
+            `Registry dependency "${depName}" not found in current registry.`,
+          );
+        }
+      }
+    }
+  }
+  selectedItems = Array.from(allResolvedItems.values());
 
   if (!selectedItems || !selectedItems.length) {
     context.runtime.prompt.warn("No items selected.");

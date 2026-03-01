@@ -1,9 +1,9 @@
 import path from "node:path";
 
-import { appError, type AppError } from "../core/errors.js";
-import { err, ok, type Result } from "../core/result.js";
-import { extractDependencies } from "../domain/packCore.js";
-import type { CommandContext, CommandOutcome, RegistryItem } from "../types.js";
+import { appError, type AppError } from "@/core/errors.js";
+import { err, ok, type Result } from "@/core/result.js";
+import { extractDependencies } from "@/domain/packCore.js";
+import type { CommandContext, CommandOutcome, RegistryItem } from "@/types.js";
 
 async function getFilesRecursive(
   dir: string,

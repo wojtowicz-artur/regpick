@@ -1,16 +1,27 @@
-import type { InstallPlan, PlannedWrite, RegpickConfig, RegistryItem } from "../types.js";
-import { resolveOutputPathFromPolicy } from "./pathPolicy.js";
-import { err, ok, type Result } from "../core/result.js";
-import type { AppError } from "../core/errors.js";
+import type { AppError } from "@/core/errors.js";
+import { ok, type Result } from "@/core/result.js";
+import { resolveOutputPathFromPolicy } from "@/domain/pathPolicy.js";
+import type {
+  InstallPlan,
+  PlannedWrite,
+  RegistryItem,
+  RegpickConfig,
+} from "@/types.js";
 
 function unique(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))];
 }
 
-function buildDependencyPlan(selectedItems: RegistryItem[]): InstallPlan["dependencyPlan"] {
+function buildDependencyPlan(
+  selectedItems: RegistryItem[],
+): InstallPlan["dependencyPlan"] {
   return {
-    dependencies: unique(selectedItems.flatMap((item) => item.dependencies || [])),
-    devDependencies: unique(selectedItems.flatMap((item) => item.devDependencies || [])),
+    dependencies: unique(
+      selectedItems.flatMap((item) => item.dependencies || []),
+    ),
+    devDependencies: unique(
+      selectedItems.flatMap((item) => item.devDependencies || []),
+    ),
   };
 }
 
@@ -27,7 +38,7 @@ export function buildInstallPlan(
     for (const file of item.files) {
       const outputRes = resolveOutputPathFromPolicy(item, file, cwd, config);
       if (!outputRes.ok) return outputRes;
-      
+
       const { absoluteTarget, relativeTarget } = outputRes.value;
       const planned: PlannedWrite = {
         itemName: item.name,

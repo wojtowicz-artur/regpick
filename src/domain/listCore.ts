@@ -1,5 +1,3 @@
-import type { RegistryItem } from "../types.js";
-
 type Registries = Record<string, string>;
 
 export function resolveRegistrySourceFromAliases(

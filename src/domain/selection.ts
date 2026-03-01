@@ -1,6 +1,6 @@
-import { appError, type AppError } from "../core/errors.js";
-import { err, ok, type Result } from "../core/result.js";
-import type { CommandContext, RegistryItem } from "../types.js";
+import { appError, type AppError } from "@/core/errors.js";
+import { err, ok, type Result } from "@/core/result.js";
+import type { CommandContext, RegistryItem } from "@/types.js";
 
 export function parseSelectedNames(
   rawSelectFlag: string | boolean | undefined,
@@ -39,7 +39,7 @@ export function selectItemsFromFlags(
 ): Result<RegistryItem[] | null, AppError> {
   const { flags } = context.args;
   const explicit = parseSelectedNames(flags.select);
-  if (Boolean(flags.all)) {
+  if (flags.all) {
     return ok(items);
   }
 

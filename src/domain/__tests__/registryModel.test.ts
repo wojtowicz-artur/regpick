@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { extractItemReferences, normalizeManifestInline } from "../registryModel.js";
+import {
+  extractItemReferences,
+  normalizeManifestInline,
+} from "@/domain/registryModel.js";
 
 describe("registry model core", () => {
   it("normalizes inline items from registry.json", () => {
@@ -15,7 +18,10 @@ describe("registry model core", () => {
       ],
     };
 
-    const normalized = normalizeManifestInline(payload, { type: "file", baseDir: "/registry" });
+    const normalized = normalizeManifestInline(payload, {
+      type: "file",
+      baseDir: "/registry",
+    });
     expect(normalized.ok).toBe(true);
     if (normalized.ok) {
       expect(normalized.value).toHaveLength(1);
@@ -25,8 +31,16 @@ describe("registry model core", () => {
 
   it("extracts item references from registry.json entries", () => {
     const payload = {
-      items: [{ name: "a", url: "./a.json" }, { name: "b", href: "./b.json" }, { name: "c", path: "./c.json" }],
+      items: [
+        { name: "a", url: "./a.json" },
+        { name: "b", href: "./b.json" },
+        { name: "c", path: "./c.json" },
+      ],
     };
-    expect(extractItemReferences(payload)).toEqual(["./a.json", "./b.json", "./c.json"]);
+    expect(extractItemReferences(payload)).toEqual([
+      "./a.json",
+      "./b.json",
+      "./c.json",
+    ]);
   });
 });

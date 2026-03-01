@@ -1,9 +1,9 @@
 import path from "node:path";
 
-import type { RegpickConfig, RegistryFile, RegistryItem } from "../types.js";
+import type { RegistryFile, RegistryItem, RegpickConfig } from "@/types.js";
 
-import { appError, type AppError } from "../core/errors.js";
-import { err, ok, type Result } from "../core/result.js";
+import { appError, type AppError } from "@/core/errors.js";
+import { err, ok, type Result } from "@/core/result.js";
 
 function normalizeSlashes(relativePath: string): string {
   return relativePath.replace(/\\/g, "/");
@@ -15,7 +15,7 @@ function assertInsideProject(
   allowOutsideProject: boolean,
 ): Result<void, AppError> {
   const projectRootWithSep = `${path.resolve(projectRoot)}${path.sep}`;
-    const resolvedOutput = path.resolve(outputPath);
+  const resolvedOutput = path.resolve(outputPath);
   if (allowOutsideProject) {
     return ok(undefined);
   }
@@ -23,7 +23,12 @@ function assertInsideProject(
     resolvedOutput !== path.resolve(projectRoot) &&
     !resolvedOutput.startsWith(projectRootWithSep)
   ) {
-    return err(appError("ValidationError", `Refusing to write outside project: ${resolvedOutput}`));
+    return err(
+      appError(
+        "ValidationError",
+        `Refusing to write outside project: ${resolvedOutput}`,
+      ),
+    );
   }
   return ok(undefined);
 }
@@ -51,9 +56,13 @@ export function resolveOutputPathFromPolicy(
   }
 
   const absoluteTarget = path.resolve(cwd, relativeTarget);
-  const assertRes = assertInsideProject(cwd, absoluteTarget, Boolean(config.allowOutsideProject));
+  const assertRes = assertInsideProject(
+    cwd,
+    absoluteTarget,
+    Boolean(config.allowOutsideProject),
+  );
   if (!assertRes.ok) return assertRes;
-  
+
   return ok({
     absoluteTarget,
     relativeTarget: normalizeSlashes(path.relative(cwd, absoluteTarget)),

@@ -1,10 +1,10 @@
 import path from "node:path";
 import { styleText } from "node:util";
 
-import { type AppError, toAppError } from "./core/errors.js";
-import type { Result } from "./core/result.js";
-import { parseCliArgs } from "./shell/cli/args.js";
-import type { CommandContext, CommandOutcome } from "./types.js";
+import { type AppError, toAppError } from "@/core/errors.js";
+import type { Result } from "@/core/result.js";
+import { parseCliArgs } from "@/shell/cli/args.js";
+import type { CommandContext, CommandOutcome } from "@/types.js";
 
 function printHelp(): void {
   console.log(`
@@ -55,7 +55,7 @@ async function run(): Promise<void> {
     return;
   }
 
-  const { createRuntimePorts } = await import("./shell/runtime/ports.js");
+  const { createRuntimePorts } = await import("@/shell/runtime/ports.js");
   const runtime = createRuntimePorts({ signal: abortController.signal });
 
   if (!command || parsed.flags.help) {
@@ -76,23 +76,23 @@ async function run(): Promise<void> {
   try {
     let result: Result<CommandOutcome, AppError>;
     if (command === "init") {
-      result = await import("./commands/init.js").then((mod) =>
+      result = await import("@/commands/init.js").then((mod) =>
         mod.runInitCommand(context),
       );
     } else if (command === "list") {
-      result = await import("./commands/list.js").then((mod) =>
+      result = await import("@/commands/list.js").then((mod) =>
         mod.runListCommand(context),
       );
     } else if (command === "add") {
-      result = await import("./commands/add.js").then((mod) =>
+      result = await import("@/commands/add.js").then((mod) =>
         mod.runAddCommand(context),
       );
     } else if (command === "update") {
-      result = await import("./commands/update.js").then((mod) =>
+      result = await import("@/commands/update.js").then((mod) =>
         mod.runUpdateCommand(context),
       );
     } else if (command === "pack") {
-      result = await import("./commands/pack.js").then((mod) =>
+      result = await import("@/commands/pack.js").then((mod) =>
         mod.runPackCommand(context),
       );
     } else {

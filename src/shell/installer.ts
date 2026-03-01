@@ -1,15 +1,13 @@
 import path from "node:path";
 
-import type { OverwritePolicy, RegpickConfig, RegistryItem } from "../types.js";
-import { appError, type AppError } from "../core/errors.js";
-import { err, ok, type Result } from "../core/result.js";
-import { resolveOutputPathFromPolicy } from "../domain/pathPolicy.js";
+import { appError, type AppError } from "@/core/errors.js";
+import { err, ok, type Result } from "@/core/result.js";
 import {
   getPackageManagerStrategy,
   type RuntimePackageManager,
-} from "../shell/packageManagers/strategy.js";
-import type { RuntimePorts } from "../shell/runtime/ports.js";
-import { resolvePackageManager } from "../shell/packageManagers/resolver.js";
+} from "@/shell/packageManagers/strategy.js";
+import type { RuntimePorts } from "@/shell/runtime/ports.js";
+import type { RegistryItem } from "@/types.js";
 
 function unique(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))];
@@ -38,7 +36,9 @@ export function collectMissingDependencies(
   };
 
   const allDeps = unique(items.flatMap((item) => item.dependencies || []));
-  const allDevDeps = unique(items.flatMap((item) => item.devDependencies || []));
+  const allDevDeps = unique(
+    items.flatMap((item) => item.devDependencies || []),
+  );
 
   const missingDependencies = allDeps.filter((dep) => !declared[dep]);
   const missingDevDependencies = allDevDeps.filter((dep) => !declared[dep]);
@@ -62,9 +62,13 @@ export function installDependencies(
   for (const command of commands) {
     const result = runtime.process.run(command.command, command.args, cwd);
     if (result.status !== 0) {
-      return err(appError("InstallError", `Dependency install failed: ${command.command} ${command.args.join(" ")}`));
+      return err(
+        appError(
+          "InstallError",
+          `Dependency install failed: ${command.command} ${command.args.join(" ")}`,
+        ),
+      );
     }
   }
   return ok(undefined);
 }
-

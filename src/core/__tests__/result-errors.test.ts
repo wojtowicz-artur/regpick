@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { appError, toAppError } from "../errors.js";
-import { err, isErr, isOk, ok } from "../result.js";
+import { appError, toAppError } from "@/core/errors.js";
+import { err, isErr, isOk, ok } from "@/core/result.js";
 
 describe("result and error model", () => {
   it("creates ok/err results", () => {

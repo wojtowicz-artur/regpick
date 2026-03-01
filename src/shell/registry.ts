@@ -1,19 +1,19 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { appError, type AppError } from "../core/errors.js";
-import { err, ok, type Result } from "../core/result.js";
+import { appError, type AppError } from "@/core/errors.js";
+import { err, ok, type Result } from "@/core/result.js";
 import {
   extractItemReferences,
   normalizeItem,
   normalizeManifestInline,
-} from "../domain/registryModel.js";
-import type { RuntimePorts } from "../shell/runtime/ports.js";
+} from "@/domain/registryModel.js";
+import type { RuntimePorts } from "@/shell/runtime/ports.js";
 import type {
   RegistryFile,
   RegistryItem,
   RegistrySourceMeta,
-} from "../types.js";
+} from "@/types.js";
 
 function isHttpUrl(value: string): boolean {
   return /^https?:\/\//i.test(value);

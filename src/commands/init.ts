@@ -31,47 +31,54 @@ export async function runInitCommand(
   }
 
   const { config: existingConfig } = await readConfig(context.cwd);
+  const assumeYes = Boolean(context.args.flags.yes);
 
-  const packageManager = await context.runtime.prompt.select({
-    message: "Jakiego menedżera pakietów używasz?",
-    options: [
-      { value: "auto", label: "Auto (wykrywanie)" },
-      { value: "npm", label: "npm" },
-      { value: "yarn", label: "yarn" },
-      { value: "pnpm", label: "pnpm" },
-    ],
-  });
+  const packageManager = assumeYes
+    ? "auto"
+    : await context.runtime.prompt.select({
+        message: "Jakiego menedżera pakietów używasz?",
+        options: [
+          { value: "auto", label: "Auto (wykrywanie)" },
+          { value: "npm", label: "npm" },
+          { value: "yarn", label: "yarn" },
+          { value: "pnpm", label: "pnpm" },
+        ],
+      });
 
   const isPackageManagerCancel =
     await context.runtime.prompt.isCancel(packageManager);
-  if (isPackageManagerCancel) {
+  if (!assumeYes && isPackageManagerCancel) {
     return err(appError("UserCancelled", "Operation cancelled."));
   }
 
-  const componentsFolder = await context.runtime.prompt.text({
-    message: "W jakim folderze trzymasz komponenty UI?",
-    placeholder: "src/components/ui",
-  });
+  const componentsFolder = assumeYes
+    ? "src/components/ui"
+    : await context.runtime.prompt.text({
+        message: "W jakim folderze trzymasz komponenty UI?",
+        placeholder: "src/components/ui",
+      });
 
   const isComponentsFolderCancel =
     await context.runtime.prompt.isCancel(componentsFolder);
-  if (isComponentsFolderCancel) {
+  if (!assumeYes && isComponentsFolderCancel) {
     return err(appError("UserCancelled", "Operation cancelled."));
   }
 
-  const overwritePolicy = await context.runtime.prompt.select({
-    message:
-      "Czy chcesz nadpisywać pliki automatycznie, czy wolisz być pytany?",
-    options: [
-      { value: "prompt", label: "Pytaj (prompt)" },
-      { value: "overwrite", label: "Zawsze nadpisuj (overwrite)" },
-      { value: "skip", label: "Pomijaj nadpisywanie (skip)" },
-    ],
-  });
+  const overwritePolicy = assumeYes
+    ? "prompt"
+    : await context.runtime.prompt.select({
+        message:
+          "Czy chcesz nadpisywać pliki automatycznie, czy wolisz być pytany?",
+        options: [
+          { value: "prompt", label: "Pytaj (prompt)" },
+          { value: "overwrite", label: "Zawsze nadpisuj (overwrite)" },
+          { value: "skip", label: "Pomijaj nadpisywanie (skip)" },
+        ],
+      });
 
   const isOverwritePolicyCancel =
     await context.runtime.prompt.isCancel(overwritePolicy);
-  if (isOverwritePolicyCancel) {
+  if (!assumeYes && isOverwritePolicyCancel) {
     return err(appError("UserCancelled", "Operation cancelled."));
   }
 
@@ -87,7 +94,14 @@ export async function runInitCommand(
     },
   };
 
-  await writeConfig(context.cwd, newConfig, { overwrite: true });
+  try {
+    await writeConfig(context.cwd, newConfig, { overwrite: true });
+  } catch (error) {
+    const errorMsg = `Failed to write config file: ${error instanceof Error ? error.message : String(error)}`;
+    context.runtime.prompt.error(errorMsg);
+    return err(appError("RuntimeError", errorMsg));
+  }
+
   context.runtime.prompt.success(
     `${existsRes.ok ? "Overwrote" : "Created"} ${outputPath}`,
   );

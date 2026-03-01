@@ -1,9 +1,9 @@
-import { appError, type AppError } from "../core/errors.js";
-import { err, ok, type Result } from "../core/result.js";
-import { resolveListSourceDecision } from "../domain/listCore.js";
-import { readConfig } from "../shell/config.js";
-import { loadRegistry } from "../shell/registry.js";
-import type { CommandContext, CommandOutcome, RegistryItem } from "../types.js";
+import { appError, type AppError } from "@/core/errors.js";
+import { err, ok, type Result } from "@/core/result.js";
+import { resolveListSourceDecision } from "@/domain/listCore.js";
+import { readConfig } from "@/shell/config.js";
+import { loadRegistry } from "@/shell/registry.js";
+import type { CommandContext, CommandOutcome, RegistryItem } from "@/types.js";
 
 function formatItemLabel(item: RegistryItem): string {
   const type = item.type || "registry:file";

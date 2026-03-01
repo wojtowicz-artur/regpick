@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getPackageManagerStrategy } from "../strategy.js";
+import { getPackageManagerStrategy } from "@/shell/packageManagers/strategy.js";
 
 describe("package manager strategy", () => {
   it("builds npm commands for deps and devDeps", () => {

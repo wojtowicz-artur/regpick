@@ -1,14 +1,14 @@
 import path from "node:path";
 import { styleText } from "node:util";
 
-import { type AppError } from "../core/errors.js";
-import { ok, type Result } from "../core/result.js";
-import { applyAliases } from "../domain/aliasCore.js";
-import { resolveOutputPathFromPolicy } from "../domain/pathPolicy.js";
-import { readConfig } from "../shell/config.js";
-import { computeHash, readLockfile, writeLockfile } from "../shell/lockfile.js";
-import { loadRegistry, resolveFileContent } from "../shell/registry.js";
-import type { CommandContext, CommandOutcome } from "../types.js";
+import { type AppError } from "@/core/errors.js";
+import { ok, type Result } from "@/core/result.js";
+import { applyAliases } from "@/domain/aliasCore.js";
+import { resolveOutputPathFromPolicy } from "@/domain/pathPolicy.js";
+import { readConfig } from "@/shell/config.js";
+import { computeHash, readLockfile, writeLockfile } from "@/shell/lockfile.js";
+import { loadRegistry, resolveFileContent } from "@/shell/registry.js";
+import type { CommandContext, CommandOutcome } from "@/types.js";
 
 async function printDiff(oldContent: string, newContent: string) {
   // TODO: Use a native diff implementation to avoid the dependency. This is a temporary solution. WHEN: implement when ecosystem will move further from Node 20, because native diff landad in Node 22.15

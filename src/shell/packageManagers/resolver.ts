@@ -1,8 +1,8 @@
 import path from "node:path";
 
-import type { PackageManager } from "../../types.js";
-import type { RuntimePorts } from "../runtime/ports.js";
-import type { RuntimePackageManager } from "./strategy.js";
+import type { RuntimePackageManager } from "@/shell/packageManagers/strategy.js";
+import type { RuntimePorts } from "@/shell/runtime/ports.js";
+import type { PackageManager } from "@/types.js";
 
 export function resolvePackageManager(
   cwd: string,

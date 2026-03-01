@@ -1,0 +1,29 @@
+{
+  "name": "test-shadcn-registry",
+  "items": [
+    {
+      "name": "button",
+      "type": "registry:ui",
+      "dependencies": ["lucide-react"],
+      "files": [
+        {
+          "path": "ui/button.tsx",
+          "url": "https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/bases/radix/ui/button.tsx",
+          "target": "components/ui/button.tsx"
+        }
+      ]
+    },
+    {
+      "name": "card",
+      "type": "registry:ui",
+      "registryDependencies": ["button"],
+      "files": [
+        {
+          "path": "ui/card.tsx",
+          "url": "https://github.com/shadcn-ui/ui/blob/main/apps/v4/registry/bases/radix/ui/card.tsx",
+          "target": "components/ui/card.tsx"
+        }
+      ]
+    }
+  ]
+}

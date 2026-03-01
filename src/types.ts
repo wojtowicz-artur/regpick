@@ -1,4 +1,4 @@
-import type { RuntimePorts } from "./shell/runtime/ports.js";
+import type { RuntimePorts } from "@/shell/runtime/ports.js";
 
 export type FlagValue = string | boolean;
 

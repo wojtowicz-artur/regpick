@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import type { CommandContext, RegistryItem } from "../../types.js";
-import type { RuntimePorts } from "../../shell/runtime/ports.js";
-import { filterItemsByQuery, parseSelectedNames, selectItemsFromFlags } from "../selection.js";
+import {
+  filterItemsByQuery,
+  parseSelectedNames,
+  selectItemsFromFlags,
+} from "@/domain/selection.js";
+import type { RuntimePorts } from "@/shell/runtime/ports.js";
+import type { CommandContext, RegistryItem } from "@/types.js";
 
 const items: RegistryItem[] = [
   {
@@ -48,11 +52,16 @@ describe("selection core", () => {
   });
 
   it("selects all when --all is set", () => {
-    expect(selectItemsFromFlags(items, context({ all: true }))).toEqual({ ok: true, value: items });
+    expect(selectItemsFromFlags(items, context({ all: true }))).toEqual({
+      ok: true,
+      value: items,
+    });
   });
 
   it("selects explicit items when --select is set", () => {
     const result = selectItemsFromFlags(items, context({ select: "check" }));
-    expect(result.ok && result.value?.map((item) => item.name)).toEqual(["check"]);
+    expect(result.ok && result.value?.map((item) => item.name)).toEqual([
+      "check",
+    ]);
   });
 });

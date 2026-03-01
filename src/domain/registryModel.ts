@@ -1,6 +1,10 @@
-import type { RegistryFile, RegistryItem, RegistrySourceMeta } from "../types.js";
-import { err, ok, type Result } from "../core/result.js";
-import { appError, type AppError } from "../core/errors.js";
+import { appError, type AppError } from "@/core/errors.js";
+import { err, ok, type Result } from "@/core/result.js";
+import type {
+  RegistryFile,
+  RegistryItem,
+  RegistrySourceMeta,
+} from "@/types.js";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -21,10 +25,15 @@ function asObjectArray<T extends JsonRecord>(value: unknown): T[] {
   if (!Array.isArray(value)) {
     return [];
   }
-  return value.filter((entry): entry is T => Boolean(entry && typeof entry === "object"));
+  return value.filter((entry): entry is T =>
+    Boolean(entry && typeof entry === "object"),
+  );
 }
 
-export function normalizeItem(rawItem: JsonRecord, sourceMeta: RegistrySourceMeta): RegistryItem {
+export function normalizeItem(
+  rawItem: JsonRecord,
+  sourceMeta: RegistrySourceMeta,
+): RegistryItem {
   const rawFiles = asObjectArray<JsonRecord>(rawItem.files);
   const files: RegistryFile[] = rawFiles.map((file) => ({
     path: typeof file.path === "string" ? file.path : undefined,
@@ -49,7 +58,8 @@ export function normalizeItem(rawItem: JsonRecord, sourceMeta: RegistrySourceMet
   return {
     name,
     title: typeof rawItem.title === "string" ? rawItem.title : name,
-    description: typeof rawItem.description === "string" ? rawItem.description : "",
+    description:
+      typeof rawItem.description === "string" ? rawItem.description : "",
     type: typeof rawItem.type === "string" ? rawItem.type : "registry:file",
     dependencies: asStringArray(rawItem.dependencies),
     devDependencies: asStringArray(rawItem.devDependencies),
@@ -77,22 +87,35 @@ export function extractItemReferences(payload: JsonRecord): string[] {
     .filter((value): value is string => Boolean(value));
 }
 
-export function normalizeManifestInline(data: unknown, sourceMeta: RegistrySourceMeta): Result<RegistryItem[], AppError> {
+export function normalizeManifestInline(
+  data: unknown,
+  sourceMeta: RegistrySourceMeta,
+): Result<RegistryItem[], AppError> {
   if (Array.isArray(data)) {
     const items = data
-      .filter((entry): entry is JsonRecord => Boolean(entry && typeof entry === "object"))
+      .filter((entry): entry is JsonRecord =>
+        Boolean(entry && typeof entry === "object"),
+      )
       .map((entry) => normalizeItem(entry, sourceMeta));
     return ok(items);
   }
 
-  if (data && typeof data === "object" && Array.isArray((data as JsonRecord).items)) {
-    const entries = asObjectArray<JsonRecord>((data as JsonRecord).items).filter((entry) =>
-      Array.isArray(entry.files),
-    );
+  if (
+    data &&
+    typeof data === "object" &&
+    Array.isArray((data as JsonRecord).items)
+  ) {
+    const entries = asObjectArray<JsonRecord>(
+      (data as JsonRecord).items,
+    ).filter((entry) => Array.isArray(entry.files));
     return ok(entries.map((entry) => normalizeItem(entry, sourceMeta)));
   }
 
-  if (data && typeof data === "object" && Array.isArray((data as JsonRecord).files)) {
+  if (
+    data &&
+    typeof data === "object" &&
+    Array.isArray((data as JsonRecord).files)
+  ) {
     return ok([normalizeItem(data as JsonRecord, sourceMeta)]);
   }
 

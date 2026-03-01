@@ -1,8 +1,8 @@
+import { appError, type AppError } from "@/core/errors.js";
+import { err, ok, type Result } from "@/core/result.js";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import fsPromises from "node:fs/promises";
-import { appError, type AppError } from "../../core/errors.js";
-import { err, ok, type Result } from "../../core/result.js";
 
 export type FileSystemPort = {
   existsSync(path: string): boolean;

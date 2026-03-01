@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { RegpickConfig, RegistryItem } from "../../types.js";
-import { resolveOutputPathFromPolicy } from "../pathPolicy.js";
+import { resolveOutputPathFromPolicy } from "@/domain/pathPolicy.js";
+import type { RegistryItem, RegpickConfig } from "@/types.js";
 
 const baseConfig: RegpickConfig = {
   registries: {},
@@ -23,13 +23,24 @@ const item: RegistryItem = {
   dependencies: [],
   devDependencies: [],
   registryDependencies: [],
-  files: [{ type: "registry:file", path: "icons/check.tsx", target: "src/custom/check.tsx" }],
+  files: [
+    {
+      type: "registry:file",
+      path: "icons/check.tsx",
+      target: "src/custom/check.tsx",
+    },
+  ],
   sourceMeta: { type: "directory", baseDir: "/registry" },
 };
 
 describe("path policy core", () => {
   it("prefers manifest target by default", () => {
-    const outputRes = resolveOutputPathFromPolicy(item, item.files[0], "/tmp/project", baseConfig);
+    const outputRes = resolveOutputPathFromPolicy(
+      item,
+      item.files[0],
+      "/tmp/project",
+      baseConfig,
+    );
     expect(outputRes.ok).toBe(true);
     if (outputRes.ok) {
       expect(outputRes.value.relativeTarget).toBe("src/custom/check.tsx");
@@ -45,7 +56,9 @@ describe("path policy core", () => {
     );
     expect(outputRes.ok).toBe(true);
     if (outputRes.ok) {
-      expect(outputRes.value.relativeTarget).toBe("src/components/ui/check.tsx");
+      expect(outputRes.value.relativeTarget).toBe(
+        "src/components/ui/check.tsx",
+      );
     }
   });
 
@@ -58,7 +71,9 @@ describe("path policy core", () => {
     );
     expect(outputRes.ok).toBe(false);
     if (!outputRes.ok) {
-      expect(outputRes.error.message).toMatch(/Refusing to write outside project/);
+      expect(outputRes.error.message).toMatch(
+        /Refusing to write outside project/,
+      );
     }
   });
 });

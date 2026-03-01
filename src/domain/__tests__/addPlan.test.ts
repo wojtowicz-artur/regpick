@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { RegpickConfig, RegistryItem } from "../../types.js";
-import { buildInstallPlan } from "../addPlan.js";
+import { buildInstallPlan } from "@/domain/addPlan.js";
+import type { RegistryItem, RegpickConfig } from "@/types.js";
 
 const config: RegpickConfig = {
   registries: {},
@@ -45,8 +45,13 @@ describe("add plan core", () => {
     const planRes = buildInstallPlan(items, "/tmp/project", config);
     expect(planRes.ok).toBe(true);
     if (planRes.ok) {
-      expect(planRes.value.dependencyPlan.dependencies).toEqual(["react", "clsx"]);
-      expect(planRes.value.dependencyPlan.devDependencies).toEqual(["@types/react"]);
+      expect(planRes.value.dependencyPlan.dependencies).toEqual([
+        "react",
+        "clsx",
+      ]);
+      expect(planRes.value.dependencyPlan.devDependencies).toEqual([
+        "@types/react",
+      ]);
     }
   });
 
@@ -54,8 +59,15 @@ describe("add plan core", () => {
     const firstPlanRes = buildInstallPlan(items, "/tmp/project", config);
     expect(firstPlanRes.ok).toBe(true);
     if (!firstPlanRes.ok) return;
-    const existingTargets = new Set([firstPlanRes.value.plannedWrites[0].absoluteTarget]);
-    const planWithConflictsRes = buildInstallPlan(items, "/tmp/project", config, existingTargets);
+    const existingTargets = new Set([
+      firstPlanRes.value.plannedWrites[0].absoluteTarget,
+    ]);
+    const planWithConflictsRes = buildInstallPlan(
+      items,
+      "/tmp/project",
+      config,
+      existingTargets,
+    );
     expect(planWithConflictsRes.ok).toBe(true);
     if (!planWithConflictsRes.ok) return;
     expect(planWithConflictsRes.value.conflicts).toHaveLength(1);

@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { loadConfig } from "unconfig";
 
-import type { RegpickConfig } from "../types.js";
+import type { RegpickConfig } from "@/types.js";
 
 const DEFAULT_CONFIG: RegpickConfig = {
   registries: {

@@ -4,7 +4,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { readConfig } from "../config.js";
+import { readConfig } from "@/shell/config.js";
 
 describe("readConfig", () => {
   it("returns defaults and null path when no config exists", async () => {
