@@ -38,6 +38,16 @@ export interface PackageManagerPlugin {
   buildInstallCommands: (dependencies: string[], devDependencies: string[]) => InstallCommand[];
 }
 
+export interface PathResolverPlugin {
+  name: string;
+  resolve: (
+    file: RegistryFile,
+    item: RegistryItem,
+    defaultPath: string,
+    config: RegpickConfig,
+  ) => string | undefined | null;
+}
+
 export type RegpickConfig = ValibotRegpickConfig;
 export type RegistrySourceMeta = ValibotRegistrySourceMeta;
 export type RegistryFile = ValibotRegistryFile;

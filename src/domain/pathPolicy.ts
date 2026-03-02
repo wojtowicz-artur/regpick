@@ -50,6 +50,17 @@ export function resolveOutputPathFromPolicy(
     relativeTarget = path.join("src", fallbackFileName);
   }
 
+  // Allow custom path resolvers to override the fallback logic
+  if (config.pathResolvers && config.pathResolvers.length > 0) {
+    for (const resolver of config.pathResolvers) {
+      const resolved = resolver.resolve(file, item, relativeTarget, config);
+      if (resolved) {
+        relativeTarget = resolved;
+        break;
+      }
+    }
+  }
+
   const absoluteTarget = path.resolve(cwd, relativeTarget);
   const assertRes = assertInsideProject(cwd, absoluteTarget, Boolean(config.allowOutsideProject));
   if (!assertRes.ok) return assertRes;

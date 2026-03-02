@@ -13,6 +13,7 @@ const config: RegpickConfig = {
   overwritePolicy: "prompt",
   packageManager: "auto",
   packageManagers: [],
+  pathResolvers: [],
   preferManifestTarget: false,
   allowOutsideProject: false,
   adapters: [],
