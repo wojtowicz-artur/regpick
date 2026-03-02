@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.12.0](https://github.com/wojtowicz-artur/regpick/compare/v0.11.0...v0.12.0) (2026-03-02)
+
+### Features
+
+* introduce custom path resolver plugins ([5ac35bd](https://github.com/wojtowicz-artur/regpick/commit/5ac35bd2e4af54b994b576155f410ae2f3c65aa7))
+
 ## [0.11.0](https://github.com/wojtowicz-artur/regpick/compare/v0.10.1...v0.11.0) (2026-03-02)
 
 ### Features
