@@ -9,6 +9,13 @@ import { readConfig, resolveRegistrySource } from "@/shell/config.js";
 import { collectMissingDependencies } from "@/shell/installer.js";
 import { resolvePackageManager } from "@/shell/packageManagers/resolver.js";
 import { loadRegistry, resolveFileContent } from "@/shell/registry.js";
+import {
+  DirectoryAdapter,
+  FileAdapter,
+  HttpAdapter,
+  loadAdapters,
+  type RegistryAdapter,
+} from "@/shell/registry/index.js";
 import type {
   CommandContext,
   CommandOutcome,
@@ -122,11 +129,12 @@ interface QueryItemsResult {
 async function queryRegistryItemsToProcess(
   context: CommandContext,
   source: string,
+  adapters: RegistryAdapter[],
 ): Promise<Result<QueryItemsResult, AppError>> {
   const sourcePosIdx = context.args.positionals[0] === "add" ? 1 : 0;
   const itemPosIdx = sourcePosIdx + 1;
 
-  const registryResult = await loadRegistry(source, context.cwd, context.runtime);
+  const registryResult = await loadRegistry(source, context.cwd, context.runtime, adapters);
   if (!registryResult.ok) return registryResult;
 
   const { items } = registryResult.value;
@@ -329,6 +337,7 @@ async function queryHydrateContents(
   context: CommandContext,
   config: RegpickConfig,
   approved: ApprovedAddPlan,
+  adapters: RegistryAdapter[],
 ): Promise<Result<HydratedAddPlan, AppError>> {
   const hydratedWrites = [];
 
@@ -341,6 +350,7 @@ async function queryHydrateContents(
       item,
       context.cwd,
       context.runtime,
+      adapters,
     );
     if (!contentResult.ok) return err(contentResult.error);
 
@@ -418,7 +428,15 @@ export async function runAddCommand(
   if (!sourceQ.ok) return err(sourceQ.error);
   if (!sourceQ.value) return ok({ kind: "noop", message: "No source provided." });
 
-  const itemsQ = await queryRegistryItemsToProcess(context, sourceQ.value);
+  const customAdapters = await loadAdapters(configQ.value.config.adapters || [], context.cwd);
+  const adapters = [
+    ...customAdapters,
+    new HttpAdapter(),
+    new FileAdapter(),
+    new DirectoryAdapter(),
+  ];
+
+  const itemsQ = await queryRegistryItemsToProcess(context, sourceQ.value, adapters);
   if (!itemsQ.ok) return err(itemsQ.error);
 
   for (const depName of itemsQ.value.missingRegistryDeps) {
@@ -442,13 +460,14 @@ export async function runAddCommand(
     context,
     configQ.value.config,
     approvedPlan.value,
+    adapters,
   );
   if (!hydratedPlan.ok) return err(hydratedPlan.error);
 
   // 6. Assemble Transactions
   const sagaSteps = buildTransactionsCommand(context, hydratedPlan.value);
 
-  // 7. Execute!
+  // 7. Execute
   const runRes = await runSaga(sagaSteps, (stepName, status) => {
     if (status === "executing") {
       // Option to print executing

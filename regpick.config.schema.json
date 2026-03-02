@@ -35,6 +35,14 @@
     "allowOutsideProject": {
       "type": "boolean",
       "default": false
+    },
+    "adapters": {
+      "type": "array",
+      "description": "Paths or module names of custom registry adapters.",
+      "items": {
+        "type": "string"
+      },
+      "default": []
     }
   }
 }

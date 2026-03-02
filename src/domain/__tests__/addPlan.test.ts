@@ -14,6 +14,7 @@ const config: RegpickConfig = {
   packageManager: "auto",
   preferManifestTarget: false,
   allowOutsideProject: false,
+  adapters: [],
 };
 
 const items: RegistryItem[] = [

@@ -9,6 +9,13 @@ import { buildUpdatePlanForItem, groupBySource } from "@/domain/updatePlan.js";
 import { readConfig } from "@/shell/config.js";
 import { readLockfile } from "@/shell/lockfile.js";
 import { loadRegistry, resolveFileContent } from "@/shell/registry.js";
+import {
+  DirectoryAdapter,
+  FileAdapter,
+  HttpAdapter,
+  loadAdapters,
+  type RegistryAdapter,
+} from "@/shell/registry/index.js";
 import type {
   CommandContext,
   CommandOutcome,
@@ -68,12 +75,13 @@ async function queryAvailableUpdates(
   context: CommandContext,
   config: RegpickConfig,
   lockfile: RegpickLockfile,
+  adapters: RegistryAdapter[],
 ): Promise<Result<DetectedUpdate[], AppError>> {
   const bySource = groupBySource(lockfile);
   const availableUpdates: DetectedUpdate[] = [];
 
   for (const [source, itemsToUpdate] of Object.entries(bySource)) {
-    const registryRes = await loadRegistry(source, context.cwd, context.runtime);
+    const registryRes = await loadRegistry(source, context.cwd, context.runtime, adapters);
     if (!registryRes.ok) {
       context.runtime.prompt.warn(`Failed to load registry ${source}`);
       continue;
@@ -92,6 +100,7 @@ async function queryAvailableUpdates(
             registryItem,
             context.cwd,
             context.runtime,
+            adapters,
           );
           if (!contentRes.ok) return null;
           return { file, content: contentRes.value };
@@ -272,7 +281,20 @@ export async function runUpdateCommand(
   }
 
   // 2. Discover Targets (Network & Local disk reads)
-  const updatesQ = await queryAvailableUpdates(context, stateQ.value.config, stateQ.value.lockfile);
+  const customAdapters = await loadAdapters(stateQ.value.config.adapters || [], context.cwd);
+  const adapters = [
+    ...customAdapters,
+    new HttpAdapter(),
+    new FileAdapter(),
+    new DirectoryAdapter(),
+  ];
+
+  const updatesQ = await queryAvailableUpdates(
+    context,
+    stateQ.value.config,
+    stateQ.value.lockfile,
+    adapters,
+  );
   if (!updatesQ.ok) return err(updatesQ.error);
 
   if (updatesQ.value.length === 0) {

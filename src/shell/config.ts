@@ -24,6 +24,7 @@ export const RegpickConfigSchema = v.object({
   packageManager: PackageManagerSchema,
   preferManifestTarget: v.boolean(),
   allowOutsideProject: v.boolean(),
+  adapters: v.optional(v.array(v.union([v.string(), v.any()])), []),
 });
 
 export type RegpickConfig = v.InferOutput<typeof RegpickConfigSchema>;
@@ -42,6 +43,7 @@ const DEFAULT_CONFIG: RegpickConfig = {
   packageManager: "auto",
   preferManifestTarget: true,
   allowOutsideProject: false,
+  adapters: [],
 };
 
 export function getConfigPath(cwd: string): string {

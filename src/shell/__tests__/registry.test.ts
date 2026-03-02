@@ -4,8 +4,11 @@ import { createRuntimePorts } from "@/shell/runtime/ports.js";
 import * as path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { DirectoryAdapter, FileAdapter, HttpAdapter } from "@/shell/registry/index.js";
+
 describe("registry loader", () => {
   let mockRuntime: ReturnType<typeof createRuntimePorts>;
+  const mockAdapters = [new HttpAdapter(), new FileAdapter(), new DirectoryAdapter()];
 
   beforeEach(() => {
     mockRuntime = createRuntimePorts();
@@ -30,6 +33,7 @@ describe("registry loader", () => {
       "https://github.com/user/repo/blob/main/registry.json",
       "/test",
       mockRuntime,
+      mockAdapters,
     );
 
     expect(mockRuntime.http.getJson).toHaveBeenCalledWith(
@@ -54,7 +58,7 @@ describe("registry loader", () => {
       ),
     );
 
-    const result = await loadRegistry("/abs/path/local.json", "/test", mockRuntime);
+    const result = await loadRegistry("/abs/path/local.json", "/test", mockRuntime, mockAdapters);
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.items[0].name).toBe("local-comp");
@@ -84,7 +88,7 @@ describe("registry loader", () => {
       );
     });
 
-    const result = await loadRegistry("/abs/dir", "/test", mockRuntime);
+    const result = await loadRegistry("/abs/dir", "/test", mockRuntime, mockAdapters);
 
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -110,7 +114,7 @@ describe("registry loader", () => {
 
     const file = { path: "utils.ts", type: "registry:file" };
 
-    const result = await resolveFileContent(file, item as any, "/test", mockRuntime);
+    const result = await resolveFileContent(file, item as any, "/test", mockRuntime, mockAdapters);
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value).toBe("remote-content");
 
