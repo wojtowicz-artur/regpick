@@ -64,7 +64,10 @@ export class PipelineRenderer {
     this.plugins = plugins;
   }
 
-  async run(ctx: PipelineContext, files: { id: string; code: string | Uint8Array }[]): Promise<void> {
+  async run(
+    ctx: PipelineContext,
+    files: { id: string; code: string | Uint8Array }[],
+  ): Promise<void> {
     try {
       // 1. Start Phase
       for (const plugin of this.plugins) {
@@ -72,7 +75,10 @@ export class PipelineRenderer {
           try {
             await plugin.start(ctx);
           } catch (e: any) {
-            throw appError("RuntimeError", `[${plugin.name}] Failed during start hook: ${e.message}`);
+            throw appError(
+              "RuntimeError",
+              `[${plugin.name}] Failed during start hook: ${e.message}`,
+            );
           }
         }
       }
@@ -93,7 +99,10 @@ export class PipelineRenderer {
                   break; // Stop at first resolver that claims it
                 }
               } catch (e: any) {
-                throw appError("RuntimeError", `[${plugin.name}] Failed to resolveId for '${currentId}': ${e.message}`);
+                throw appError(
+                  "RuntimeError",
+                  `[${plugin.name}] Failed to resolveId for '${currentId}': ${e.message}`,
+                );
               }
             }
           }
@@ -108,7 +117,10 @@ export class PipelineRenderer {
                   break; // Stop at first loader that claims it
                 }
               } catch (e: any) {
-                throw appError("RuntimeError", `[${plugin.name}] Failed to load '${currentId}': ${e.message}`);
+                throw appError(
+                  "RuntimeError",
+                  `[${plugin.name}] Failed to load '${currentId}': ${e.message}`,
+                );
               }
             }
           }
@@ -124,7 +136,10 @@ export class PipelineRenderer {
                       currentCode = transformed;
                     }
                   } catch (e: any) {
-                    throw appError("RuntimeError", `[${plugin.name}] Failed to transform '${currentId}': ${e.message}`);
+                    throw appError(
+                      "RuntimeError",
+                      `[${plugin.name}] Failed to transform '${currentId}': ${e.message}`,
+                    );
                   }
                 }
               }
@@ -142,7 +157,10 @@ export class PipelineRenderer {
           try {
             await plugin.finish(ctx);
           } catch (e: any) {
-            throw appError("RuntimeError", `[${plugin.name}] Failed during finish hook: ${e.message}`);
+            throw appError(
+              "RuntimeError",
+              `[${plugin.name}] Failed during finish hook: ${e.message}`,
+            );
           }
         }
       }

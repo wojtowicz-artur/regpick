@@ -13,7 +13,10 @@ function normalizePath(id: string): string {
 export class MemoryVFS implements PersistableVFS {
   private memory = new Volume();
 
-  async readFile(filePath: string, encoding: "utf-8" | undefined = "utf-8"): Promise<string | Uint8Array> {
+  async readFile(
+    filePath: string,
+    encoding: "utf-8" | undefined = "utf-8",
+  ): Promise<string | Uint8Array> {
     const normPath = normalizePath(filePath);
     const memBuffer = this.memory.readFileSync(normPath);
     if (memBuffer) {
@@ -63,12 +66,12 @@ export class MemoryVFS implements PersistableVFS {
     const files = this.memory.toJSON();
     const writePromises = Object.entries(files).map(async ([filePath, content]) => {
       if (content !== null) {
-        // We write to real FS using the system's path semantics, but read from VFS 
+        // We write to real FS using the system's path semantics, but read from VFS
         // using the normPath we get natively from iterating memfs
-        // Although toJSON might give POSIX paths anyway, we pass the raw system filePath 
+        // Although toJSON might give POSIX paths anyway, we pass the raw system filePath
         const realTargetPath = path.normalize(filePath);
         await fs.mkdir(path.dirname(realTargetPath), { recursive: true });
-        
+
         // Read raw buffer from memfs to avoid encoding corruptions
         const raw = this.memory.readFileSync(filePath);
         await fs.writeFile(realTargetPath, raw as Buffer);
