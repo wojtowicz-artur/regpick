@@ -108,7 +108,7 @@ describe("registry loader", () => {
       files: [],
       sourceMeta: {
         type: "http" as const,
-        baseUrl: "https://example.com/registry/",
+        adapterState: { baseUrl: "https://example.com/registry/" },
       },
     };
 

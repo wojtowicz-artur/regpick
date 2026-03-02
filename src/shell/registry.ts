@@ -81,9 +81,19 @@ export async function loadRegistry(
         items = itemsRes.value;
       }
 
+      const finalSource = manifest.resolvedSource || source;
+
+      const enhancedItems = items.map((item) => ({
+        ...item,
+        sourceMeta: {
+          ...item.sourceMeta,
+          originalSource: finalSource,
+        },
+      }));
+
       return ok({
-        items,
-        source: manifest.resolvedSource || source,
+        items: enhancedItems,
+        source: finalSource,
       });
     }
   }

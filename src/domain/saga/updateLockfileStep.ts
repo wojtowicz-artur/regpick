@@ -30,7 +30,7 @@ export class UpdateLockfileStep implements TransactionStep<void> {
     for (const item of this.itemsToInstall) {
       if (!lockfile.components) lockfile.components = {};
       lockfile.components[item.name] = {
-        source: item.sourceMeta?.baseUrl ?? item.sourceMeta?.baseDir ?? "unknown",
+        source: item.sourceMeta?.originalSource ?? "unknown",
         hash: "pending", // needs proper hash integration
       };
     }

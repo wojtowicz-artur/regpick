@@ -27,7 +27,7 @@ const items: RegistryItem[] = [
     devDependencies: ["@types/react"],
     registryDependencies: [],
     files: [{ type: "registry:file", path: "icons/check.tsx" }],
-    sourceMeta: { type: "directory", baseDir: "/registry" },
+    sourceMeta: { type: "directory", adapterState: { baseDir: "/registry" } },
   },
   {
     name: "calendar",
@@ -38,7 +38,7 @@ const items: RegistryItem[] = [
     devDependencies: [],
     registryDependencies: [],
     files: [{ type: "registry:file", path: "icons/calendar.tsx" }],
-    sourceMeta: { type: "directory", baseDir: "/registry" },
+    sourceMeta: { type: "directory", adapterState: { baseDir: "/registry" } },
   },
 ];
 
@@ -75,7 +75,7 @@ describe("add plan core", () => {
         devDependencies: [],
         registryDependencies: ["icon", "utils"],
         files: [],
-        sourceMeta: { type: "directory", baseDir: "/registry" },
+        sourceMeta: { type: "directory", adapterState: { baseDir: "/registry" } },
       };
       const iconItem: RegistryItem = {
         ...itemWithDeps,
@@ -111,7 +111,7 @@ describe("add plan core", () => {
         devDependencies: [],
         registryDependencies: ["icon", "utils"],
         files: [],
-        sourceMeta: { type: "directory", baseDir: "/registry" },
+        sourceMeta: { type: "directory", adapterState: { baseDir: "/registry" } },
       };
 
       const allItems = [itemWithDeps];

@@ -18,7 +18,7 @@ const items: RegistryItem[] = [
     devDependencies: [],
     registryDependencies: [],
     files: [{ type: "registry:file", path: "icons/check.tsx" }],
-    sourceMeta: { type: "directory", baseDir: "/registry" },
+    sourceMeta: { type: "directory", adapterState: { baseDir: "/registry" } },
   },
   {
     name: "calendar",
@@ -29,7 +29,7 @@ const items: RegistryItem[] = [
     devDependencies: [],
     registryDependencies: [],
     files: [{ type: "registry:file", path: "icons/calendar.tsx" }],
-    sourceMeta: { type: "directory", baseDir: "/registry" },
+    sourceMeta: { type: "directory", adapterState: { baseDir: "/registry" } },
   },
 ];
 

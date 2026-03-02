@@ -4,11 +4,16 @@ import { normalizeItem } from "@/domain/registryModel.js";
 import type { RuntimePorts } from "@/shell/runtime/ports.js";
 import type { RegistryFile, RegistryItem, RegistrySourceMeta } from "@/types.js";
 import path from "node:path";
+import * as v from "valibot";
 import type {
   RegistryAdapter,
   RegistryAdapterManifestResult,
   RegistryAdapterMatchContext,
 } from "./types.js";
+
+const DirectoryAdapterStateSchema = v.object({
+  baseDir: v.string(),
+});
 
 export class DirectoryAdapter implements RegistryAdapter {
   name = "directory";
@@ -35,7 +40,10 @@ export class DirectoryAdapter implements RegistryAdapter {
     const files = dirRes.value;
     const jsonFiles = files.filter((file) => file.endsWith(".json"));
 
-    const sourceMeta: RegistrySourceMeta = { type: "directory", baseDir: absoluteDir };
+    const sourceMeta: RegistrySourceMeta = {
+      type: "directory",
+      adapterState: { baseDir: absoluteDir },
+    };
 
     const fileResults = await Promise.all(
       jsonFiles.map(async (fileName) => {
@@ -81,9 +89,11 @@ export class DirectoryAdapter implements RegistryAdapter {
     sourceMeta: RegistrySourceMeta,
     runtime: RuntimePorts,
   ): Promise<Result<unknown, AppError>> {
-    const targetPath = sourceMeta.baseDir
-      ? path.resolve(sourceMeta.baseDir, reference)
-      : path.resolve(reference);
+    let targetPath = path.resolve(reference);
+    const parsedState = v.safeParse(DirectoryAdapterStateSchema, sourceMeta.adapterState);
+    if (parsedState.success) {
+      targetPath = path.resolve(parsedState.output.baseDir, reference);
+    }
 
     const res = await runtime.fs.readFile(targetPath, "utf8");
     if (!res.ok) return err(res.error);
@@ -105,10 +115,13 @@ export class DirectoryAdapter implements RegistryAdapter {
       return err(appError("ValidationError", `File entry in "${item.name}" missing path/url.`));
     }
 
-    const localPath =
-      item.sourceMeta.baseDir && !path.isAbsolute(targetPathOrUrl)
-        ? path.resolve(item.sourceMeta.baseDir, targetPathOrUrl)
-        : path.resolve(cwd, targetPathOrUrl);
+    let localPath = path.resolve(cwd, targetPathOrUrl);
+    if (!path.isAbsolute(targetPathOrUrl)) {
+      const parsedState = v.safeParse(DirectoryAdapterStateSchema, item.sourceMeta.adapterState);
+      if (parsedState.success) {
+        localPath = path.resolve(parsedState.output.baseDir, targetPathOrUrl);
+      }
+    }
 
     return runtime.fs.readFile(localPath, "utf8");
   }

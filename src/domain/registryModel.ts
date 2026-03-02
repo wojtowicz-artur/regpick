@@ -23,8 +23,7 @@ export const RegistryItemSchema = v.object({
 
 export const RegistrySourceMetaSchema = v.object({
   type: v.string(),
-  baseUrl: v.optional(v.string()),
-  baseDir: v.optional(v.string()),
+  originalSource: v.optional(v.string()),
   adapterState: v.optional(v.record(v.string(), v.unknown())),
 });
 

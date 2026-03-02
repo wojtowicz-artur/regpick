@@ -302,7 +302,14 @@ export async function runUpdateCommand(
   }
 
   // 3. Resolve conflicts / prompts via User Interactions
-  const approvedPlanQ = await interactApprovalPhase(context, updatesQ.value);
+  let approvedPlanQ: Result<ApprovedUpdatePlan, AppError>;
+
+  if (context.args?.flags?.yes) {
+    approvedPlanQ = ok({ approvedUpdates: updatesQ.value });
+  } else {
+    approvedPlanQ = await interactApprovalPhase(context, updatesQ.value);
+  }
+
   if (!approvedPlanQ.ok) return err(approvedPlanQ.error);
 
   const approvedCount = approvedPlanQ.value.approvedUpdates.length;

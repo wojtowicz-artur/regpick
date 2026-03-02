@@ -5,11 +5,16 @@ import { appError, type AppError } from "@/core/errors.js";
 import { err, ok, type Result } from "@/core/result.js";
 import type { RuntimePorts } from "@/shell/runtime/ports.js";
 import type { RegistryFile, RegistryItem, RegistrySourceMeta } from "@/types.js";
+import * as v from "valibot";
 import type {
   RegistryAdapter,
   RegistryAdapterManifestResult,
   RegistryAdapterMatchContext,
 } from "./types.js";
+
+const FileAdapterStateSchema = v.object({
+  baseDir: v.string(),
+});
 
 function isFileUrl(value: string): boolean {
   return /^file:\/\//i.test(value);
@@ -52,7 +57,10 @@ export class FileAdapter implements RegistryAdapter {
     }
 
     return ok({
-      sourceMeta: { type: "file", baseDir: path.dirname(fileSystemPath) },
+      sourceMeta: {
+        type: "file",
+        adapterState: { baseDir: path.dirname(fileSystemPath) },
+      },
       rawData: parsed,
       resolvedSource: fileSystemPath,
     });
@@ -64,8 +72,13 @@ export class FileAdapter implements RegistryAdapter {
     runtime: RuntimePorts,
   ): Promise<Result<unknown, AppError>> {
     let targetPath = reference;
-    if (sourceMeta.type === "file" && sourceMeta.baseDir) {
-      targetPath = path.resolve(sourceMeta.baseDir, reference);
+    if (sourceMeta.type === "file") {
+      const parsedState = v.safeParse(FileAdapterStateSchema, sourceMeta.adapterState);
+      if (parsedState.success) {
+        targetPath = path.resolve(parsedState.output.baseDir, reference);
+      } else {
+        targetPath = path.resolve(reference);
+      }
     } else {
       targetPath = path.resolve(reference);
     }
@@ -90,10 +103,13 @@ export class FileAdapter implements RegistryAdapter {
       return err(appError("ValidationError", `File entry in "${item.name}" missing path/url.`));
     }
 
-    const localPath =
-      item.sourceMeta.baseDir && !path.isAbsolute(targetPathOrUrl)
-        ? path.resolve(item.sourceMeta.baseDir, targetPathOrUrl)
-        : path.resolve(cwd, targetPathOrUrl);
+    let localPath = path.resolve(cwd, targetPathOrUrl);
+    if (!path.isAbsolute(targetPathOrUrl)) {
+      const parsedState = v.safeParse(FileAdapterStateSchema, item.sourceMeta.adapterState);
+      if (parsedState.success) {
+        localPath = path.resolve(parsedState.output.baseDir, targetPathOrUrl);
+      }
+    }
 
     return runtime.fs.readFile(localPath, "utf8");
   }

@@ -2,11 +2,16 @@ import { appError, type AppError } from "@/core/errors.js";
 import { err, ok, type Result } from "@/core/result.js";
 import type { RuntimePorts } from "@/shell/runtime/ports.js";
 import type { RegistryFile, RegistryItem, RegistrySourceMeta } from "@/types.js";
+import * as v from "valibot";
 import type {
   RegistryAdapter,
   RegistryAdapterManifestResult,
   RegistryAdapterMatchContext,
 } from "./types.js";
+
+const HttpAdapterStateSchema = v.object({
+  baseUrl: v.string(),
+});
 
 function isHttpUrl(value: string): boolean {
   return /^https?:\/\//i.test(value);
@@ -40,7 +45,7 @@ export class HttpAdapter implements RegistryAdapter {
 
     const baseUrl = resolved.endsWith("/") ? resolved : resolved.replace(/[^/]*$/, "");
     return ok({
-      sourceMeta: { type: "http", baseUrl },
+      sourceMeta: { type: "http", adapterState: { baseUrl } },
       rawData: dataRes.value,
       resolvedSource: resolved,
     });
@@ -54,9 +59,13 @@ export class HttpAdapter implements RegistryAdapter {
     if (isHttpUrl(reference)) {
       return runtime.http.getJson(reference);
     }
-    if (sourceMeta.type === "http" && sourceMeta.baseUrl) {
-      const fullUrl = joinUrl(sourceMeta.baseUrl, reference);
-      return runtime.http.getJson(fullUrl);
+
+    if (sourceMeta.type === "http") {
+      const parsedState = v.safeParse(HttpAdapterStateSchema, sourceMeta.adapterState);
+      if (parsedState.success) {
+        const fullUrl = joinUrl(parsedState.output.baseUrl, reference);
+        return runtime.http.getJson(fullUrl);
+      }
     }
     return err(appError("RegistryError", `Cannot resolve HTTP reference: ${reference}`));
   }
@@ -80,9 +89,12 @@ export class HttpAdapter implements RegistryAdapter {
       return runtime.http.getText(normalizedTarget);
     }
 
-    if (item.sourceMeta.type === "http" && item.sourceMeta.baseUrl) {
-      const remoteUrl = joinUrl(item.sourceMeta.baseUrl, normalizedTarget);
-      return runtime.http.getText(remoteUrl);
+    if (item.sourceMeta.type === "http") {
+      const parsedState = v.safeParse(HttpAdapterStateSchema, item.sourceMeta.adapterState);
+      if (parsedState.success) {
+        const remoteUrl = joinUrl(parsedState.output.baseUrl, normalizedTarget);
+        return runtime.http.getText(remoteUrl);
+      }
     }
 
     return err(appError("RegistryError", `Cannot resolve remote file: ${normalizedTarget}`));
