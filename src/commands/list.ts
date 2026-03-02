@@ -3,11 +3,19 @@ import { err, ok, type Result } from "@/core/result.js";
 import { resolveListSourceDecision } from "@/domain/listCore.js";
 import { readConfig } from "@/shell/config.js";
 import { loadRegistry } from "@/shell/registry.js";
+import {
+  DirectoryAdapter,
+  FileAdapter,
+  HttpAdapter,
+  loadAdapters,
+  type RegistryAdapter,
+} from "@/shell/registry/index.js";
 import type { CommandContext, CommandOutcome, RegistryItem } from "@/types.js";
 
 type ListSourceState = {
   source: string | null;
   requiresPrompt: boolean;
+  adapters: RegistryAdapter[];
 };
 
 /**
@@ -22,9 +30,18 @@ async function queryListSourceState(
   const { config } = await readConfig(context.cwd);
   const sourceDecision = resolveListSourceDecision(context.args.positionals[1], config.registries);
 
+  const customAdapters = await loadAdapters(config.adapters || [], context.cwd);
+  const adapters = [
+    ...customAdapters,
+    new HttpAdapter(),
+    new FileAdapter(),
+    new DirectoryAdapter(),
+  ];
+
   return ok({
     source: sourceDecision.source,
     requiresPrompt: sourceDecision.requiresPrompt,
+    adapters,
   });
 }
 
@@ -65,8 +82,9 @@ async function interactSourcePhase(
 async function queryRegistryItems(
   context: CommandContext,
   source: string,
+  adapters: RegistryAdapter[],
 ): Promise<Result<RegistryItem[], AppError>> {
-  const registryResult = await loadRegistry(source, context.cwd, context.runtime);
+  const registryResult = await loadRegistry(source, context.cwd, context.runtime, adapters);
 
   if (!registryResult.ok) {
     return registryResult as unknown as Result<RegistryItem[], AppError>;
@@ -124,7 +142,7 @@ export async function runListCommand(
   }
 
   // 3. Fetch Data
-  const itemsQ = await queryRegistryItems(context, sourceQ.value);
+  const itemsQ = await queryRegistryItems(context, sourceQ.value, stateQ.value.adapters);
   if (!itemsQ.ok) return err(itemsQ.error);
 
   const items = itemsQ.value;

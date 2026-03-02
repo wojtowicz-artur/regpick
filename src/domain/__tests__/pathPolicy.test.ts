@@ -12,8 +12,10 @@ const baseConfig: RegpickConfig = {
   },
   overwritePolicy: "prompt",
   packageManager: "auto",
+  packageManagers: [],
   preferManifestTarget: true,
   allowOutsideProject: false,
+  adapters: [],
 };
 
 const item: RegistryItem = {
@@ -31,7 +33,7 @@ const item: RegistryItem = {
       target: "src/custom/check.tsx",
     },
   ],
-  sourceMeta: { type: "directory", baseDir: "/registry" },
+  sourceMeta: { type: "directory", adapterState: { baseDir: "/registry" } },
 };
 
 describe("path policy core", () => {

@@ -22,9 +22,9 @@ export const RegistryItemSchema = v.object({
 });
 
 export const RegistrySourceMetaSchema = v.object({
-  type: v.union([v.literal("http"), v.literal("file"), v.literal("directory")]),
-  baseUrl: v.optional(v.string()),
-  baseDir: v.optional(v.string()),
+  type: v.string(),
+  originalSource: v.optional(v.string()),
+  adapterState: v.optional(v.record(v.string(), v.unknown())),
 });
 
 export type RegistryFile = v.InferOutput<typeof RegistryFileSchema>;
