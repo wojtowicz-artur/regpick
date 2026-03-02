@@ -58,6 +58,7 @@
   "dependencies": {
     "@clack/prompts": "^1.0.1",
     "diff": "^8.0.3",
+    "memfs": "^4.56.10",
     "unconfig": "^7.5.0",
     "valibot": "^1.2.0"
   },

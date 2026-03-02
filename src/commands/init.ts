@@ -1,11 +1,9 @@
-import * as v from "valibot";
 import { appError, type AppError } from "@/core/errors.js";
 import { err, ok, type Result } from "@/core/result.js";
-import { runSaga, type TransactionStep } from "@/core/saga.js";
 import { decideInitAfterOverwritePrompt } from "@/domain/initCore.js";
-import { WriteFileStep } from "@/domain/saga/index.js";
 import { getConfigPath, readConfig, RegpickConfigSchema } from "@/shell/config.js";
 import type { CommandContext, CommandOutcome, RegpickConfig } from "@/types.js";
+import * as v from "valibot";
 
 type InitQueryState = {
   configPath: string;
@@ -139,20 +137,8 @@ async function interactInitPhase(
 }
 
 /**
- * Builds atomic Saga commands required to initialize the configuration.
- *
- * @param context - Command context.
- * @param plan - Approved initialization parameters.
- * @returns Array of Saga transaction steps.
- */
-function buildInitCommand(context: CommandContext, plan: ApprovedInitPlan): TransactionStep<any>[] {
-  const content = JSON.stringify(plan.newConfig, null, 2);
-  return [new WriteFileStep(plan.configPath, content, context.runtime)];
-}
-
-/**
  * Main controller for the `init` command.
- * Orchestrates CQS flow: State Query -> Interaction -> Command Builder -> Execution.
+ * Orchestrates CQS flow: State Query -> Interaction -> Execution.
  *
  * @param context - Command context.
  * @returns Result indicating outcome.
@@ -160,26 +146,20 @@ function buildInitCommand(context: CommandContext, plan: ApprovedInitPlan): Tran
 export async function runInitCommand(
   context: CommandContext,
 ): Promise<Result<CommandOutcome, AppError>> {
-  // 1. Initial State
   const stateQ = await queryInitState(context);
   if (!stateQ.ok) return err(stateQ.error);
 
-  // 2. User Interaction
   const planQ = await interactInitPhase(context, stateQ.value);
   if (!planQ.ok) return err(planQ.error);
   if (!planQ.value) return ok({ kind: "noop", message: "Keeping existing configuration." });
 
-  // 3. Assemble Transaction
-  const sagaSteps = buildInitCommand(context, planQ.value);
+  const content = JSON.stringify(planQ.value.newConfig, null, 2);
+  const writeRes = await context.runtime.fs.writeFile(planQ.value.configPath, content, "utf8");
 
-  // 4. Execute Saga
-  const runRes = await runSaga(sagaSteps, (stepName, status) => {
-    if (status === "failed") {
-      context.runtime.prompt.error(`Failed to write config file: ${planQ.value!.configPath}`);
-    }
-  });
-
-  if (!runRes.ok) return runRes;
+  if (!writeRes.ok) {
+    context.runtime.prompt.error(`Failed to write config file: ${planQ.value.configPath}`);
+    return err(writeRes.error);
+  }
 
   context.runtime.prompt.success(
     `${planQ.value.isOverwrite ? "Overwrote" : "Created"} ${planQ.value.configPath}`,

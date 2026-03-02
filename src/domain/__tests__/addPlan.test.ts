@@ -14,6 +14,7 @@ const config: RegpickConfig = {
   packageManager: "auto",
   packageManagers: [],
   pathResolvers: [],
+  plugins: [],
   preferManifestTarget: false,
   allowOutsideProject: false,
   adapters: [],
