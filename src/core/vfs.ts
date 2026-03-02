@@ -3,28 +3,45 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { type PersistableVFS } from "./pipeline.js";
 
+/**
+ * Normalizes windows paths to posix format for compatible memory caching.
+ */
+function normalizePath(id: string): string {
+  return id.replace(/\\/g, "/");
+}
+
 export class MemoryVFS implements PersistableVFS {
   private memory = new Volume();
 
-  async readFile(filePath: string): Promise<string> {
-    const memBuffer = this.memory.readFileSync(filePath);
+  async readFile(filePath: string, encoding: "utf-8" | undefined = "utf-8"): Promise<string | Uint8Array> {
+    const normPath = normalizePath(filePath);
+    const memBuffer = this.memory.readFileSync(normPath);
     if (memBuffer) {
-      return memBuffer.toString();
+      if (encoding === "utf-8") {
+        return memBuffer.toString();
+      }
+      return memBuffer as Buffer;
     }
     // Fallback to real disk
-    const content = await fs.readFile(filePath, "utf-8");
+    if (encoding === "utf-8") {
+      const content = await fs.readFile(filePath, "utf-8");
+      return content;
+    }
+    const content = await fs.readFile(filePath);
     return content;
   }
 
-  async writeFile(filePath: string, content: string): Promise<void> {
-    const dir = path.dirname(filePath);
+  async writeFile(filePath: string, content: string | Uint8Array): Promise<void> {
+    const normPath = normalizePath(filePath);
+    const dir = path.dirname(normPath);
     await this.mkdir(dir);
-    this.memory.writeFileSync(filePath, content);
+    this.memory.writeFileSync(normPath, content);
   }
 
   async exists(filePath: string): Promise<boolean> {
+    const normPath = normalizePath(filePath);
     try {
-      if (this.memory.existsSync(filePath)) {
+      if (this.memory.existsSync(normPath)) {
         return true;
       }
       await fs.access(filePath);
@@ -35,7 +52,8 @@ export class MemoryVFS implements PersistableVFS {
   }
 
   async mkdir(dirPath: string): Promise<void> {
-    this.memory.mkdirSync(dirPath, { recursive: true });
+    const normPath = normalizePath(dirPath);
+    this.memory.mkdirSync(normPath, { recursive: true });
   }
 
   /**
@@ -44,9 +62,16 @@ export class MemoryVFS implements PersistableVFS {
   async flushToDisk(): Promise<void> {
     const files = this.memory.toJSON();
     const writePromises = Object.entries(files).map(async ([filePath, content]) => {
-      if (typeof content === "string") {
-        await fs.mkdir(path.dirname(filePath), { recursive: true });
-        await fs.writeFile(filePath, content, "utf-8");
+      if (content !== null) {
+        // We write to real FS using the system's path semantics, but read from VFS 
+        // using the normPath we get natively from iterating memfs
+        // Although toJSON might give POSIX paths anyway, we pass the raw system filePath 
+        const realTargetPath = path.normalize(filePath);
+        await fs.mkdir(path.dirname(realTargetPath), { recursive: true });
+        
+        // Read raw buffer from memfs to avoid encoding corruptions
+        const raw = this.memory.readFileSync(filePath);
+        await fs.writeFile(realTargetPath, raw as Buffer);
       }
     });
 
