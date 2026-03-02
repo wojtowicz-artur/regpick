@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.11.0](https://github.com/wojtowicz-artur/regpick/compare/v0.10.1...v0.11.0) (2026-03-02)
+
+### Features
+
+* enhance registry adapter system with improved source tracking and state management ([07da138](https://github.com/wojtowicz-artur/regpick/commit/07da138d194a1bc32688cec29c2067334aea5792))
+* implement extensible package manager plugin architecture ([2844630](https://github.com/wojtowicz-artur/regpick/commit/2844630d600e6b3a8e506ee60b987b379199ca06))
+* implement extensible registry adapter system ([d27d331](https://github.com/wojtowicz-artur/regpick/commit/d27d331b0255e55a482967936dff96611f904a6d))
+
 ## [0.10.1](https://github.com/wojtowicz-artur/regpick/compare/v0.10.0...v0.10.1) (2026-03-01)
 
 ### Code Refactoring
