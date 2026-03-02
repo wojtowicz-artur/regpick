@@ -13,6 +13,7 @@ const baseConfig: RegpickConfig = {
   overwritePolicy: "prompt",
   packageManager: "auto",
   packageManagers: [],
+  pathResolvers: [],
   preferManifestTarget: true,
   allowOutsideProject: false,
   adapters: [],
@@ -66,6 +67,69 @@ describe("path policy core", () => {
     expect(outputRes.ok).toBe(false);
     if (!outputRes.ok) {
       expect(outputRes.error.message).toMatch(/Refusing to write outside project/);
+    }
+  });
+
+  it("applies path resolvers over built-in targets", () => {
+    const configWithResolvers: RegpickConfig = {
+      ...baseConfig,
+      pathResolvers: [
+        {
+          name: "test-resolver",
+          resolve: (file: any, i: any, defaultPath: any) => {
+            if (file.path.endsWith(".test.tsx")) return `tests/${defaultPath}`;
+            return undefined;
+          },
+        },
+      ],
+    };
+
+    const testFile = {
+      ...item.files[0],
+      path: "icons/check.test.tsx",
+      target: "src/custom/check.test.tsx",
+    };
+
+    const outputRes = resolveOutputPathFromPolicy(
+      item,
+      testFile,
+      "/tmp/project",
+      configWithResolvers,
+    );
+    expect(outputRes.ok).toBe(true);
+    if (outputRes.ok) {
+      expect(outputRes.value.relativeTarget).toBe("tests/src/custom/check.test.tsx");
+    }
+  });
+
+  it("applies path resolvers to items without explicit targets", () => {
+    const configWithResolvers: RegpickConfig = {
+      ...baseConfig,
+      pathResolvers: [
+        {
+          name: "test-resolver-2",
+          resolve: (file: any) => {
+            if (file.path.endsWith(".css")) return "styles/theme.css";
+            return null;
+          },
+        },
+      ],
+    };
+
+    const cssFile = {
+      type: "registry:style" as const,
+      path: "styles/test.css",
+    };
+
+    const outputRes = resolveOutputPathFromPolicy(
+      item,
+      cssFile,
+      "/tmp/project",
+      configWithResolvers,
+    );
+    expect(outputRes.ok).toBe(true);
+    if (outputRes.ok) {
+      expect(outputRes.value.relativeTarget).toBe("styles/theme.css");
     }
   });
 });
