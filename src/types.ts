@@ -24,7 +24,19 @@ export type CommandContext = {
 };
 
 export type OverwritePolicy = "prompt" | "overwrite" | "skip";
-export type PackageManager = "auto" | "npm" | "yarn" | "pnpm";
+export type PackageManager = string;
+
+export interface InstallCommand {
+  command: string;
+  args: string[];
+}
+
+export interface PackageManagerPlugin {
+  name: string;
+  lockfiles: string[];
+  detect: (cwd: string, runtime: RuntimePorts) => Promise<boolean> | boolean;
+  buildInstallCommands: (dependencies: string[], devDependencies: string[]) => InstallCommand[];
+}
 
 export type RegpickConfig = ValibotRegpickConfig;
 export type RegistrySourceMeta = ValibotRegistrySourceMeta;

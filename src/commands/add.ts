@@ -41,7 +41,11 @@ type ApprovedAddPlan = {
 
 type HydratedAddPlan = ApprovedAddPlan & {
   // Contains the literal file content fully prepared, downloaded, and aliases applied
-  hydratedWrites: { absoluteTarget: string; finalContent: string; itemName: string }[];
+  hydratedWrites: {
+    absoluteTarget: string;
+    finalContent: string;
+    itemName: string;
+  }[];
 };
 
 /**
@@ -375,6 +379,7 @@ async function queryHydrateContents(
  */
 function buildTransactionsCommand(
   context: CommandContext,
+  config: RegpickConfig,
   hydrated: HydratedAddPlan,
 ): TransactionStep<any>[] {
   const sagaSteps: TransactionStep<any>[] = [];
@@ -402,7 +407,7 @@ function buildTransactionsCommand(
       hydrated.dependencyPlan.devDependencies.length > 0)
   ) {
     sagaSteps.push(
-      new InstallDependenciesStep(hydrated.dependencyPlan, context.cwd, context.runtime),
+      new InstallDependenciesStep(hydrated.dependencyPlan, context.cwd, context.runtime, config),
     );
   }
 
@@ -465,7 +470,7 @@ export async function runAddCommand(
   if (!hydratedPlan.ok) return err(hydratedPlan.error);
 
   // 6. Assemble Transactions
-  const sagaSteps = buildTransactionsCommand(context, hydratedPlan.value);
+  const sagaSteps = buildTransactionsCommand(context, configQ.value.config, hydratedPlan.value);
 
   // 7. Execute
   const runRes = await runSaga(sagaSteps, (stepName, status) => {

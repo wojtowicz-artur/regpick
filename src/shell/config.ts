@@ -9,12 +9,7 @@ const OverwritePolicySchema = v.union([
   v.literal("skip"),
 ]);
 
-const PackageManagerSchema = v.union([
-  v.literal("auto"),
-  v.literal("npm"),
-  v.literal("yarn"),
-  v.literal("pnpm"),
-]);
+const PackageManagerSchema = v.string();
 
 export const RegpickConfigSchema = v.object({
   registries: v.record(v.string(), v.string()),
@@ -22,6 +17,7 @@ export const RegpickConfigSchema = v.object({
   aliases: v.optional(v.record(v.string(), v.string()), {}),
   overwritePolicy: OverwritePolicySchema,
   packageManager: PackageManagerSchema,
+  packageManagers: v.optional(v.array(v.any()), []),
   preferManifestTarget: v.boolean(),
   allowOutsideProject: v.boolean(),
   adapters: v.optional(v.array(v.union([v.string(), v.any()])), []),
@@ -41,6 +37,7 @@ const DEFAULT_CONFIG: RegpickConfig = {
   aliases: {},
   overwritePolicy: "prompt",
   packageManager: "auto",
+  packageManagers: [],
   preferManifestTarget: true,
   allowOutsideProject: false,
   adapters: [],

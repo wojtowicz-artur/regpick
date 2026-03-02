@@ -12,6 +12,7 @@ const config: RegpickConfig = {
   },
   overwritePolicy: "prompt",
   packageManager: "auto",
+  packageManagers: [],
   preferManifestTarget: false,
   allowOutsideProject: false,
   adapters: [],
@@ -75,7 +76,10 @@ describe("add plan core", () => {
         devDependencies: [],
         registryDependencies: ["icon", "utils"],
         files: [],
-        sourceMeta: { type: "directory", adapterState: { baseDir: "/registry" } },
+        sourceMeta: {
+          type: "directory",
+          adapterState: { baseDir: "/registry" },
+        },
       };
       const iconItem: RegistryItem = {
         ...itemWithDeps,
@@ -111,7 +115,10 @@ describe("add plan core", () => {
         devDependencies: [],
         registryDependencies: ["icon", "utils"],
         files: [],
-        sourceMeta: { type: "directory", adapterState: { baseDir: "/registry" } },
+        sourceMeta: {
+          type: "directory",
+          adapterState: { baseDir: "/registry" },
+        },
       };
 
       const allItems = [itemWithDeps];
