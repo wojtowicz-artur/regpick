@@ -17,7 +17,7 @@ type ListSourceState = {
  * Resolves list source configuration states.
  *
  * @param context - Command context.
- * @returns Result containing list source state.
+ * @returns Either containing list source state.
  */
 async function queryListSourceState(
   context: CommandContext,
@@ -43,7 +43,7 @@ async function queryListSourceState(
  *
  * @param context - Command context.
  * @param state - Current list query state.
- * @returns Result containing the final registry URL.
+ * @returns Either containing the final registry URL.
  */
 async function interactSourcePhase(
   context: CommandContext,
@@ -119,7 +119,7 @@ function presentItems(context: CommandContext, items: RegistryItem[]): void {
  * Evaluates CQS flow: State Query -> Interaction -> Fetch Items -> Presentation.
  *
  * @param context - Command context.
- * @returns Result command status execution payload.
+ * @returns Either command status execution payload.
  */
 export async function runListCommand(
   context: CommandContext,

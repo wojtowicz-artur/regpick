@@ -76,5 +76,5 @@ Order used by installer:
   - `PromptPort`,
   - `ProcessPort`.
 - Commands receive adapters through `CommandContext.runtime` instead of importing IO libraries directly.
-- The app now uses a shared typed result model from `src/core/result.ts` (`Result`, `ok`, `err`).
+- The app uses Effect-TS built-in monads (`Either`) for shared typed result modeling, completely migrating away from custom generic union models.
 - Domain and shell errors are mapped to `AppError` in `src/core/errors.ts` and surfaced consistently in CLI output.

@@ -49,7 +49,7 @@ type HydratedAddPlan = ApprovedAddPlan & {
  * Pure query phase.
  *
  * @param context - Command context.
- * @returns Result with configuration and path.
+ * @returns Either with configuration and path.
  */
 async function queryLoadConfiguration(
   context: CommandContext,
@@ -67,7 +67,7 @@ async function queryLoadConfiguration(
  *
  * @param context - Command context.
  * @param config - Application configuration.
- * @returns Result with the registry source string.
+ * @returns Either with the registry source string.
  */
 async function queryResolveRegistrySource(
   context: CommandContext,
@@ -128,7 +128,7 @@ interface QueryItemsResult {
  *
  * @param context - Command context.
  * @param source - Registry HTTP URL or local path.
- * @returns Result containing selected items and missing dependencies.
+ * @returns Either containing selected items and missing dependencies.
  */
 async function queryRegistryItemsToProcess(
   context: CommandContext,
@@ -200,7 +200,7 @@ async function queryRegistryItemsToProcess(
  * @param context - Command context.
  * @param config - Application configuration.
  * @param selectedItems - Registry items to install.
- * @returns Result with interaction state payload.
+ * @returns Either with interaction state payload.
  */
 async function queryInstallPlanState(
   context: CommandContext,
@@ -243,7 +243,7 @@ async function queryInstallPlanState(
  * @param context - Command context.
  * @param config - Application configuration.
  * @param state - The current pre-calculated installation state.
- * @returns Result with an approved action plan.
+ * @returns Either with an approved action plan.
  */
 async function interactApprovalPhase(
   context: CommandContext,
@@ -350,7 +350,7 @@ async function interactApprovalPhase(
  * @param context - Command context.
  * @param config - Application configuration.
  * @param approved - The user-approved installation plan.
- * @returns Result with hydrated payload containing raw file texts.
+ * @returns Either with hydrated payload containing raw file texts.
  */
 async function queryHydrateContents(
   context: CommandContext,
