@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.14.0](https://github.com/wojtowicz-artur/regpick/compare/v0.13.0...v0.14.0) (2026-03-03)
+
+### Features
+
+* refactor to Vite-like domain-driven architecture ([3cf5eb6](https://github.com/wojtowicz-artur/regpick/commit/3cf5eb60a5c7c7815a1887dc7865451010cc58cf))
+
 ## [0.13.0](https://github.com/wojtowicz-artur/regpick/compare/v0.12.0...v0.13.0) (2026-03-03)
 
 ### Features
