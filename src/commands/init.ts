@@ -117,13 +117,17 @@ async function interactInitPhase(
 
   const newConfigRaw = {
     ...state.existingConfig,
-    packageManager: String(packageManager),
-    overwritePolicy: String(overwritePolicy),
-    targetsByType: {
-      ...state.existingConfig.targetsByType,
-      "registry:component": String(componentsFolder || "src/components/ui"),
-      "registry:file": String(componentsFolder || "src/components/ui"),
-      "registry:icon": `${String(componentsFolder || "src/components/ui")}/icons`,
+    install: {
+      packageManager: String(packageManager),
+      overwritePolicy: String(overwritePolicy),
+    },
+    resolve: {
+      targets: {
+        ...(state.existingConfig.resolve?.targets || {}),
+        "registry:component": String(componentsFolder || "src/components/ui"),
+        "registry:file": String(componentsFolder || "src/components/ui"),
+        "registry:icon": `${String(componentsFolder || "src/components/ui")}/icons`,
+      },
     },
   };
 

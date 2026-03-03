@@ -242,7 +242,7 @@ export async function runUpdateCommand(
     return ok({ kind: "noop", message: "No components to update." });
   }
 
-  const customAdapters = await loadAdapters(stateQ.value.config.adapters || [], context.cwd);
+  const customAdapters = await loadAdapters(stateQ.value.config.plugins || [], context.cwd);
   const adapters = [
     ...customAdapters,
     new HttpAdapter(),

@@ -4,20 +4,23 @@ import { resolveOutputPathFromPolicy } from "@/domain/pathPolicy.js";
 import type { RegistryItem, RegpickConfig } from "@/types.js";
 
 const baseConfig: RegpickConfig = {
-  registries: {},
-  aliases: {},
-  targetsByType: {
-    "registry:icon": "src/components/ui/icons",
-    "registry:file": "src/components/ui",
+  registry: {
+    sources: {},
+    aliases: {},
   },
-  overwritePolicy: "prompt",
-  packageManager: "auto",
-  packageManagers: [],
-  pathResolvers: [],
-  plugins: [],
-  preferManifestTarget: true,
+  resolve: {
+    targets: {
+      "registry:icon": "src/components/ui/icons",
+      "registry:file": "src/components/ui",
+    },
+    preferManifestTarget: true,
+  },
+  install: {
+    overwritePolicy: "prompt",
+    packageManager: "auto",
+  },
   allowOutsideProject: false,
-  adapters: [],
+  plugins: [],
 };
 
 const item: RegistryItem = {
@@ -50,7 +53,10 @@ describe("path policy core", () => {
   it("uses mapped type target when preferManifestTarget is false", () => {
     const outputRes = resolveOutputPathFromPolicy(item, item.files[0], "/tmp/project", {
       ...baseConfig,
-      preferManifestTarget: false,
+      resolve: {
+        ...baseConfig.resolve,
+        preferManifestTarget: false,
+      },
     });
     expect(outputRes.ok).toBe(true);
     if (outputRes.ok) {
@@ -74,10 +80,10 @@ describe("path policy core", () => {
   it("applies path resolvers over built-in targets", () => {
     const configWithResolvers: RegpickConfig = {
       ...baseConfig,
-      pathResolvers: [
+      plugins: [
         {
           name: "test-resolver",
-          resolve: (file: any, i: any, defaultPath: any) => {
+          resolvePath: (file: any, i: any, defaultPath: any) => {
             if (file.path.endsWith(".test.tsx")) return `tests/${defaultPath}`;
             return undefined;
           },
@@ -106,10 +112,10 @@ describe("path policy core", () => {
   it("applies path resolvers to items without explicit targets", () => {
     const configWithResolvers: RegpickConfig = {
       ...baseConfig,
-      pathResolvers: [
+      plugins: [
         {
           name: "test-resolver-2",
-          resolve: (file: any) => {
+          resolvePath: (file: any) => {
             if (file.path.endsWith(".css")) return "styles/theme.css";
             return null;
           },

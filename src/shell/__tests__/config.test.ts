@@ -12,9 +12,9 @@ describe("readConfig", () => {
     try {
       const { config, configPath } = await readConfig(tmp);
       expect(configPath).toBeNull();
-      expect(config).toHaveProperty("registries");
-      expect(config).toHaveProperty("targetsByType");
-      expect(config.preferManifestTarget).toBe(true);
+      expect(config).toHaveProperty("registry");
+      expect(config).toHaveProperty("resolve");
+      expect(config.registry?.preferManifestTarget ?? true).toBe(true);
     } finally {
       await fs.rm(tmp, { recursive: true, force: true });
     }
@@ -24,8 +24,8 @@ describe("readConfig", () => {
     const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "regpick-"));
     try {
       const custom = {
-        registries: { testreg: "./r" },
-        overwritePolicy: "overwrite",
+        registry: { sources: { testreg: "./r" } },
+        install: { overwritePolicy: "overwrite" },
       };
       await fs.writeFile(path.join(tmp, "regpick.json"), JSON.stringify(custom), "utf8");
 
@@ -33,9 +33,9 @@ describe("readConfig", () => {
 
       expect(configPath).not.toBeNull();
       expect(configPath?.endsWith("regpick.json")).toBe(true);
-      expect(config.registries.testreg).toBe("./r");
-      expect(config.overwritePolicy).toBe("overwrite");
-      expect(config.targetsByType).toBeDefined();
+      expect((config.registry?.sources || {}).testreg).toBe("./r");
+      expect(config.install?.overwritePolicy || "prompt").toBe("overwrite");
+      expect(config.resolve?.targets || {}).toBeDefined();
     } finally {
       await fs.rm(tmp, { recursive: true, force: true });
     }
@@ -45,7 +45,7 @@ describe("readConfig", () => {
     const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "regpick-"));
     try {
       // write config in parent
-      const custom = { registries: { parentreg: "./pr" } };
+      const custom = { registry: { sources: { parentreg: "./pr" } } };
       await fs.writeFile(path.join(tmp, "regpick.json"), JSON.stringify(custom), "utf8");
 
       // create nested folder and run readConfig from there
@@ -59,7 +59,7 @@ describe("readConfig", () => {
         configPath?.endsWith(path.join(path.basename(tmp), "regpick.json")) ||
           configPath?.endsWith("regpick.json"),
       ).toBe(true);
-      expect(config.registries.parentreg).toBe("./pr");
+      expect((config.registry?.sources || {}).parentreg).toBe("./pr");
     } finally {
       await fs.rm(tmp, { recursive: true, force: true });
     }

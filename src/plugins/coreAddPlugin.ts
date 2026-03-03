@@ -26,7 +26,12 @@ export function coreAddPlugin(
       const depsToInstall = [...dependencyPlan.dependencies, ...dependencyPlan.devDependencies];
 
       if (depsToInstall.length > 0) {
-        const pmName = await resolvePackageManager(ctx.cwd, config.packageManager, runtime, config);
+        const pmName = await resolvePackageManager(
+          ctx.cwd,
+          config.install?.packageManager || "auto",
+          runtime,
+          config,
+        );
 
         const result = installDependencies(
           ctx.cwd,

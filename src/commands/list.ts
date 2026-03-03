@@ -28,9 +28,12 @@ async function queryListSourceState(
   context: CommandContext,
 ): Promise<Result<ListSourceState, AppError>> {
   const { config } = await readConfig(context.cwd);
-  const sourceDecision = resolveListSourceDecision(context.args.positionals[1], config.registries);
+  const sourceDecision = resolveListSourceDecision(
+    context.args.positionals[1],
+    config.registry?.sources || {},
+  );
 
-  const customAdapters = await loadAdapters(config.adapters || [], context.cwd);
+  const customAdapters = await loadAdapters(config.plugins || [], context.cwd);
   const adapters = [
     ...customAdapters,
     new HttpAdapter(),

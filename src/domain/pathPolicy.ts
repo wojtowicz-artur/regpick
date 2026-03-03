@@ -35,8 +35,8 @@ export function resolveOutputPathFromPolicy(
   config: RegpickConfig,
 ): Result<{ absoluteTarget: string; relativeTarget: string }, AppError> {
   const typeKey = file.type || item.type || "registry:file";
-  const mappedBase = config.targetsByType?.[typeKey];
-  const preferManifestTarget = config.preferManifestTarget !== false;
+  const mappedBase = (config.resolve?.targets || {})?.[typeKey];
+  const preferManifestTarget = (config.resolve?.preferManifestTarget ?? true) !== false;
   const fallbackFileName = path.basename(file.path || `${item.name}.txt`);
 
   let relativeTarget: string;
@@ -51,9 +51,9 @@ export function resolveOutputPathFromPolicy(
   }
 
   // Allow custom path resolvers to override the fallback logic
-  if (config.pathResolvers && config.pathResolvers.length > 0) {
-    for (const resolver of config.pathResolvers) {
-      const resolved = resolver.resolve(file, item, relativeTarget, config);
+  if (config.plugins && config.plugins.length > 0) {
+    for (const resolver of config.plugins) {
+      const resolved = resolver.resolvePath?.(file, item, relativeTarget, config);
       if (resolved) {
         relativeTarget = resolved;
         break;
@@ -62,7 +62,11 @@ export function resolveOutputPathFromPolicy(
   }
 
   const absoluteTarget = path.resolve(cwd, relativeTarget);
-  const assertRes = assertInsideProject(cwd, absoluteTarget, Boolean(config.allowOutsideProject));
+  const assertRes = assertInsideProject(
+    cwd,
+    absoluteTarget,
+    Boolean(config.install?.allowOutsideProject || false),
+  );
   if (!assertRes.ok) return assertRes;
 
   return ok({

@@ -14,70 +14,128 @@ const PackageManagerSchema = v.string();
 export const isFunction = (val: unknown) => typeof val === "function";
 export const FunctionSchema = v.custom<Function>(isFunction, "Expected a function");
 
-export const PluginSchema = v.object({
-  name: v.string(),
-  start: v.optional(FunctionSchema),
-  resolveId: v.optional(FunctionSchema),
-  load: v.optional(FunctionSchema),
-  transform: v.optional(FunctionSchema),
-  finish: v.optional(FunctionSchema),
-  onError: v.optional(FunctionSchema),
-});
+export const PluginSchema = v.objectWithRest(
+  {
+    name: v.string(),
+    start: v.optional(FunctionSchema),
+    resolveId: v.optional(FunctionSchema),
+    load: v.optional(FunctionSchema),
+    transform: v.optional(FunctionSchema),
+    finish: v.optional(FunctionSchema),
+    onError: v.optional(FunctionSchema),
+  },
+  v.any(),
+);
 
-export const RegistryAdapterSchema = v.object({
-  name: v.string(),
-  match: FunctionSchema,
-  resolveManifest: FunctionSchema,
-  resolveItemReference: FunctionSchema,
-  resolveFile: FunctionSchema,
-});
+export const RegistryAdapterSchema = v.objectWithRest(
+  {
+    name: v.string(),
+    match: FunctionSchema,
+    resolveManifest: FunctionSchema,
+    resolveItemReference: FunctionSchema,
+    resolveFile: FunctionSchema,
+  },
+  v.any(),
+);
 
-export const PackageManagerPluginSchema = v.object({
-  name: v.string(),
-  lockfiles: v.array(v.string()),
-  detect: FunctionSchema,
-  buildInstallCommands: FunctionSchema,
-});
+export const PackageManagerPluginSchema = v.objectWithRest(
+  {
+    name: v.string(),
+    lockfiles: v.array(v.string()),
+    detect: FunctionSchema,
+    buildInstallCommands: FunctionSchema,
+  },
+  v.any(),
+);
 
-export const PathResolverPluginSchema = v.object({
-  name: v.string(),
-  resolve: FunctionSchema,
-});
+export const PathResolverPluginSchema = v.objectWithRest(
+  {
+    name: v.string(),
+    resolvePath: FunctionSchema,
+  },
+  v.any(),
+);
 
-export const RegpickConfigSchema = v.object({
-  registries: v.record(v.string(), v.string()),
-  targetsByType: v.record(v.string(), v.string()),
-  aliases: v.optional(v.record(v.string(), v.string()), {}),
-  overwritePolicy: OverwritePolicySchema,
-  packageManager: PackageManagerSchema,
-  packageManagers: v.optional(v.array(PackageManagerPluginSchema), []),
-  pathResolvers: v.optional(v.array(PathResolverPluginSchema), []),
-  plugins: v.optional(v.array(PluginSchema), []),
-  preferManifestTarget: v.boolean(),
-  allowOutsideProject: v.boolean(),
-  adapters: v.optional(v.array(v.union([v.string(), RegistryAdapterSchema])), []),
-});
+export const RegpickConfigSchema = v.pipe(
+  v.object({
+    resolve: v.optional(
+      v.object({
+        targets: v.optional(v.record(v.string(), v.string()), {}),
+        aliases: v.optional(v.record(v.string(), v.string()), {}),
+      }),
+      {},
+    ),
+    registry: v.optional(
+      v.object({
+        sources: v.optional(v.record(v.string(), v.string()), {}),
+        preferManifestTarget: v.optional(v.boolean(), true),
+      }),
+      {},
+    ),
+    install: v.optional(
+      v.object({
+        packageManager: v.optional(PackageManagerSchema, "auto"),
+        overwritePolicy: v.optional(OverwritePolicySchema, "prompt"),
+        allowOutsideProject: v.optional(v.boolean(), false),
+      }),
+      {},
+    ),
+    plugins: v.optional(
+      v.array(
+        v.union([
+          PluginSchema,
+          RegistryAdapterSchema,
+          PackageManagerPluginSchema,
+          PathResolverPluginSchema,
+          v.string(),
+        ]),
+      ),
+      [],
+    ),
+  }),
+  v.forward(
+    v.custom((input) => {
+      if (!input.install?.allowOutsideProject) {
+        const targets = input.resolve?.targets || {};
+        for (const target of Object.values(targets)) {
+          if (typeof target === "string" && (target.startsWith("..") || path.isAbsolute(target))) {
+            return false;
+          }
+        }
+      }
+      return true;
+    }, "Target paths outside project are disallowed when install.allowOutsideProject is false"),
+    ["resolve", "targets"],
+  ),
+);
 
 export type RegpickConfig = v.InferOutput<typeof RegpickConfigSchema>;
 
+export function defineConfig(config: RegpickConfig): RegpickConfig {
+  return config;
+}
+
 const DEFAULT_CONFIG: RegpickConfig = {
-  registries: {
-    tebra: "./tebra-icon-registry/registry",
+  resolve: {
+    targets: {
+      "registry:icon": "src/components/ui/icons",
+      "registry:component": "src/components/ui",
+      "registry:file": "src/components/ui",
+    },
+    aliases: {},
   },
-  targetsByType: {
-    "registry:icon": "src/components/ui/icons",
-    "registry:component": "src/components/ui",
-    "registry:file": "src/components/ui",
+  registry: {
+    sources: {
+      tebra: "./tebra-icon-registry/registry",
+    },
+    preferManifestTarget: true,
   },
-  aliases: {},
-  overwritePolicy: "prompt",
-  packageManager: "auto",
-  packageManagers: [],
-  pathResolvers: [],
+  install: {
+    overwritePolicy: "prompt",
+    packageManager: "auto",
+    allowOutsideProject: false,
+  },
   plugins: [],
-  preferManifestTarget: true,
-  allowOutsideProject: false,
-  adapters: [],
 };
 
 export function getConfigPath(cwd: string): string {
@@ -151,8 +209,8 @@ export function resolveRegistrySource(
     return null;
   }
 
-  if (config.registries[input]) {
-    return String(config.registries[input]);
+  if (config.registry?.sources?.[input]) {
+    return String(config.registry.sources[input]);
   }
 
   return input;

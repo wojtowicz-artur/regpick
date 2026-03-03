@@ -85,7 +85,7 @@ async function queryResolveRegistrySource(
     return ok(resolveRegistrySource(argValue, config));
   }
 
-  const aliases = Object.entries(config.registries || {}).map(([alias, value]) => ({
+  const aliases = Object.entries(config.registry?.sources || {} || {}).map(([alias, value]) => ({
     label: `${alias} -> ${value}`,
     value: alias,
   }));
@@ -266,9 +266,9 @@ async function interactApprovalPhase(
   const finalWrites: PlannedWrite[] = [];
   for (const write of state.plannedWrites) {
     if (state.existingTargets.has(write.absoluteTarget)) {
-      if (assumeYes || config.overwritePolicy === "overwrite") {
+      if (assumeYes || (config.install?.overwritePolicy || "prompt") === "overwrite") {
         finalWrites.push(write);
-      } else if (config.overwritePolicy === "skip") {
+      } else if ((config.install?.overwritePolicy || "prompt") === "skip") {
         context.runtime.prompt.warn(`Skipped existing file: ${write.absoluteTarget}`);
       } else {
         const answer = await context.runtime.prompt.select({
@@ -296,7 +296,11 @@ async function interactApprovalPhase(
     if (assumeYes) {
       shouldInstallDeps = true;
     } else {
-      const pm = resolvePackageManager(context.cwd, config.packageManager, context.runtime);
+      const pm = resolvePackageManager(
+        context.cwd,
+        config.install?.packageManager || "auto",
+        context.runtime,
+      );
       const msgParts: string[] = [];
       if (state.missingDependencies.length)
         msgParts.push(`dependencies: ${state.missingDependencies.join(", ")}`);
@@ -381,7 +385,7 @@ export async function runAddCommand(
   if (!sourceQ.ok) return err(sourceQ.error);
   if (!sourceQ.value) return ok({ kind: "noop", message: "No source provided." });
 
-  const customAdapters = await loadAdapters(configQ.value.config.adapters || [], context.cwd);
+  const customAdapters = await loadAdapters(configQ.value.config.plugins || [], context.cwd);
   const adapters = [
     ...customAdapters,
     new HttpAdapter(),

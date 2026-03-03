@@ -27,10 +27,10 @@ describe("regpick e2e (adapters)", () => {
       // Write regpick.mjs with our custom adapter
       const configContent = `
 export default {
-  targetsByType: {
-    "registry:test": "src/test-components",
+  resolve: { targets: {
+    "registry:test": "src/test-components" },
   },
-  adapters: [
+  plugins: [
     {
       name: "mock-proto",
       match: ({ source }) => source.startsWith("mock-proto://"),
@@ -164,10 +164,10 @@ export default {
 
       const configContent = `
 export default {
-  targetsByType: {
-    "registry:test": "src/test-components",
+  resolve: { targets: {
+    "registry:test": "src/test-components" },
   },
-  adapters: ["./custom-adapter.mjs"]
+  plugins: ["./custom-adapter.mjs"]
 };
 `;
       await fs.writeFile(path.join(testDir, "regpick.mjs"), configContent);

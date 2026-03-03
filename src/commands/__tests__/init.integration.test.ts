@@ -58,7 +58,11 @@ describe("init integration", () => {
     const configContent = await fs.readFile(configPath, "utf8");
     const configData = JSON.parse(configContent);
     expect(configData).toMatchObject({
-      packageManager: "auto",
+      install: {
+        packageManager: "auto",
+        overwritePolicy: "prompt",
+        allowOutsideProject: false,
+      },
     });
   });
 
@@ -125,11 +129,15 @@ describe("init integration", () => {
     const configContent = await fs.readFile(configPath, "utf8");
     const configData = JSON.parse(configContent);
     expect(configData).toMatchObject({
-      packageManager: "npm",
-      overwritePolicy: "prompt",
-      targetsByType: expect.objectContaining({
-        "registry:component": "src/custom-ui",
-      }),
+      install: {
+        packageManager: "npm",
+        overwritePolicy: "prompt",
+      },
+      resolve: {
+        targets: expect.objectContaining({
+          "registry:component": "src/custom-ui",
+        }),
+      },
     });
   });
 

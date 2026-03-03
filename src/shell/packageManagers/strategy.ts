@@ -11,7 +11,10 @@ export const npmPlugin: PackageManagerPlugin = {
       commands.push({ command: "npm", args: ["install", ...dependencies] });
     }
     if (devDependencies.length) {
-      commands.push({ command: "npm", args: ["install", "-D", ...devDependencies] });
+      commands.push({
+        command: "npm",
+        args: ["install", "-D", ...devDependencies],
+      });
     }
     return commands;
   },
@@ -27,7 +30,10 @@ export const yarnPlugin: PackageManagerPlugin = {
       commands.push({ command: "yarn", args: ["add", ...dependencies] });
     }
     if (devDependencies.length) {
-      commands.push({ command: "yarn", args: ["add", "-D", ...devDependencies] });
+      commands.push({
+        command: "yarn",
+        args: ["add", "-D", ...devDependencies],
+      });
     }
     return commands;
   },
@@ -43,7 +49,10 @@ export const pnpmPlugin: PackageManagerPlugin = {
       commands.push({ command: "pnpm", args: ["add", ...dependencies] });
     }
     if (devDependencies.length) {
-      commands.push({ command: "pnpm", args: ["add", "-D", ...devDependencies] });
+      commands.push({
+        command: "pnpm",
+        args: ["add", "-D", ...devDependencies],
+      });
     }
     return commands;
   },
@@ -61,7 +70,10 @@ export const bunPlugin: PackageManagerPlugin = {
       commands.push({ command: "bun", args: ["add", ...dependencies] });
     }
     if (devDependencies.length) {
-      commands.push({ command: "bun", args: ["add", "-D", ...devDependencies] });
+      commands.push({
+        command: "bun",
+        args: ["add", "-D", ...devDependencies],
+      });
     }
     return commands;
   },
@@ -78,9 +90,9 @@ export function getPackageManagerPlugin(
   name: string,
   config?: RegpickConfig,
 ): PackageManagerPlugin | undefined {
-  if (config?.packageManagers) {
-    const userPlugin = config.packageManagers.find((p) => p.name === name);
-    if (userPlugin) return userPlugin;
+  if (config?.plugins) {
+    const userPlugin = config.plugins.find((p) => p.name === name);
+    if (userPlugin) return userPlugin as unknown as PackageManagerPlugin;
   }
   return defaultPluginRegistry[name];
 }
