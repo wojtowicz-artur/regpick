@@ -10,19 +10,14 @@ import { readConfig, resolveRegistrySource } from "@/shell/config.js";
 import { collectMissingDependencies } from "@/shell/installer.js";
 import { resolvePackageManager } from "@/shell/packageManagers/resolver.js";
 import { loadRegistry, resolveFileContent } from "@/shell/registry.js";
-import {
-  DirectoryAdapter,
-  FileAdapter,
-  HttpAdapter,
-  loadAdapters,
-  type RegistryAdapter,
-} from "@/shell/registry/index.js";
+import { DirectoryPlugin, FilePlugin, HttpPlugin, loadPlugins } from "@/shell/plugins/index.js";
 import type {
   CommandContext,
   CommandOutcome,
   PlannedWrite,
   RegistryItem,
   RegpickConfig,
+  RegpickPlugin,
 } from "@/types.js";
 
 type AddPlanInteractionState = {
@@ -134,12 +129,12 @@ interface QueryItemsResult {
 async function queryRegistryItemsToProcess(
   context: CommandContext,
   source: string,
-  adapters: RegistryAdapter[],
+  plugins: RegpickPlugin[],
 ): Promise<Result<QueryItemsResult, AppError>> {
   const sourcePosIdx = context.args.positionals[0] === "add" ? 1 : 0;
   const itemPosIdx = sourcePosIdx + 1;
 
-  const registryResult = await loadRegistry(source, context.cwd, context.runtime, adapters);
+  const registryResult = await loadRegistry(source, context.cwd, context.runtime, plugins);
   if (!registryResult.ok) return registryResult;
 
   const { items } = registryResult.value;
@@ -346,7 +341,7 @@ async function queryHydrateContents(
   context: CommandContext,
   config: RegpickConfig,
   approved: ApprovedAddPlan,
-  adapters: RegistryAdapter[],
+  plugins: RegpickPlugin[],
 ): Promise<Result<HydratedAddPlan, AppError>> {
   const hydratedWrites = [];
 
@@ -359,7 +354,7 @@ async function queryHydrateContents(
       item,
       context.cwd,
       context.runtime,
-      adapters,
+      plugins,
     );
     if (!contentResult.ok) return err(contentResult.error);
 
@@ -385,15 +380,10 @@ export async function runAddCommand(
   if (!sourceQ.ok) return err(sourceQ.error);
   if (!sourceQ.value) return ok({ kind: "noop", message: "No source provided." });
 
-  const customAdapters = await loadAdapters(configQ.value.config.plugins || [], context.cwd);
-  const adapters = [
-    ...customAdapters,
-    new HttpAdapter(),
-    new FileAdapter(),
-    new DirectoryAdapter(),
-  ];
+  const customPlugins = await loadPlugins(configQ.value.config.plugins || [], context.cwd);
+  const plugins = [...customPlugins, HttpPlugin(), FilePlugin(), DirectoryPlugin()];
 
-  const itemsQ = await queryRegistryItemsToProcess(context, sourceQ.value, adapters);
+  const itemsQ = await queryRegistryItemsToProcess(context, sourceQ.value, plugins);
   if (!itemsQ.ok) return err(itemsQ.error);
 
   for (const depName of itemsQ.value.missingRegistryDeps) {
@@ -414,7 +404,7 @@ export async function runAddCommand(
     context,
     configQ.value.config,
     approvedPlan.value,
-    adapters,
+    plugins,
   );
   if (!hydratedPlan.ok) return err(hydratedPlan.error);
 

@@ -129,7 +129,7 @@ async function interactInitPhase(
     },
     resolve: {
       targets: {
-        ...(state.existingConfig.resolve?.targets || {}),
+        ...state.existingConfig.resolve?.targets,
         "registry:component": String(componentsFolder || "src/components/ui"),
         "registry:file": String(componentsFolder || "src/components/ui"),
         "registry:icon": `${String(componentsFolder || "src/components/ui")}/icons`,

@@ -91,7 +91,7 @@ export function getPackageManagerPlugin(
   config?: RegpickConfig,
 ): PackageManagerPlugin | undefined {
   if (config?.plugins) {
-    const userPlugin = config.plugins.find((p) => p.name === name);
+    const userPlugin = config.plugins.find((p: any) => p.name === name);
     if (userPlugin) return userPlugin as unknown as PackageManagerPlugin;
   }
   return defaultPluginRegistry[name];
@@ -100,7 +100,7 @@ export function getPackageManagerPlugin(
 export function getAllPackageManagerPlugins(config?: RegpickConfig): PackageManagerPlugin[] {
   const userPlugins = config?.packageManagers || [];
   const builtIns = Object.values(defaultPluginRegistry).filter(
-    (bp) => !userPlugins.find((up) => up.name === bp.name),
+    (bp) => !userPlugins.find((up: any) => up.name === bp.name),
   );
   return [...userPlugins, ...builtIns];
 }

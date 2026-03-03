@@ -17,7 +17,6 @@ const config: RegpickConfig = {
   plugins: [],
   preferManifestTarget: false,
   allowOutsideProject: false,
-  adapters: [],
 };
 
 const items: RegistryItem[] = [
@@ -30,7 +29,7 @@ const items: RegistryItem[] = [
     devDependencies: ["@types/react"],
     registryDependencies: [],
     files: [{ type: "registry:file", path: "icons/check.tsx" }],
-    sourceMeta: { type: "directory", adapterState: { baseDir: "/registry" } },
+    sourceMeta: { type: "directory", pluginState: { baseDir: "/registry" } },
   },
   {
     name: "calendar",
@@ -41,7 +40,7 @@ const items: RegistryItem[] = [
     devDependencies: [],
     registryDependencies: [],
     files: [{ type: "registry:file", path: "icons/calendar.tsx" }],
-    sourceMeta: { type: "directory", adapterState: { baseDir: "/registry" } },
+    sourceMeta: { type: "directory", pluginState: { baseDir: "/registry" } },
   },
 ];
 
@@ -80,7 +79,7 @@ describe("add plan core", () => {
         files: [],
         sourceMeta: {
           type: "directory",
-          adapterState: { baseDir: "/registry" },
+          pluginState: { baseDir: "/registry" },
         },
       };
       const iconItem: RegistryItem = {
@@ -119,7 +118,7 @@ describe("add plan core", () => {
         files: [],
         sourceMeta: {
           type: "directory",
-          adapterState: { baseDir: "/registry" },
+          pluginState: { baseDir: "/registry" },
         },
       };
 

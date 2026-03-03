@@ -47,14 +47,10 @@ describe("add integration with shadcn compatibility", () => {
     );
 
     // 2. Setup mock network responses
-    mockHttp.getJson.mockImplementation(async (url: string) => {
-      if (url === "https://example.com/registry.json") {
-        return ok(mockRegistry);
-      }
-      return ok({});
-    });
-
     mockHttp.getText.mockImplementation(async (url: string) => {
+      if (url === "https://example.com/registry.json") {
+        return ok(JSON.stringify(mockRegistry));
+      }
       if (url.includes("button.tsx")) {
         return ok("export function Button() { return <button /> }");
       }
@@ -72,6 +68,7 @@ describe("add integration with shadcn compatibility", () => {
     });
 
     // 4. Assertions
+    if (!result.ok) console.log(result.error);
     expect(result.ok).toBe(true);
 
     // Verify file existence in real FS
@@ -101,7 +98,7 @@ describe("add integration with shadcn compatibility", () => {
     );
 
     // Verify network calls
-    expect(mockHttp.getJson).toHaveBeenCalledWith("https://example.com/registry.json");
+    expect(mockHttp.getText).toHaveBeenCalledWith("https://example.com/registry.json");
     expect(mockHttp.getText).toHaveBeenCalledWith(expect.stringContaining("button.tsx"));
   });
 
@@ -113,8 +110,10 @@ describe("add integration with shadcn compatibility", () => {
       JSON.stringify({ targetsByType: { "registry:ui": "components/ui" } }),
     );
 
-    mockHttp.getJson.mockResolvedValue(ok(mockRegistry));
     mockHttp.getText.mockImplementation(async (url: string) => {
+      if (url === "https://example.com/registry.json") {
+        return ok(JSON.stringify(mockRegistry));
+      }
       if (url.includes("card.tsx")) return ok("CardContent");
       if (url.includes("button.tsx")) return ok("ButtonContent");
       return ok("");
@@ -131,6 +130,7 @@ describe("add integration with shadcn compatibility", () => {
     });
 
     // 3. Assertions
+    if (!result.ok) console.log(result.error);
     expect(result.ok).toBe(true);
     // Verify BOTH files were installed
     const cardPath = path.join(testDir, "components/ui/card.tsx");
@@ -150,7 +150,7 @@ describe("add integration with shadcn compatibility", () => {
     ).toBe(true);
 
     // Verify network calls
-    expect(mockHttp.getJson).toHaveBeenCalledWith("https://example.com/registry.json");
+    expect(mockHttp.getText).toHaveBeenCalledWith("https://example.com/registry.json");
     expect(mockHttp.getText).toHaveBeenCalledWith(expect.stringContaining("card.tsx"));
     expect(mockHttp.getText).toHaveBeenCalledWith(expect.stringContaining("button.tsx"));
   });
@@ -176,9 +176,12 @@ describe("add integration with shadcn compatibility", () => {
       ],
     };
 
-    mockHttp.getJson.mockResolvedValue(ok(fakeRegistryWithDeps));
-    // simulate file found
-    mockHttp.getText.mockResolvedValue(ok("fake text"));
+    mockHttp.getText.mockImplementation(async (url: string) => {
+      if (url === "https://example.com/registry.json") {
+        return ok(JSON.stringify(fakeRegistryWithDeps));
+      }
+      return ok("fake text");
+    });
 
     // allow installation confirm but deny dependency install
     mockPrompt.confirm.mockResolvedValueOnce(true); // "Install 1 item(s)?"
@@ -231,7 +234,7 @@ describe("add integration with shadcn compatibility", () => {
       JSON.stringify({ targetsByType: { "registry:ui": "components/ui" } }),
     );
 
-    mockHttp.getJson.mockResolvedValueOnce({
+    mockHttp.getText.mockResolvedValueOnce({
       ok: false,
       error: {
         kind: "RuntimeError",
@@ -262,8 +265,10 @@ describe("add integration with shadcn compatibility", () => {
       JSON.stringify({ targetsByType: { "registry:ui": "components/ui" } }),
     );
 
-    mockHttp.getJson.mockResolvedValue(ok(mockRegistry));
     mockHttp.getText.mockImplementation(async (url: string) => {
+      if (url === "https://example.com/registry.json") {
+        return ok(JSON.stringify(mockRegistry));
+      }
       if (url.includes("card.tsx")) return ok("CardContent");
       if (url.includes("button.tsx")) return ok("ButtonContent");
       return ok("");
@@ -300,7 +305,7 @@ describe("add integration with shadcn compatibility", () => {
     );
 
     // Send malformed data that isn't an array of items or proper registry object
-    mockHttp.getJson.mockResolvedValue(ok({ unexpectedField: "invalid dataset" }));
+    mockHttp.getText.mockResolvedValue(ok(JSON.stringify({ unexpectedField: "invalid dataset" })));
 
     const result = await runAddCommand({
       cwd: testDir,

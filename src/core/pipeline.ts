@@ -170,7 +170,7 @@ export class PipelineRenderer {
         if (plugin.onError) {
           try {
             await plugin.onError(error, ctx);
-          } catch (err) {
+          } catch {
             // Ignore nested errors during cleanup
           }
         }

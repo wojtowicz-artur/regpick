@@ -27,17 +27,6 @@ export const PluginSchema = v.objectWithRest(
   v.any(),
 );
 
-export const RegistryAdapterSchema = v.objectWithRest(
-  {
-    name: v.string(),
-    match: FunctionSchema,
-    resolveManifest: FunctionSchema,
-    resolveItemReference: FunctionSchema,
-    resolveFile: FunctionSchema,
-  },
-  v.any(),
-);
-
 export const PackageManagerPluginSchema = v.objectWithRest(
   {
     name: v.string(),
@@ -80,33 +69,19 @@ export const RegpickConfigSchema = v.pipe(
       }),
       {},
     ),
-    plugins: v.optional(
-      v.array(
-        v.union([
-          PluginSchema,
-          RegistryAdapterSchema,
-          PackageManagerPluginSchema,
-          PathResolverPluginSchema,
-          v.string(),
-        ]),
-      ),
-      [],
-    ),
+    plugins: v.optional(v.array(v.union([PluginSchema, v.string()])), []),
   }),
-  v.forward(
-    v.custom((input) => {
-      if (!input.install?.allowOutsideProject) {
-        const targets = input.resolve?.targets || {};
-        for (const target of Object.values(targets)) {
-          if (typeof target === "string" && (target.startsWith("..") || path.isAbsolute(target))) {
-            return false;
-          }
+  v.check((input: any) => {
+    if (!input.install?.allowOutsideProject) {
+      const targets = input.resolve?.targets || {};
+      for (const target of Object.values(targets)) {
+        if (typeof target === "string" && (target.startsWith("..") || path.isAbsolute(target))) {
+          return false;
         }
       }
-      return true;
-    }, "Target paths outside project are disallowed when install.allowOutsideProject is false"),
-    ["resolve", "targets"],
-  ),
+    }
+    return true;
+  }, "Target paths outside project are disallowed when install.allowOutsideProject is false"),
 );
 
 export type RegpickConfig = v.InferOutput<typeof RegpickConfigSchema>;

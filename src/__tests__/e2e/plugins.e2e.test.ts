@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
 
-describe("regpick e2e (adapters)", () => {
+describe("regpick e2e (plugins)", () => {
   const projectRoot = path.resolve(".");
   const entryPath = path.resolve("dist/index.mjs");
 
@@ -33,38 +33,19 @@ export default {
   plugins: [
     {
       name: "mock-proto",
-      match: ({ source }) => source.startsWith("mock-proto://"),
-      resolveItemReference: async () => ({ ok: false, error: new Error("Not implemented") }),
-      resolveManifest: async ({ source }, runtime) => {
-        if (!source.startsWith("mock-proto://")) {
-          return { ok: false, error: new Error("Not supported") };
-        }
-        return {
-          ok: true,
-          value: {
-            resolvedSource: source,
-            sourceMeta: { type: "mock-proto", url: "mock-proto://test" },
-            items: [
-              {
-                name: "mock-button",
-                type: "registry:test",
-                sourceMeta: {
-                  type: "mock-proto",
-                  url: "mock-proto://button-file"
-                },
-                files: [
-                  { path: "mock-button.ts" }
-                ]
-              }
-            ]
-          }
-        };
+      resolveId: async (source, importer) => {
+        if (source.startsWith("mock-proto://")) return source;
+        if (source === "mock-button.ts") return source;
+        return null;
       },
-      resolveFile: async (file, item, cwd, runtime) => {
-        if (file.path === "mock-button.ts") {
-          return { ok: true, value: "export const MockButton = () => <button>Hello</button>;" };
+      load: async (id) => {
+        if (id === "mock-proto://my-custom-registry") {
+            return { items: [{ name: "mock-button", type: "registry:test", files: [{ path: "mock-button.ts" }] }] };
         }
-        return { ok: false, error: new Error("File not found") };
+        if (id === "mock-button.ts") {
+            return "export const MockButton = () => <button>Hello</button>;";
+        }
+        return null;
       }
     }
   ]
@@ -119,7 +100,7 @@ export default {
     }
   }, 60000);
 
-  it("should load adapters from external modules via string reference", async () => {
+  it("should load plugins from external modules via string reference", async () => {
     const testDir = path.join(tmpdir(), `regpick-adapter-e2e-external-${Date.now()}`);
     await fs.mkdir(testDir, { recursive: true });
 
@@ -133,30 +114,16 @@ export default {
       const adapterContent = `
 export default {
   name: "external-proto",
-  match: ({ source }) => source.startsWith("external-proto://"),
-  resolveItemReference: async () => ({ ok: false, error: new Error("Not implemented") }),
-  resolveManifest: async ({ source }) => {
-    return {
-      ok: true,
-      value: {
-        resolvedSource: source,
-        sourceMeta: { type: "external-proto", url: source },
-        items: [
-          {
-            name: "external-card",
-            type: "registry:test",
-            sourceMeta: { type: "external-proto", url: "file-ref" },
-            files: [{ path: "card.ts" }]
-          }
-        ]
-      }
-    };
+  resolveId: async (source, importer) => {
+      if (source.startsWith("external-proto://") || source === 'card.ts') return source;
+      return null;
   },
-  resolveFile: async (file) => {
-    if (file.path === "card.ts") {
-      return { ok: true, value: "export const Card = () => <div />;" };
-    }
-    return { ok: false, error: new Error("File not found") };
+  load: async (id) => {
+      if (id.startsWith("external-proto://")) {
+          return { items: [{ name: "external-card", type: "registry:test", files: [{ path: "card.ts" }] }] };
+      }
+      if (id === "card.ts") return "export const Card = () => <div />;";
+      return null;
   }
 };
 `;

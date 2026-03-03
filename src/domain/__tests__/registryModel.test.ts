@@ -17,7 +17,7 @@ describe("registry model core", () => {
 
     const normalized = normalizeManifestInline(payload, {
       type: "file",
-      adapterState: { baseDir: "/registry" },
+      pluginState: { baseDir: "/registry" },
     });
     expect(normalized.ok).toBe(true);
     if (normalized.ok) {

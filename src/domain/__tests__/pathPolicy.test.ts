@@ -38,7 +38,7 @@ const item: RegistryItem = {
       target: "src/custom/check.tsx",
     },
   ],
-  sourceMeta: { type: "directory", adapterState: { baseDir: "/registry" } },
+  sourceMeta: { type: "directory", pluginState: { baseDir: "/registry" } },
 };
 
 describe("path policy core", () => {
