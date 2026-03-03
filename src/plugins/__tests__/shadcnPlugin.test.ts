@@ -20,7 +20,7 @@ describe("shadcnPlugin", () => {
       },
     ];
 
-    await pipeline.run({ vfs, cwd: "/" }, files);
+    await pipeline.run({ vfs, cwd: "/", runtime: {} as any }, files);
 
     const btnOutput = await vfs.readFile("/components/ui/button.tsx");
     expect(btnOutput).toContain('"use client";');

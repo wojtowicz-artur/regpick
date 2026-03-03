@@ -71,7 +71,7 @@ export const RegpickConfigSchema = v.pipe(
     ),
     plugins: v.optional(v.array(v.union([PluginSchema, v.string()])), []),
   }),
-  v.check((input: any) => {
+  v.check((input) => {
     if (!input.install?.allowOutsideProject) {
       const targets = input.resolve?.targets || {};
       for (const target of Object.values(targets)) {
@@ -84,7 +84,10 @@ export const RegpickConfigSchema = v.pipe(
   }, "Target paths outside project are disallowed when install.allowOutsideProject is false"),
 );
 
-export type RegpickConfig = v.InferOutput<typeof RegpickConfigSchema>;
+type BaseRegpickConfig = v.InferOutput<typeof RegpickConfigSchema>;
+export type RegpickConfig = Omit<BaseRegpickConfig, "plugins"> & {
+  plugins?: (string | import("../types.js").RegpickPlugin)[];
+};
 
 export function defineConfig(config: RegpickConfig): RegpickConfig {
   return config;
@@ -224,7 +227,7 @@ export async function readConfig(cwd: string): Promise<{
   const validConfig = v.parse(RegpickConfigSchema, loadedConfig);
 
   return {
-    config: validConfig,
+    config: validConfig as RegpickConfig,
     configPath: sources[0] || null,
   };
 }
@@ -254,7 +257,7 @@ export async function writeConfig(
   }
 
   const ext = path.extname(filePath).slice(1);
-  const format = ["ts", "mjs", "cjs", "js", "json"].includes(ext) ? (ext as any) : "json";
+  const format = ["ts", "mjs", "cjs", "js", "json"].includes(ext) ? (ext as ConfigFormat) : "json";
 
   await fs.writeFile(filePath, generateConfigCode(config, format), "utf8");
   return { filePath, written: true };

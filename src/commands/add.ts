@@ -9,8 +9,8 @@ import { coreAddPlugin } from "@/plugins/coreAddPlugin.js";
 import { readConfig, resolveRegistrySource } from "@/shell/config.js";
 import { collectMissingDependencies } from "@/shell/installer.js";
 import { resolvePackageManager } from "@/shell/packageManagers/resolver.js";
-import { loadRegistry, resolveFileContent } from "@/shell/registry.js";
 import { DirectoryPlugin, FilePlugin, HttpPlugin, loadPlugins } from "@/shell/plugins/index.js";
+import { loadRegistry, resolveFileContent } from "@/shell/registry.js";
 import type {
   CommandContext,
   CommandOutcome,
@@ -423,20 +423,20 @@ export async function runAddCommand(
 
   const vfs = new MemoryVFS();
 
-  const userPlugins = configQ.value.config.plugins || [];
+  const userPlugins = configQ.value.config.plugins?.filter((p) => typeof p === "object") || [];
 
   const pipeline = new PipelineRenderer([
-    ...userPlugins,
+    ...(userPlugins as import("../core/pipeline.js").Plugin[]),
     coreAddPlugin(
       hydratedPlan.value.dependencyPlan,
       configQ.value.config,
       context.runtime,
       installedItemsInfo,
-    ),
+    ) as import("../core/pipeline.js").Plugin,
   ]);
 
   try {
-    await pipeline.run({ vfs, cwd: context.cwd }, vfsFiles);
+    await pipeline.run({ vfs, cwd: context.cwd, runtime: context.runtime }, vfsFiles);
   } catch (error) {
     vfs.rollback();
     context.runtime.prompt.error(`[Failed] Installation aborted: ${error}`);

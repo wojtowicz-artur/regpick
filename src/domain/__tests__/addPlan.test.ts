@@ -4,19 +4,23 @@ import { buildInstallPlan, resolveRegistryDependencies } from "@/domain/addPlan.
 import type { RegistryItem, RegpickConfig } from "@/types.js";
 
 const config: RegpickConfig = {
-  registries: {},
-  aliases: {},
-  targetsByType: {
-    "registry:icon": "src/components/ui/icons",
-    "registry:file": "src/components/ui",
+  resolve: {
+    aliases: {},
+    targets: {
+      "registry:icon": "src/components/ui/icons",
+      "registry:file": "src/components/ui",
+    },
   },
-  overwritePolicy: "prompt",
-  packageManager: "auto",
-  packageManagers: [],
-  pathResolvers: [],
+  registry: {
+    sources: {},
+    preferManifestTarget: false,
+  },
+  install: {
+    overwritePolicy: "prompt",
+    packageManager: "auto",
+    allowOutsideProject: false,
+  },
   plugins: [],
-  preferManifestTarget: false,
-  allowOutsideProject: false,
 };
 
 const items: RegistryItem[] = [

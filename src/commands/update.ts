@@ -7,8 +7,8 @@ import { MemoryVFS } from "@/core/vfs.js";
 import { buildUpdatePlanForItem, groupBySource } from "@/domain/updatePlan.js";
 import { readConfig } from "@/shell/config.js";
 import { readLockfile, writeLockfile } from "@/shell/lockfile.js";
-import { loadRegistry, resolveFileContent } from "@/shell/registry.js";
 import { DirectoryPlugin, FilePlugin, HttpPlugin, loadPlugins } from "@/shell/plugins/index.js";
+import { loadRegistry, resolveFileContent } from "@/shell/registry.js";
 import type {
   CommandContext,
   CommandOutcome,
@@ -280,10 +280,10 @@ export async function runUpdateCommand(
     updatedLockfile.components[update.itemName].hash = update.newHash;
   }
 
-  const userPlugins = stateQ.value.config.plugins || [];
+  const userPlugins = stateQ.value.config.plugins?.filter((p) => typeof p === "object") || [];
   const vfs = new MemoryVFS();
   const pipeline = new PipelineRenderer([
-    ...userPlugins,
+    ...(userPlugins as import("../core/pipeline.js").Plugin[]),
     {
       name: "regpick:core-update",
       async finish(ctx) {
@@ -296,7 +296,7 @@ export async function runUpdateCommand(
   ]);
 
   try {
-    await pipeline.run({ vfs, cwd: context.cwd }, vfsFiles);
+    await pipeline.run({ vfs, cwd: context.cwd, runtime: context.runtime }, vfsFiles);
   } catch (error) {
     vfs.rollback();
     context.runtime.prompt.error(`[Failed] Update aborted: ${error}`);

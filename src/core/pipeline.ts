@@ -1,3 +1,4 @@
+import type { RuntimePorts } from "../shell/runtime/ports.js";
 import { appError } from "./errors.js";
 
 export interface VFS {
@@ -15,6 +16,7 @@ export interface PersistableVFS extends VFS {
 export interface PipelineContext {
   vfs: VFS;
   cwd: string;
+  runtime: RuntimePorts;
 }
 
 export interface PluginHooks {
