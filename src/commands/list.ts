@@ -79,16 +79,8 @@ function queryRegistryItems(
   plugins: RegpickPlugin[],
 ): Effect.Effect<RegistryItem[], AppError> {
   return Effect.gen(function* () {
-    const registryResult = yield* Effect.tryPromise({
-      try: () => loadRegistry(source, context.cwd, context.runtime, plugins),
-      catch: (e): AppError => appError("RuntimeError", String(e)),
-    });
-
-    if (Either.isLeft(registryResult)) {
-      return yield* Effect.fail(registryResult.left);
-    }
-
-    return registryResult.right.items;
+    const { items } = yield* loadRegistry(source, context.cwd, context.runtime, plugins);
+    return items;
   });
 }
 

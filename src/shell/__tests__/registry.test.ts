@@ -1,5 +1,4 @@
-import { Either } from "effect";
-import { Effect } from "effect";
+import { Effect, Either } from "effect";
 import { pathToFileURL } from "node:url";
 
 import { loadRegistry, resolveFileContent } from "@/shell/registry.js";
@@ -36,11 +35,15 @@ describe("registry loader", () => {
       ),
     );
 
-    const result = await loadRegistry(
-      "https://github.com/user/repo/blob/main/registry.json",
-      "/test",
-      mockRuntime,
-      mockPlugins,
+    const result = await Effect.runPromise(
+      Effect.either(
+        loadRegistry(
+          "https://github.com/user/repo/blob/main/registry.json",
+          "/test",
+          mockRuntime,
+          mockPlugins,
+        ),
+      ),
     );
 
     expect(mockRuntime.http.getText).toHaveBeenCalledWith(
@@ -67,7 +70,9 @@ describe("registry loader", () => {
       ),
     );
 
-    const result = await loadRegistry("/abs/path/local.json", "/test", mockRuntime, mockPlugins);
+    const result = await Effect.runPromise(
+      Effect.either(loadRegistry("/abs/path/local.json", "/test", mockRuntime, mockPlugins)),
+    );
     expect(Either.isRight(result)).toBe(true);
     if (Either.isRight(result)) {
       expect(result.right.items[0].name).toBe("local-comp");
@@ -99,7 +104,9 @@ describe("registry loader", () => {
       );
     });
 
-    const result = await loadRegistry("/abs/dir", "/test", mockRuntime, mockPlugins);
+    const result = await Effect.runPromise(
+      Effect.either(loadRegistry("/abs/dir", "/test", mockRuntime, mockPlugins)),
+    );
 
     expect(Either.isRight(result)).toBe(true);
     if (Either.isRight(result)) {
@@ -125,7 +132,11 @@ describe("registry loader", () => {
 
     const file = { path: "utils.ts", type: "registry:file" };
 
-    const result = await resolveFileContent(file, item as any, "/test", mockRuntime, mockPlugins);
+    const result = await Effect.runPromise(
+      Effect.either(
+        resolveFileContent(file as any, item as any, "/test", mockRuntime, mockPlugins),
+      ),
+    );
     expect(Either.isRight(result)).toBe(true);
     if (Either.isRight(result)) expect(result.right).toBe("remote-content");
 
