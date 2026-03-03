@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.15.0](https://github.com/wojtowicz-artur/regpick/compare/v0.14.0...v0.15.0) (2026-03-03)
+
+### Features
+
+* update config file handling to support multiple formats and improve initialization logic ([0cd9bf9](https://github.com/wojtowicz-artur/regpick/commit/0cd9bf9e470797383d748a2bd3b7cd92ce6bec2b))
+
 ## [0.14.0](https://github.com/wojtowicz-artur/regpick/compare/v0.13.0...v0.14.0) (2026-03-03)
 
 ### Features
