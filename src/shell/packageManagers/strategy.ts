@@ -91,14 +91,18 @@ export function getPackageManagerPlugin(
   config?: RegpickConfig,
 ): PackageManagerPlugin | undefined {
   if (config?.plugins) {
-    const userPlugin = config.plugins.find((p: any) => p.name === name);
+    const userPlugin = config.plugins.find(
+      (p: any) => typeof p === "object" && p !== null && "name" in p && p.name === name,
+    );
     if (userPlugin) return userPlugin as unknown as PackageManagerPlugin;
   }
   return defaultPluginRegistry[name];
 }
 
-export function getAllPackageManagerPlugins(config?: RegpickConfig): PackageManagerPlugin[] {
-  const userPlugins = config?.packageManagers || [];
+export function getAllPackageManagerPlugins(config?: RegpickConfig | any): PackageManagerPlugin[] {
+  const userPlugins = (config?.plugins || []).filter(
+    (p: any) => typeof p === "object" && p !== null && "buildInstallCommands" in p,
+  );
   const builtIns = Object.values(defaultPluginRegistry).filter(
     (bp) => !userPlugins.find((up: any) => up.name === bp.name),
   );
