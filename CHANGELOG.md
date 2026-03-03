@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.16.4](https://github.com/wojtowicz-artur/regpick/compare/v0.16.3...v0.16.4) (2026-03-03)
+
+### Code Refactoring
+
+* migrate list and update commands to use Effect for better error handling and async flow ([b0fc259](https://github.com/wojtowicz-artur/regpick/commit/b0fc259ffe4a967c7a3e5b1ca34306f3441118f2))
+
 ## [0.16.3](https://github.com/wojtowicz-artur/regpick/compare/v0.16.2...v0.16.3) (2026-03-03)
 
 ### Code Refactoring
