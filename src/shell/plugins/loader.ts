@@ -4,7 +4,7 @@ import * as v from "valibot";
 import { PluginSchema } from "../config.js";
 
 export async function loadPlugins(
-  configuredPlugins: (string | any)[],
+  configuredPlugins: (string | unknown)[],
   cwd: string,
 ): Promise<RegpickPlugin[]> {
   const plugins: RegpickPlugin[] = [];
@@ -22,15 +22,17 @@ export async function loadPlugins(
 
         const validPlugin = v.parse(PluginSchema, resolved);
         plugins.push(validPlugin as unknown as RegpickPlugin);
-      } catch (err: any) {
-        console.warn(`[regpick] Failed to load plugin module: ${plugin} - ${err.message}`);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[regpick] Failed to load plugin module: ${plugin} - ${msg}`);
       }
     } else {
       try {
         const validPlugin = v.parse(PluginSchema, plugin);
         plugins.push(validPlugin as unknown as RegpickPlugin);
-      } catch (err: any) {
-        console.warn(`[regpick] Invalid plugin provided: ${err.message}`);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[regpick] Invalid plugin provided: ${msg}`);
       }
     }
   }

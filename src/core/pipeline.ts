@@ -59,6 +59,44 @@ export interface Plugin extends PluginHooks {
   name: string;
 }
 
+/**
+ * A simple lock mechanism to ensure operations on the same target ID
+ * do not run concurrently, eliminating race conditions while allowing
+ * other IDs to be processed in parallel.
+ */
+class KeyedMutex {
+  private locks = new Map<string, Promise<void>>();
+
+  async runExclusive<T>(key: string, task: () => Promise<T>): Promise<T> {
+    const currentLock = this.locks.get(key) || Promise.resolve();
+
+    let release!: () => void;
+    const nextLock = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+
+    this.locks.set(
+      key,
+      currentLock.finally(() => nextLock),
+    );
+
+    try {
+      await currentLock;
+    } catch {
+      // safe to ignore previous task rejection here
+    }
+
+    try {
+      return await task();
+    } finally {
+      release();
+      if (this.locks.get(key) === nextLock) {
+        this.locks.delete(key);
+      }
+    }
+  }
+}
+
 export class PipelineRenderer {
   private plugins: Plugin[] = [];
 
@@ -76,22 +114,22 @@ export class PipelineRenderer {
         if (plugin.start) {
           try {
             await plugin.start(ctx);
-          } catch (e: any) {
-            throw appError(
-              "RuntimeError",
-              `[${plugin.name}] Failed during start hook: ${e.message}`,
-            );
+          } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message : String(e);
+            throw appError("RuntimeError", `[${plugin.name}] Failed during start hook: ${msg}`);
           }
         }
       }
 
-      // 2. Resolve, Load & Transform Phase (Concurrent per file)
+      // 2. Resolve, Load & Transform Phase (Concurrent mapping, synchronized per Target ID)
+      const fileMutex = new KeyedMutex();
+
       await Promise.all(
         files.map(async (file) => {
           let currentId = file.id;
           let currentCode: string | Uint8Array | null = file.code;
 
-          // resolveId
+          // resolveId (Wait-free execution)
           for (const plugin of this.plugins) {
             if (plugin.resolveId) {
               try {
@@ -100,56 +138,62 @@ export class PipelineRenderer {
                   currentId = resolved;
                   break; // Stop at first resolver that claims it
                 }
-              } catch (e: any) {
+              } catch (e: unknown) {
+                const msg = e instanceof Error ? e.message : String(e);
                 throw appError(
                   "RuntimeError",
-                  `[${plugin.name}] Failed to resolveId for '${currentId}': ${e.message}`,
+                  `[${plugin.name}] Failed to resolveId for '${currentId}': ${msg}`,
                 );
               }
             }
           }
 
-          // load
-          for (const plugin of this.plugins) {
-            if (plugin.load) {
-              try {
-                const loaded = await plugin.load(currentId, ctx);
-                if (loaded !== null && loaded !== undefined) {
-                  currentCode = loaded;
-                  break; // Stop at first loader that claims it
+          // Lock modifications and assertions to strictly this `currentId`
+          await fileMutex.runExclusive(currentId, async () => {
+            // load
+            for (const plugin of this.plugins) {
+              if (plugin.load) {
+                try {
+                  const loaded = await plugin.load(currentId, ctx);
+                  if (loaded !== null && loaded !== undefined) {
+                    currentCode = loaded;
+                    break; // Stop at first loader that claims it
+                  }
+                } catch (e: unknown) {
+                  const msg = e instanceof Error ? e.message : String(e);
+                  throw appError(
+                    "RuntimeError",
+                    `[${plugin.name}] Failed to load '${currentId}': ${msg}`,
+                  );
                 }
-              } catch (e: any) {
-                throw appError(
-                  "RuntimeError",
-                  `[${plugin.name}] Failed to load '${currentId}': ${e.message}`,
-                );
               }
             }
-          }
 
-          // transform
-          if (currentCode !== null) {
-            if (typeof currentCode === "string") {
-              for (const plugin of this.plugins) {
-                if (plugin.transform) {
-                  try {
-                    const transformed = await plugin.transform(currentCode, currentId, ctx);
-                    if (transformed !== null && transformed !== undefined) {
-                      currentCode = transformed;
+            // transform
+            if (currentCode !== null) {
+              if (typeof currentCode === "string") {
+                for (const plugin of this.plugins) {
+                  if (plugin.transform) {
+                    try {
+                      const transformed = await plugin.transform(currentCode, currentId, ctx);
+                      if (transformed !== null && transformed !== undefined) {
+                        currentCode = transformed;
+                      }
+                    } catch (e: unknown) {
+                      const msg = e instanceof Error ? e.message : String(e);
+                      throw appError(
+                        "RuntimeError",
+                        `[${plugin.name}] Failed to transform '${currentId}': ${msg}`,
+                      );
                     }
-                  } catch (e: any) {
-                    throw appError(
-                      "RuntimeError",
-                      `[${plugin.name}] Failed to transform '${currentId}': ${e.message}`,
-                    );
                   }
                 }
               }
-            }
 
-            // write result to VFS
-            await ctx.vfs.writeFile(currentId, currentCode);
-          }
+              // write result to VFS
+              await ctx.vfs.writeFile(currentId, currentCode);
+            }
+          });
         }),
       );
 
@@ -158,20 +202,19 @@ export class PipelineRenderer {
         if (plugin.finish) {
           try {
             await plugin.finish(ctx);
-          } catch (e: any) {
-            throw appError(
-              "RuntimeError",
-              `[${plugin.name}] Failed during finish hook: ${e.message}`,
-            );
+          } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message : String(e);
+            throw appError("RuntimeError", `[${plugin.name}] Failed during finish hook: ${msg}`);
           }
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       // 4. Error Hook On Failure
+      const actualError = error instanceof Error ? error : new Error(String(error));
       for (const plugin of this.plugins) {
         if (plugin.onError) {
           try {
-            await plugin.onError(error, ctx);
+            await plugin.onError(actualError, ctx);
           } catch {
             // Ignore nested errors during cleanup
           }

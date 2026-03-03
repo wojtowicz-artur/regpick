@@ -136,7 +136,7 @@ export async function detectConfigFormat(cwd: string): Promise<ConfigFormat> {
   return "mjs"; // fallback
 }
 
-function serializeObjectToJS(obj: any, indentLevel = 1): string {
+function serializeObjectToJS(obj: unknown, indentLevel = 1): string {
   if (obj === null) return "null";
   if (typeof obj === "string") return `"${obj}"`;
   if (typeof obj === "number" || typeof obj === "boolean") return String(obj);
@@ -152,12 +152,13 @@ function serializeObjectToJS(obj: any, indentLevel = 1): string {
     const keys = Object.keys(obj);
     if (keys.length === 0) return "{}";
 
+    const record = obj as Record<string, unknown>;
     const indent = "  ".repeat(indentLevel);
     const inner = keys
       .map((key) => {
         const isIdentifier = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(key);
         const safeKey = isIdentifier ? key : `"${key}"`;
-        return `${safeKey}: ${serializeObjectToJS(obj[key], indentLevel + 1)}`;
+        return `${safeKey}: ${serializeObjectToJS(record[key], indentLevel + 1)}`;
       })
       .join(`,\n${indent}`);
 
@@ -214,8 +215,11 @@ export async function readConfig(cwd: string): Promise<{
       {
         files: "package.json",
         extensions: [],
-        rewrite(config: any) {
-          return config?.regpick;
+        rewrite(config: unknown) {
+          if (typeof config === "object" && config !== null && "regpick" in config) {
+            return config.regpick;
+          }
+          return undefined;
         },
       },
     ],

@@ -77,7 +77,7 @@ describe("registry loader", () => {
       ok(["button.json", "input.json", "not.txt"]),
     );
 
-    vi.mocked(mockRuntime.fs.readFile).mockImplementation(async (filePath: any) => {
+    vi.mocked(mockRuntime.fs.readFile).mockImplementation(async (filePath: string) => {
       if (filePath.endsWith("button.json")) {
         return ok(
           JSON.stringify({

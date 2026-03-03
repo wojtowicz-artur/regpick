@@ -23,7 +23,7 @@ export interface RegpickPlugin {
     importer?: string,
     ctx?: PluginContext,
   ): string | null | undefined | Promise<string | null | undefined>;
-  load?(id: string, ctx?: PluginContext): any | Promise<any>;
+  load?(id: string, ctx?: PluginContext): unknown | Promise<unknown>;
   transform?(
     code: string,
     id: string,

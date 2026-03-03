@@ -1,6 +1,6 @@
+import type { PluginContext, RegpickPlugin } from "@/types.js";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import type { PluginContext, RegpickPlugin } from "@/types.js";
 
 function isFileUrl(value: string): boolean {
   return /^file:\/\//i.test(value);
@@ -52,7 +52,7 @@ export function DirectoryPlugin(): RegpickPlugin {
 
       const jsonFiles = dirRes.value.filter((file) => file.endsWith(".json"));
 
-      const items: any[] = [];
+      const items: unknown[] = [];
 
       for (const fileName of jsonFiles) {
         const fullPath = path.join(fileSystemPath, fileName);

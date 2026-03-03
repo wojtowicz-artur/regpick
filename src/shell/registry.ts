@@ -111,8 +111,13 @@ export async function loadRegistry(
       if (!manifestRes) {
         continue;
       }
-      if (manifestRes && typeof manifestRes === "object" && manifestRes.ok === false) {
-        return err(manifestRes.error);
+      if (
+        manifestRes &&
+        typeof manifestRes === "object" &&
+        "ok" in manifestRes &&
+        manifestRes.ok === false
+      ) {
+        return err((manifestRes as unknown as { error: AppError }).error);
       }
 
       const manifest =
@@ -131,7 +136,7 @@ export async function loadRegistry(
       } else if (manifest && typeof manifest === "object" && "rawData" in manifest) {
         const itemsRes = await normalizeManifest(
           manifest.rawData,
-          manifest.sourceMeta,
+          (manifest as unknown as { sourceMeta: RegistrySourceMeta }).sourceMeta,
           runtime,
           plugins,
         );
@@ -148,7 +153,10 @@ export async function loadRegistry(
         items = itemsRes.value;
       }
 
-      const finalSource = manifest.resolvedSource || source;
+      const finalSource =
+        (manifest && typeof manifest === "object" && "resolvedSource" in manifest
+          ? (manifest as any).resolvedSource
+          : undefined) || source;
 
       const enhancedItems = items.map((item) => ({
         ...item,
