@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.16.1](https://github.com/wojtowicz-artur/regpick/compare/v0.16.0...v0.16.1) (2026-03-03)
+
+### Code Refactoring
+
+* enhance plugin retrieval logic to ensure proper object validation ([939f14d](https://github.com/wojtowicz-artur/regpick/commit/939f14d19bc74579deb30d728f287184ac4c5267))
+* improve plugin handling and configuration validation across commands ([4aef175](https://github.com/wojtowicz-artur/regpick/commit/4aef175ba6f4fa4f2d4134841dbadda088484b47))
+* replace legacy RegistryAdapter architecture with unified RegpickPlugin system ([2b89c5d](https://github.com/wojtowicz-artur/regpick/commit/2b89c5d994eb7caa7538f0f03d918fc871bb18a9))
+
 ## [0.16.0](https://github.com/wojtowicz-artur/regpick/compare/v0.15.0...v0.16.0) (2026-03-03)
 
 ### Features
