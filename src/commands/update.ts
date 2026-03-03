@@ -7,20 +7,15 @@ import { MemoryVFS } from "@/core/vfs.js";
 import { buildUpdatePlanForItem, groupBySource } from "@/domain/updatePlan.js";
 import { readConfig } from "@/shell/config.js";
 import { readLockfile, writeLockfile } from "@/shell/lockfile.js";
+import { DirectoryPlugin, FilePlugin, HttpPlugin, loadPlugins } from "@/shell/plugins/index.js";
 import { loadRegistry, resolveFileContent } from "@/shell/registry.js";
-import {
-  DirectoryAdapter,
-  FileAdapter,
-  HttpAdapter,
-  loadAdapters,
-  type RegistryAdapter,
-} from "@/shell/registry/index.js";
 import type {
   CommandContext,
   CommandOutcome,
   RegistryFile,
   RegpickConfig,
   RegpickLockfile,
+  RegpickPlugin,
 } from "@/types.js";
 
 type DetectedUpdateFile = {
@@ -74,13 +69,13 @@ async function queryAvailableUpdates(
   context: CommandContext,
   config: RegpickConfig,
   lockfile: RegpickLockfile,
-  adapters: RegistryAdapter[],
+  plugins: RegpickPlugin[],
 ): Promise<Result<DetectedUpdate[], AppError>> {
   const bySource = groupBySource(lockfile);
   const availableUpdates: DetectedUpdate[] = [];
 
   for (const [source, itemsToUpdate] of Object.entries(bySource)) {
-    const registryRes = await loadRegistry(source, context.cwd, context.runtime, adapters);
+    const registryRes = await loadRegistry(source, context.cwd, context.runtime, plugins);
     if (!registryRes.ok) {
       context.runtime.prompt.warn(`Failed to load registry ${source}`);
       continue;
@@ -99,7 +94,7 @@ async function queryAvailableUpdates(
             registryItem,
             context.cwd,
             context.runtime,
-            adapters,
+            plugins,
           );
           if (!contentRes.ok) return null;
           return { file, content: contentRes.value };
@@ -242,19 +237,14 @@ export async function runUpdateCommand(
     return ok({ kind: "noop", message: "No components to update." });
   }
 
-  const customAdapters = await loadAdapters(stateQ.value.config.plugins || [], context.cwd);
-  const adapters = [
-    ...customAdapters,
-    new HttpAdapter(),
-    new FileAdapter(),
-    new DirectoryAdapter(),
-  ];
+  const customPlugins = await loadPlugins(stateQ.value.config.plugins || [], context.cwd);
+  const plugins = [...customPlugins, HttpPlugin(), FilePlugin(), DirectoryPlugin()];
 
   const updatesQ = await queryAvailableUpdates(
     context,
     stateQ.value.config,
     stateQ.value.lockfile,
-    adapters,
+    plugins,
   );
   if (!updatesQ.ok) return err(updatesQ.error);
 
@@ -290,10 +280,10 @@ export async function runUpdateCommand(
     updatedLockfile.components[update.itemName].hash = update.newHash;
   }
 
-  const userPlugins = stateQ.value.config.plugins || [];
+  const userPlugins = stateQ.value.config.plugins?.filter((p) => typeof p === "object") || [];
   const vfs = new MemoryVFS();
   const pipeline = new PipelineRenderer([
-    ...userPlugins,
+    ...(userPlugins as import("../core/pipeline.js").Plugin[]),
     {
       name: "regpick:core-update",
       async finish(ctx) {
@@ -306,7 +296,7 @@ export async function runUpdateCommand(
   ]);
 
   try {
-    await pipeline.run({ vfs, cwd: context.cwd }, vfsFiles);
+    await pipeline.run({ vfs, cwd: context.cwd, runtime: context.runtime }, vfsFiles);
   } catch (error) {
     vfs.rollback();
     context.runtime.prompt.error(`[Failed] Update aborted: ${error}`);

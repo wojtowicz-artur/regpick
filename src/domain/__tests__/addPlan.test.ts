@@ -4,20 +4,23 @@ import { buildInstallPlan, resolveRegistryDependencies } from "@/domain/addPlan.
 import type { RegistryItem, RegpickConfig } from "@/types.js";
 
 const config: RegpickConfig = {
-  registries: {},
-  aliases: {},
-  targetsByType: {
-    "registry:icon": "src/components/ui/icons",
-    "registry:file": "src/components/ui",
+  resolve: {
+    aliases: {},
+    targets: {
+      "registry:icon": "src/components/ui/icons",
+      "registry:file": "src/components/ui",
+    },
   },
-  overwritePolicy: "prompt",
-  packageManager: "auto",
-  packageManagers: [],
-  pathResolvers: [],
+  registry: {
+    sources: {},
+    preferManifestTarget: false,
+  },
+  install: {
+    overwritePolicy: "prompt",
+    packageManager: "auto",
+    allowOutsideProject: false,
+  },
   plugins: [],
-  preferManifestTarget: false,
-  allowOutsideProject: false,
-  adapters: [],
 };
 
 const items: RegistryItem[] = [
@@ -30,7 +33,7 @@ const items: RegistryItem[] = [
     devDependencies: ["@types/react"],
     registryDependencies: [],
     files: [{ type: "registry:file", path: "icons/check.tsx" }],
-    sourceMeta: { type: "directory", adapterState: { baseDir: "/registry" } },
+    sourceMeta: { type: "directory", pluginState: { baseDir: "/registry" } },
   },
   {
     name: "calendar",
@@ -41,7 +44,7 @@ const items: RegistryItem[] = [
     devDependencies: [],
     registryDependencies: [],
     files: [{ type: "registry:file", path: "icons/calendar.tsx" }],
-    sourceMeta: { type: "directory", adapterState: { baseDir: "/registry" } },
+    sourceMeta: { type: "directory", pluginState: { baseDir: "/registry" } },
   },
 ];
 
@@ -80,7 +83,7 @@ describe("add plan core", () => {
         files: [],
         sourceMeta: {
           type: "directory",
-          adapterState: { baseDir: "/registry" },
+          pluginState: { baseDir: "/registry" },
         },
       };
       const iconItem: RegistryItem = {
@@ -119,7 +122,7 @@ describe("add plan core", () => {
         files: [],
         sourceMeta: {
           type: "directory",
-          adapterState: { baseDir: "/registry" },
+          pluginState: { baseDir: "/registry" },
         },
       };
 

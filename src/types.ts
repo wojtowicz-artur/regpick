@@ -10,6 +10,34 @@ import type {
 } from "@/shell/lockfile.js";
 import type { RuntimePorts } from "@/shell/runtime/ports.js";
 
+export interface PluginContext {
+  cwd: string;
+  runtime: RuntimePorts;
+}
+
+export interface RegpickPlugin {
+  name: string;
+  start?(ctx: PluginContext): void | Promise<void>;
+  resolveId?(
+    source: string,
+    importer?: string,
+    ctx?: PluginContext,
+  ): string | null | undefined | Promise<string | null | undefined>;
+  load?(id: string, ctx?: PluginContext): any | Promise<any>;
+  transform?(
+    code: string,
+    id: string,
+    ctx?: PluginContext,
+  ): string | null | undefined | Promise<string | null | undefined>;
+  finish?(ctx: PluginContext): void | Promise<void>;
+  onError?(err: Error, ctx: PluginContext): void | Promise<void>;
+
+  lockfiles?: string[];
+  detect?: Function;
+  buildInstallCommands?: Function;
+  resolvePath?: Function;
+}
+
 export type FlagValue = string | boolean;
 
 export type CliArgs = {

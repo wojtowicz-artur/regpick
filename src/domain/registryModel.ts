@@ -24,7 +24,7 @@ export const RegistryItemSchema = v.object({
 export const RegistrySourceMetaSchema = v.object({
   type: v.string(),
   originalSource: v.optional(v.string()),
-  adapterState: v.optional(v.record(v.string(), v.unknown())),
+  pluginState: v.optional(v.record(v.string(), v.unknown())),
 });
 
 export type RegistryFile = v.InferOutput<typeof RegistryFileSchema>;

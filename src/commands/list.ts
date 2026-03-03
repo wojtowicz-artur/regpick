@@ -2,20 +2,14 @@ import { appError, type AppError } from "@/core/errors.js";
 import { err, ok, type Result } from "@/core/result.js";
 import { resolveListSourceDecision } from "@/domain/listCore.js";
 import { readConfig } from "@/shell/config.js";
+import { DirectoryPlugin, FilePlugin, HttpPlugin, loadPlugins } from "@/shell/plugins/index.js";
 import { loadRegistry } from "@/shell/registry.js";
-import {
-  DirectoryAdapter,
-  FileAdapter,
-  HttpAdapter,
-  loadAdapters,
-  type RegistryAdapter,
-} from "@/shell/registry/index.js";
-import type { CommandContext, CommandOutcome, RegistryItem } from "@/types.js";
+import type { CommandContext, CommandOutcome, RegistryItem, RegpickPlugin } from "@/types.js";
 
 type ListSourceState = {
   source: string | null;
   requiresPrompt: boolean;
-  adapters: RegistryAdapter[];
+  plugins: RegpickPlugin[];
 };
 
 /**
@@ -33,18 +27,13 @@ async function queryListSourceState(
     config.registry?.sources || {},
   );
 
-  const customAdapters = await loadAdapters(config.plugins || [], context.cwd);
-  const adapters = [
-    ...customAdapters,
-    new HttpAdapter(),
-    new FileAdapter(),
-    new DirectoryAdapter(),
-  ];
+  const customPlugins = await loadPlugins(config.plugins || [], context.cwd);
+  const plugins = [...customPlugins, HttpPlugin(), FilePlugin(), DirectoryPlugin()];
 
   return ok({
     source: sourceDecision.source,
     requiresPrompt: sourceDecision.requiresPrompt,
-    adapters,
+    plugins,
   });
 }
 
@@ -85,9 +74,9 @@ async function interactSourcePhase(
 async function queryRegistryItems(
   context: CommandContext,
   source: string,
-  adapters: RegistryAdapter[],
+  plugins: RegpickPlugin[],
 ): Promise<Result<RegistryItem[], AppError>> {
-  const registryResult = await loadRegistry(source, context.cwd, context.runtime, adapters);
+  const registryResult = await loadRegistry(source, context.cwd, context.runtime, plugins);
 
   if (!registryResult.ok) {
     return registryResult as unknown as Result<RegistryItem[], AppError>;
@@ -142,7 +131,7 @@ export async function runListCommand(
     return ok({ kind: "noop", message: "No registry source provided." });
   }
 
-  const itemsQ = await queryRegistryItems(context, sourceQ.value, stateQ.value.adapters);
+  const itemsQ = await queryRegistryItems(context, sourceQ.value, stateQ.value.plugins);
   if (!itemsQ.ok) return err(itemsQ.error);
 
   const items = itemsQ.value;

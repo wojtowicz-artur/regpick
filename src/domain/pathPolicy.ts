@@ -36,7 +36,7 @@ export function resolveOutputPathFromPolicy(
 ): Result<{ absoluteTarget: string; relativeTarget: string }, AppError> {
   const typeKey = file.type || item.type || "registry:file";
   const mappedBase = (config.resolve?.targets || {})?.[typeKey];
-  const preferManifestTarget = (config.resolve?.preferManifestTarget ?? true) !== false;
+  const preferManifestTarget = (config.registry?.preferManifestTarget ?? true) !== false;
   const fallbackFileName = path.basename(file.path || `${item.name}.txt`);
 
   let relativeTarget: string;
@@ -53,10 +53,17 @@ export function resolveOutputPathFromPolicy(
   // Allow custom path resolvers to override the fallback logic
   if (config.plugins && config.plugins.length > 0) {
     for (const resolver of config.plugins) {
-      const resolved = resolver.resolvePath?.(file, item, relativeTarget, config);
-      if (resolved) {
-        relativeTarget = resolved;
-        break;
+      if (
+        typeof resolver === "object" &&
+        resolver !== null &&
+        "resolvePath" in resolver &&
+        typeof resolver.resolvePath === "function"
+      ) {
+        const resolved = resolver.resolvePath(file, item, relativeTarget, config);
+        if (resolved) {
+          relativeTarget = resolved;
+          break;
+        }
       }
     }
   }

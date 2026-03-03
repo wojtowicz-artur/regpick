@@ -6,20 +6,20 @@ import type { RegistryItem, RegpickConfig } from "@/types.js";
 const baseConfig: RegpickConfig = {
   registry: {
     sources: {},
-    aliases: {},
+    preferManifestTarget: true,
   },
   resolve: {
+    aliases: {},
     targets: {
       "registry:icon": "src/components/ui/icons",
       "registry:file": "src/components/ui",
     },
-    preferManifestTarget: true,
   },
   install: {
     overwritePolicy: "prompt",
     packageManager: "auto",
+    allowOutsideProject: false,
   },
-  allowOutsideProject: false,
   plugins: [],
 };
 
@@ -38,7 +38,7 @@ const item: RegistryItem = {
       target: "src/custom/check.tsx",
     },
   ],
-  sourceMeta: { type: "directory", adapterState: { baseDir: "/registry" } },
+  sourceMeta: { type: "directory", pluginState: { baseDir: "/registry" } },
 };
 
 describe("path policy core", () => {
@@ -53,8 +53,9 @@ describe("path policy core", () => {
   it("uses mapped type target when preferManifestTarget is false", () => {
     const outputRes = resolveOutputPathFromPolicy(item, item.files[0], "/tmp/project", {
       ...baseConfig,
-      resolve: {
-        ...baseConfig.resolve,
+      registry: {
+        ...baseConfig.registry,
+        sources: baseConfig.registry?.sources || {},
         preferManifestTarget: false,
       },
     });

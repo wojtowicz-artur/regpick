@@ -129,7 +129,7 @@ async function interactInitPhase(
     },
     resolve: {
       targets: {
-        ...(state.existingConfig.resolve?.targets || {}),
+        ...state.existingConfig.resolve?.targets,
         "registry:component": String(componentsFolder || "src/components/ui"),
         "registry:file": String(componentsFolder || "src/components/ui"),
         "registry:icon": `${String(componentsFolder || "src/components/ui")}/icons`,
@@ -140,7 +140,7 @@ async function interactInitPhase(
   const newConfig = v.parse(RegpickConfigSchema, newConfigRaw);
 
   return ok({
-    newConfig,
+    newConfig: newConfig as import("../types.js").RegpickConfig,
     configPath: state.configPath,
     isOverwrite: state.exists,
   });
@@ -164,7 +164,9 @@ export async function runInitCommand(
   if (!planQ.value) return ok({ kind: "noop", message: "Keeping existing configuration." });
 
   const ext = path.extname(planQ.value.configPath).slice(1);
-  const format = ["ts", "mjs", "cjs", "js", "json"].includes(ext) ? (ext as any) : "json";
+  const format = ["ts", "mjs", "cjs", "js", "json"].includes(ext)
+    ? (ext as import("../shell/config.js").ConfigFormat)
+    : "json";
 
   const content = generateConfigCode(planQ.value.newConfig, format);
   const writeRes = await context.runtime.fs.writeFile(planQ.value.configPath, content, "utf8");
