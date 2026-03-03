@@ -1,5 +1,5 @@
+import { Either } from "effect";
 import type { AppError } from "@/core/errors.js";
-import { ok, type Result } from "@/core/result.js";
 import { applyAliases } from "@/domain/aliasCore.js";
 import { resolveOutputPathFromPolicy } from "@/domain/pathPolicy.js";
 import { computeHash } from "@/shell/lockfile.js";
@@ -36,7 +36,7 @@ export function buildUpdatePlanForItem(
   currentHash: string,
   cwd: string,
   config: RegpickConfig,
-): Result<UpdateAction, AppError> {
+): Either.Either<UpdateAction, AppError> {
   const remoteContents: string[] = [];
   const remoteFiles: UpdateFile[] = [];
 
@@ -45,10 +45,11 @@ export function buildUpdatePlanForItem(
     remoteContents.push(content);
 
     const outputRes = resolveOutputPathFromPolicy(registryItem, file, cwd, config);
-    if (!outputRes.ok) return outputRes as unknown as Result<UpdateAction, AppError>;
+    if (Either.isLeft(outputRes))
+      return Either.left(outputRes.left) as unknown as Either.Either<UpdateAction, AppError>;
 
     remoteFiles.push({
-      target: outputRes.value.absoluteTarget,
+      target: outputRes.right.absoluteTarget,
       content: content,
     });
   }
@@ -56,7 +57,7 @@ export function buildUpdatePlanForItem(
   const newHash = computeHash(remoteContents.sort().join(""));
   const status = newHash !== currentHash ? "requires-diff-prompt" : "up-to-date";
 
-  return ok({
+  return Either.right({
     itemName,
     status,
     newHash,

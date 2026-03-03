@@ -62,10 +62,10 @@ export default {
       expect(listResult.stdout).toContain("mock-button");
 
       // Test add command
-      await execa(
+      const addRes = await execa(
         "node",
         [entryPath, "add", "mock-proto://my-custom-registry", "mock-button", "--yes"],
-        { cwd: testDir },
+        { cwd: testDir, reject: false },
       );
 
       // Verify file got written

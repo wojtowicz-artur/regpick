@@ -1,5 +1,6 @@
+import { Effect, Either } from "effect";
+
 import { appError, type AppError } from "@/core/errors.js";
-import { err, ok, type Result } from "@/core/result.js";
 import { resolveListSourceDecision } from "@/domain/listCore.js";
 import { readConfig } from "@/shell/config.js";
 import { DirectoryPlugin, FilePlugin, HttpPlugin, loadPlugins } from "@/shell/plugins/index.js";
@@ -16,11 +17,11 @@ type ListSourceState = {
  * Resolves list source configuration states.
  *
  * @param context - Command context.
- * @returns Result containing list source state.
+ * @returns Either containing list source state.
  */
 async function queryListSourceState(
   context: CommandContext,
-): Promise<Result<ListSourceState, AppError>> {
+): Promise<Either.Either<ListSourceState, AppError>> {
   const { config } = await readConfig(context.cwd);
   const sourceDecision = resolveListSourceDecision(
     context.args.positionals[1],
@@ -30,7 +31,7 @@ async function queryListSourceState(
   const customPlugins = await loadPlugins(config.plugins || [], context.cwd);
   const plugins = [...customPlugins, HttpPlugin(), FilePlugin(), DirectoryPlugin()];
 
-  return ok({
+  return Either.right({
     source: sourceDecision.source,
     requiresPrompt: sourceDecision.requiresPrompt,
     plugins,
@@ -42,26 +43,28 @@ async function queryListSourceState(
  *
  * @param context - Command context.
  * @param state - Current list query state.
- * @returns Result containing the final registry URL.
+ * @returns Either containing the final registry URL.
  */
 async function interactSourcePhase(
   context: CommandContext,
   state: ListSourceState,
-): Promise<Result<string | null, AppError>> {
+): Promise<Either.Either<string | null, AppError>> {
   if (!state.requiresPrompt) {
-    return ok(state.source);
+    return Either.right(state.source);
   }
 
-  const response = await context.runtime.prompt.text({
-    message: "Registry URL/path:",
-    placeholder: "https://example.com/registry.json",
-  });
+  const response = await Effect.runPromise(
+    context.runtime.prompt.text({
+      message: "Registry URL/path:",
+      placeholder: "https://example.com/registry.json",
+    }),
+  );
 
-  if (await context.runtime.prompt.isCancel(response)) {
-    return err(appError("UserCancelled", "Operation cancelled."));
+  if (await Effect.runPromise(context.runtime.prompt.isCancel(response))) {
+    return Either.left(appError("UserCancelled", "Operation cancelled."));
   }
 
-  return ok(String(response));
+  return Either.right(String(response));
 }
 
 /**
@@ -75,14 +78,14 @@ async function queryRegistryItems(
   context: CommandContext,
   source: string,
   plugins: RegpickPlugin[],
-): Promise<Result<RegistryItem[], AppError>> {
+): Promise<Either.Either<RegistryItem[], AppError>> {
   const registryResult = await loadRegistry(source, context.cwd, context.runtime, plugins);
 
-  if (!registryResult.ok) {
-    return registryResult as unknown as Result<RegistryItem[], AppError>;
+  if (Either.isLeft(registryResult)) {
+    return registryResult as unknown as Either.Either<RegistryItem[], AppError>;
   }
 
-  return ok(registryResult.value.items);
+  return Either.right(registryResult.right.items);
 }
 
 /**
@@ -116,32 +119,41 @@ function presentItems(context: CommandContext, items: RegistryItem[]): void {
  * Evaluates CQS flow: State Query -> Interaction -> Fetch Items -> Presentation.
  *
  * @param context - Command context.
- * @returns Result command status execution payload.
+ * @returns Either command status execution payload.
  */
 export async function runListCommand(
   context: CommandContext,
-): Promise<Result<CommandOutcome, AppError>> {
+): Promise<Either.Either<CommandOutcome, AppError>> {
   const stateQ = await queryListSourceState(context);
-  if (!stateQ.ok) return err(stateQ.error);
+  if (Either.isLeft(stateQ)) return Either.left(stateQ.left);
 
-  const sourceQ = await interactSourcePhase(context, stateQ.value);
-  if (!sourceQ.ok) return err(sourceQ.error);
+  const sourceQ = await interactSourcePhase(context, stateQ.right);
+  if (Either.isLeft(sourceQ)) return Either.left(sourceQ.left);
 
-  if (!sourceQ.value) {
-    return ok({ kind: "noop", message: "No registry source provided." });
+  if (!sourceQ.right) {
+    return Either.right({
+      kind: "noop",
+      message: "No registry source provided.",
+    });
   }
 
-  const itemsQ = await queryRegistryItems(context, sourceQ.value, stateQ.value.plugins);
-  if (!itemsQ.ok) return err(itemsQ.error);
+  const itemsQ = await queryRegistryItems(context, sourceQ.right, stateQ.right.plugins);
+  if (Either.isLeft(itemsQ)) return Either.left(itemsQ.left);
 
-  const items = itemsQ.value;
+  const items = itemsQ.right;
 
   if (!items.length) {
     context.runtime.prompt.warn("No items found in registry.");
-    return ok({ kind: "noop", message: "No items found in registry." });
+    return Either.right({
+      kind: "noop",
+      message: "No items found in registry.",
+    });
   }
 
   presentItems(context, items);
 
-  return ok({ kind: "success", message: `Listed ${items.length} item(s).` });
+  return Either.right({
+    kind: "success",
+    message: `Listed ${items.length} item(s).`,
+  });
 }

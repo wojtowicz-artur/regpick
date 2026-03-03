@@ -1,21 +1,28 @@
+import { Either } from "effect";
 import type { RuntimePorts } from "@/shell/runtime/ports.js";
+import { Effect, Schema as S } from "effect";
 import crypto from "node:crypto";
 import path from "node:path";
-import * as v from "valibot";
 
 const LOCKFILE_NAME = "regpick-lock.json";
 
-export const LockfileItemSchema = v.object({
-  version: v.optional(v.string()),
-  source: v.optional(v.string()),
-  hash: v.string(),
-});
-export type LockfileItem = v.InferOutput<typeof LockfileItemSchema>;
+export const LockfileItemSchema = S.mutable(
+  S.Struct({
+    version: S.optionalWith(S.String, { exact: true }),
+    source: S.optionalWith(S.String, { exact: true }),
+    hash: S.String,
+  }),
+);
+export type LockfileItem = S.Schema.Type<typeof LockfileItemSchema>;
 
-export const RegpickLockfileSchema = v.object({
-  components: v.record(v.string(), LockfileItemSchema),
-});
-export type RegpickLockfile = v.InferOutput<typeof RegpickLockfileSchema>;
+export const RegpickLockfileSchema = S.mutable(
+  S.Struct({
+    components: S.Record({ key: S.String, value: LockfileItemSchema }),
+  }),
+);
+export type RegpickLockfile = {
+  components: Record<string, LockfileItem>;
+};
 
 export function getLockfilePath(cwd: string): string {
   return path.join(cwd, LOCKFILE_NAME);
@@ -23,21 +30,22 @@ export function getLockfilePath(cwd: string): string {
 
 export async function readLockfile(cwd: string, runtime: RuntimePorts): Promise<RegpickLockfile> {
   const lockfilePath = getLockfilePath(cwd);
-  const exists = await runtime.fs.pathExists(lockfilePath);
+  const exists = await Effect.runPromise(runtime.fs.pathExists(lockfilePath));
 
   if (!exists) {
     return { components: {} };
   }
 
-  const readRes = runtime.fs.readJsonSync<unknown>(lockfilePath);
-  if (!readRes.ok) {
+  const readRes = Effect.runSyncExit(runtime.fs.readJsonSync<unknown>(lockfilePath));
+  if (readRes._tag !== "Success") {
     return { components: {} };
   }
 
-  try {
-    const parsed = v.parse(RegpickLockfileSchema, readRes.value);
-    return parsed;
-  } catch {
+  const decodeEither = S.decodeUnknownEither(RegpickLockfileSchema);
+  const parsed = decodeEither(readRes.value);
+  if (parsed._tag === "Right") {
+    return parsed.right;
+  } else {
     return { components: {} };
   }
 }
@@ -48,7 +56,7 @@ export async function writeLockfile(
   runtime: RuntimePorts,
 ): Promise<void> {
   const lockfilePath = getLockfilePath(cwd);
-  await runtime.fs.writeJson(lockfilePath, lockfile, { spaces: 2 });
+  await Effect.runPromise(runtime.fs.writeJson(lockfilePath, lockfile, { spaces: 2 }));
 }
 
 export function computeHash(content: string): string {

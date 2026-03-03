@@ -1,9 +1,9 @@
+import { Either } from "effect";
 import path from "node:path";
 
 import type { RegistryFile, RegistryItem, RegpickConfig } from "@/types.js";
 
 import { appError, type AppError } from "@/core/errors.js";
-import { err, ok, type Result } from "@/core/result.js";
 
 function normalizeSlashes(relativePath: string): string {
   return relativePath.replace(/\\/g, "/");
@@ -13,19 +13,21 @@ function assertInsideProject(
   projectRoot: string,
   outputPath: string,
   allowOutsideProject: boolean,
-): Result<void, AppError> {
+): Either.Either<void, AppError> {
   const projectRootWithSep = `${path.resolve(projectRoot)}${path.sep}`;
   const resolvedOutput = path.resolve(outputPath);
   if (allowOutsideProject) {
-    return ok(undefined);
+    return Either.right(undefined);
   }
   if (
     resolvedOutput !== path.resolve(projectRoot) &&
     !resolvedOutput.startsWith(projectRootWithSep)
   ) {
-    return err(appError("ValidationError", `Refusing to write outside project: ${resolvedOutput}`));
+    return Either.left(
+      appError("ValidationError", `Refusing to write outside project: ${resolvedOutput}`),
+    );
   }
-  return ok(undefined);
+  return Either.right(undefined);
 }
 
 export function resolveOutputPathFromPolicy(
@@ -33,7 +35,7 @@ export function resolveOutputPathFromPolicy(
   file: RegistryFile,
   cwd: string,
   config: RegpickConfig,
-): Result<{ absoluteTarget: string; relativeTarget: string }, AppError> {
+): Either.Either<{ absoluteTarget: string; relativeTarget: string }, AppError> {
   const typeKey = file.type || item.type || "registry:file";
   const mappedBase = (config.resolve?.targets || {})?.[typeKey];
   const preferManifestTarget = (config.registry?.preferManifestTarget ?? true) !== false;
@@ -74,9 +76,9 @@ export function resolveOutputPathFromPolicy(
     absoluteTarget,
     Boolean(config.install?.allowOutsideProject || false),
   );
-  if (!assertRes.ok) return assertRes;
+  if (Either.isLeft(assertRes)) return Either.left(assertRes.left);
 
-  return ok({
+  return Either.right({
     absoluteTarget,
     relativeTarget: normalizeSlashes(path.relative(cwd, absoluteTarget)),
   });

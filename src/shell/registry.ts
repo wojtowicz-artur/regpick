@@ -1,5 +1,5 @@
+import { Either } from "effect";
 import { appError, type AppError } from "@/core/errors.js";
-import { err, ok, type Result } from "@/core/result.js";
 import {
   extractItemReferences,
   normalizeItem,
@@ -13,7 +13,7 @@ async function normalizeManifest(
   sourceMeta: RegistrySourceMeta,
   runtime: RuntimePorts,
   plugins: RegpickPlugin[],
-): Promise<Result<RegistryItem[], AppError>> {
+): Promise<Either.Either<RegistryItem[], AppError>> {
   const inlineItemsRes = normalizeManifestInline(data, sourceMeta);
 
   if (!data || typeof data !== "object" || Array.isArray(data)) {
@@ -25,7 +25,7 @@ async function normalizeManifest(
     return inlineItemsRes;
   }
 
-  const inlineItems = inlineItemsRes.ok ? inlineItemsRes.value : [];
+  const inlineItems = Either.isRight(inlineItemsRes) ? inlineItemsRes.right : [];
 
   const resolvedItemResults = await Promise.all(
     references.map(async (itemRef) => {
@@ -50,38 +50,42 @@ async function normalizeManifest(
             try {
               itemData = JSON.parse(loadResult);
             } catch {
-              return err(appError("RegistryError", `Failed to parse JSON for ${resolvedId}`));
+              return Either.left(
+                appError("RegistryError", `Failed to parse JSON for ${resolvedId}`),
+              );
             }
           } else {
             itemData = loadResult;
           }
 
           if (itemData && typeof itemData === "object") {
-            return ok(normalizeItem(itemData, sourceMeta));
+            return Either.right(normalizeItem(itemData, sourceMeta));
           }
-          return ok(null);
+          return Either.right(null);
         } catch (e) {
           const errorMsg = e instanceof Error ? e.message : String(e);
           // If we encounter a critical error like HTTP 500, we should probably fail fully,
           // rather than silently ignoring it and trying another plugin,
           // but we follow adapter approach to throw/err where necessary
           if (e instanceof Error && "kind" in e) {
-            return err(e as AppError);
+            return Either.left(e as AppError);
           }
-          return err(appError("RegistryError", `Failed to resolve ${itemRef}: ${errorMsg}`, e));
+          return Either.left(
+            appError("RegistryError", `Failed to resolve ${itemRef}: ${errorMsg}`, e),
+          );
         }
       }
-      return err(appError("RegistryError", `Could not resolve reference: ${itemRef}`));
+      return Either.left(appError("RegistryError", `Could not resolve reference: ${itemRef}`));
     }),
   );
 
   const resolvedItems: RegistryItem[] = [];
   for (const res of resolvedItemResults) {
-    if (!res.ok) return res;
-    if (res.value) resolvedItems.push(res.value);
+    if (Either.isLeft(res)) return Either.left(res.left);
+    if (res.right) resolvedItems.push(res.right);
   }
 
-  return ok([...inlineItems, ...resolvedItems]);
+  return Either.right([...inlineItems, ...resolvedItems]);
 }
 
 export async function loadRegistry(
@@ -89,9 +93,9 @@ export async function loadRegistry(
   cwd: string,
   runtime: RuntimePorts,
   plugins: RegpickPlugin[],
-): Promise<Result<{ items: RegistryItem[]; source: string }, AppError>> {
+): Promise<Either.Either<{ items: RegistryItem[]; source: string }, AppError>> {
   if (!source) {
-    return err(appError("ValidationError", "Registry source is required."));
+    return Either.left(appError("ValidationError", "Registry source is required."));
   }
 
   for (const plugin of plugins) {
@@ -117,7 +121,7 @@ export async function loadRegistry(
         "ok" in manifestRes &&
         manifestRes.ok === false
       ) {
-        return err((manifestRes as unknown as { error: AppError }).error);
+        return Either.left((manifestRes as unknown as { error: AppError }).error);
       }
 
       const manifest =
@@ -140,8 +144,8 @@ export async function loadRegistry(
           runtime,
           plugins,
         );
-        if (!itemsRes.ok) return err(itemsRes.error);
-        items = itemsRes.value;
+        if (Either.isLeft(itemsRes)) return Either.left(itemsRes.left);
+        items = itemsRes.right;
       } else if ((manifest && typeof manifest === "object") || Array.isArray(manifest)) {
         const itemsRes = await normalizeManifest(
           manifest,
@@ -149,8 +153,8 @@ export async function loadRegistry(
           runtime,
           plugins,
         );
-        if (!itemsRes.ok) return err(itemsRes.error);
-        items = itemsRes.value;
+        if (Either.isLeft(itemsRes)) return Either.left(itemsRes.left);
+        items = itemsRes.right;
       }
 
       const finalSource =
@@ -166,22 +170,22 @@ export async function loadRegistry(
         },
       }));
 
-      return ok({
+      return Either.right({
         items: enhancedItems,
         source: finalSource,
       });
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : String(e);
       if (e && typeof e === "object" && "kind" in e) {
-        return err(e as AppError);
+        return Either.left(e as AppError);
       }
-      return err(
+      return Either.left(
         appError("RegistryError", `Failed to load registry from ${source}: ${errorMsg}`, e),
       );
     }
   }
 
-  return err(appError("RegistryError", `No suitable plugin found for source: ${source}`));
+  return Either.left(appError("RegistryError", `No suitable plugin found for source: ${source}`));
 }
 
 export async function resolveFileContent(
@@ -190,15 +194,15 @@ export async function resolveFileContent(
   cwd: string,
   runtime: RuntimePorts,
   plugins: RegpickPlugin[],
-): Promise<Result<string, AppError>> {
+): Promise<Either.Either<string, AppError>> {
   if (typeof file.content === "string") {
-    return ok(file.content);
+    return Either.right(file.content);
   }
 
   const targetPathOrUrl = file.url || file.path;
 
   if (!targetPathOrUrl) {
-    return err(
+    return Either.left(
       appError(
         "ValidationError",
         `File entry in "${item.name}" is missing both content and path/url.`,
@@ -223,14 +227,14 @@ export async function resolveFileContent(
       });
       if (content == null) continue;
 
-      return ok(typeof content === "string" ? content : JSON.stringify(content, null, 2));
+      return Either.right(typeof content === "string" ? content : JSON.stringify(content, null, 2));
     } catch (e) {
       // Here we catch any thrown appErrors from the plugins and bubble them up
       if (e && typeof e === "object" && "kind" in e) {
-        return err(e as AppError);
+        return Either.left(e as AppError);
       }
       const errorMsg = e instanceof Error ? e.message : String(e);
-      return err(
+      return Either.left(
         appError(
           "RegistryError",
           `Failed to load file content for ${targetPathOrUrl}: ${errorMsg}`,
@@ -240,7 +244,7 @@ export async function resolveFileContent(
     }
   }
 
-  return err(
+  return Either.left(
     appError(
       "RegistryError",
       `No suitable plugin found to resolve file content for: ${targetPathOrUrl}`,

@@ -1,6 +1,7 @@
+import { Either } from "effect";
+import { Effect } from "effect";
 import { pathToFileURL } from "node:url";
 
-import { ok } from "@/core/result.js";
 import { loadRegistry, resolveFileContent } from "@/shell/registry.js";
 import { createRuntimePorts } from "@/shell/runtime/ports.js";
 import * as path from "node:path";
@@ -26,8 +27,8 @@ describe("registry loader", () => {
   });
 
   it("should normalize GitHub blob/tree URLs to raw.githubusercontent.com", async () => {
-    vi.mocked(mockRuntime.http.getText).mockResolvedValue(
-      ok(
+    vi.mocked(mockRuntime.http.getText).mockReturnValue(
+      Effect.succeed(
         JSON.stringify({
           name: "gh-registry",
           items: [{ name: "comp", files: [{ path: "comp.ts", content: "x" }] }],
@@ -45,13 +46,15 @@ describe("registry loader", () => {
     expect(mockRuntime.http.getText).toHaveBeenCalledWith(
       "https://raw.githubusercontent.com/user/repo/main/registry.json",
     );
-    expect(result.ok).toBe(true);
+    expect(Either.isRight(result)).toBe(true);
   });
 
   it("should load a registry from a local json file", async () => {
-    vi.mocked(mockRuntime.fs.stat).mockResolvedValue(ok({ isDirectory: () => false } as any));
-    vi.mocked(mockRuntime.fs.readFile).mockResolvedValue(
-      ok(
+    vi.mocked(mockRuntime.fs.stat).mockReturnValue(
+      Effect.succeed({ isDirectory: () => false } as any),
+    );
+    vi.mocked(mockRuntime.fs.readFile).mockReturnValue(
+      Effect.succeed(
         JSON.stringify({
           items: [
             {
@@ -65,28 +68,30 @@ describe("registry loader", () => {
     );
 
     const result = await loadRegistry("/abs/path/local.json", "/test", mockRuntime, mockPlugins);
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.value.items[0].name).toBe("local-comp");
+    expect(Either.isRight(result)).toBe(true);
+    if (Either.isRight(result)) {
+      expect(result.right.items[0].name).toBe("local-comp");
     }
   });
 
   it("should resolve a directory registry containing multiple json files", async () => {
-    vi.mocked(mockRuntime.fs.stat).mockResolvedValue(ok({ isDirectory: () => true } as any));
-    vi.mocked(mockRuntime.fs.readdir).mockResolvedValue(
-      ok(["button.json", "input.json", "not.txt"]),
+    vi.mocked(mockRuntime.fs.stat).mockReturnValue(
+      Effect.succeed({ isDirectory: () => true } as any),
+    );
+    vi.mocked(mockRuntime.fs.readdir).mockReturnValue(
+      Effect.succeed(["button.json", "input.json", "not.txt"]),
     );
 
-    vi.mocked(mockRuntime.fs.readFile).mockImplementation(async (filePath: string) => {
+    vi.mocked(mockRuntime.fs.readFile).mockImplementation((filePath: string) => {
       if (filePath.endsWith("button.json")) {
-        return ok(
+        return Effect.succeed(
           JSON.stringify({
             name: "button",
             files: [{ path: "b.ts", content: "b" }],
           }),
         );
       }
-      return ok(
+      return Effect.succeed(
         JSON.stringify({
           name: "input",
           files: [{ path: "i.ts", content: "i" }],
@@ -96,16 +101,16 @@ describe("registry loader", () => {
 
     const result = await loadRegistry("/abs/dir", "/test", mockRuntime, mockPlugins);
 
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.value.items).toHaveLength(2);
-      expect(result.value.items.map((i) => i.name).sort()).toEqual(["button", "input"]);
-      expect(result.value.source).toBe(pathToFileURL(path.resolve("/abs/dir")).toString());
+    expect(Either.isRight(result)).toBe(true);
+    if (Either.isRight(result)) {
+      expect(result.right.items).toHaveLength(2);
+      expect(result.right.items.map((i) => i.name).sort()).toEqual(["button", "input"]);
+      expect(result.right.source).toBe(pathToFileURL(path.resolve("/abs/dir")).toString());
     }
   });
 
   it("should fetch related file content over HTTP using baseUrl", async () => {
-    vi.mocked(mockRuntime.http.getText).mockResolvedValue(ok("remote-content"));
+    vi.mocked(mockRuntime.http.getText).mockReturnValue(Effect.succeed("remote-content"));
 
     const item = {
       name: "net-comp",
@@ -121,8 +126,8 @@ describe("registry loader", () => {
     const file = { path: "utils.ts", type: "registry:file" };
 
     const result = await resolveFileContent(file, item as any, "/test", mockRuntime, mockPlugins);
-    expect(result.ok).toBe(true);
-    if (result.ok) expect(result.value).toBe("remote-content");
+    expect(Either.isRight(result)).toBe(true);
+    if (Either.isRight(result)) expect(result.right).toBe("remote-content");
 
     expect(mockRuntime.http.getText).toHaveBeenCalledWith("https://example.com/registry/utils.ts");
   });

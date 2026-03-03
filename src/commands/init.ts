@@ -1,5 +1,4 @@
 import { appError, type AppError } from "@/core/errors.js";
-import { err, ok, type Result } from "@/core/result.js";
 import { decideInitAfterOverwritePrompt } from "@/domain/initCore.js";
 import {
   generateConfigCode,
@@ -8,8 +7,8 @@ import {
   resolveTargetConfigPath,
 } from "@/shell/config.js";
 import type { CommandContext, CommandOutcome, RegpickConfig } from "@/types.js";
+import { Effect, Either, Schema as S } from "effect";
 import path from "node:path";
-import * as v from "valibot";
 
 type InitQueryState = {
   configPath: string;
@@ -23,165 +22,156 @@ type ApprovedInitPlan = {
   isOverwrite: boolean;
 };
 
-/**
- * Queries the current environment state for regpick initialization.
- *
- * @param context - Command context.
- * @returns Result with existing configuration states.
- */
-async function queryInitState(context: CommandContext): Promise<Result<InitQueryState, AppError>> {
-  const configPath = await resolveTargetConfigPath(context.cwd);
-  const existsRes = await context.runtime.fs.stat(configPath);
-  const exists = existsRes.ok;
+const queryInitState = (context: CommandContext) =>
+  Effect.gen(function* () {
+    const configPath = yield* Effect.promise(() => resolveTargetConfigPath(context.cwd));
 
-  const { config: existingConfig } = await readConfig(context.cwd);
+    const statEff = yield* Effect.either(context.runtime.fs.stat(configPath));
+    const exists = statEff._tag === "Right";
 
-  return ok({
-    configPath,
-    exists,
-    existingConfig,
+    const { config: existingConfig } = yield* Effect.promise(() => readConfig(context.cwd));
+
+    return {
+      configPath,
+      exists,
+      existingConfig,
+    } satisfies InitQueryState;
   });
-}
 
-/**
- * Interacts with the user to determine framework and project specifications.
- *
- * @param context - Command context.
- * @param state - Evaluated environment initial query state.
- * @returns Approved plan, or null to indicate skipping config creation.
- */
-async function interactInitPhase(
-  context: CommandContext,
-  state: InitQueryState,
-): Promise<Result<ApprovedInitPlan | null, AppError>> {
-  if (state.exists) {
-    const shouldOverwrite = await context.runtime.prompt.confirm({
-      message: `${state.configPath} already exists. Overwrite?`,
-      initialValue: false,
-    });
+const interactInitPhase = (context: CommandContext, state: InitQueryState) =>
+  Effect.gen(function* () {
+    if (state.exists) {
+      const shouldOverwriteOrCancel = yield* context.runtime.prompt.confirm({
+        message: `${state.configPath} already exists. Overwrite?`,
+        initialValue: false,
+      });
 
-    const secondDecision = decideInitAfterOverwritePrompt(
-      await context.runtime.prompt.isCancel(shouldOverwrite),
-      Boolean(shouldOverwrite),
-    );
-    if (secondDecision === "cancelled") {
-      return err(appError("UserCancelled", "Operation cancelled."));
+      const isCancel = yield* context.runtime.prompt.isCancel(shouldOverwriteOrCancel);
+
+      const secondDecision = decideInitAfterOverwritePrompt(
+        isCancel,
+        shouldOverwriteOrCancel === true,
+      );
+      if (secondDecision === "cancelled") {
+        return yield* Effect.fail(appError("UserCancelled", "Operation cancelled."));
+      }
+
+      if (secondDecision === "keep") {
+        yield* context.runtime.prompt.info("Keeping existing configuration.");
+        return null;
+      }
     }
 
-    if (secondDecision === "keep") {
-      context.runtime.prompt.info("Keeping existing configuration.");
-      return ok(null); // Explicit noop signal
+    const assumeYes = Boolean(context.args.flags.yes);
+
+    const packageManager = assumeYes
+      ? "auto"
+      : yield* context.runtime.prompt.select({
+          message: "Jakiego menedżera pakietów używasz?",
+          options: [
+            { value: "auto", label: "Auto (wykrywanie)" },
+            { value: "npm", label: "npm" },
+            { value: "yarn", label: "yarn" },
+            { value: "pnpm", label: "pnpm" },
+          ],
+        });
+
+    const isPackageManagerCancel = yield* context.runtime.prompt.isCancel(packageManager);
+    if (!assumeYes && isPackageManagerCancel) {
+      return yield* Effect.fail(appError("UserCancelled", "Operation cancelled."));
     }
-  }
 
-  const assumeYes = Boolean(context.args.flags.yes);
+    const componentsFolder = assumeYes
+      ? "src/components/ui"
+      : yield* context.runtime.prompt.text({
+          message: "W jakim folderze trzymasz komponenty UI?",
+          placeholder: "src/components/ui",
+        });
 
-  const packageManager = assumeYes
-    ? "auto"
-    : await context.runtime.prompt.select({
-        message: "Jakiego menedżera pakietów używasz?",
-        options: [
-          { value: "auto", label: "Auto (wykrywanie)" },
-          { value: "npm", label: "npm" },
-          { value: "yarn", label: "yarn" },
-          { value: "pnpm", label: "pnpm" },
-        ],
-      });
+    const isComponentsFolderCancel = yield* context.runtime.prompt.isCancel(componentsFolder);
+    if (!assumeYes && isComponentsFolderCancel) {
+      return yield* Effect.fail(appError("UserCancelled", "Operation cancelled."));
+    }
 
-  const isPackageManagerCancel = await context.runtime.prompt.isCancel(packageManager);
-  if (!assumeYes && isPackageManagerCancel) {
-    return err(appError("UserCancelled", "Operation cancelled."));
-  }
+    const overwritePolicy = assumeYes
+      ? "prompt"
+      : yield* context.runtime.prompt.select({
+          message: "Czy chcesz nadpisywać pliki automatycznie, czy wolisz być pytany?",
+          options: [
+            { value: "prompt", label: "Pytaj (prompt)" },
+            { value: "overwrite", label: "Zawsze nadpisuj (overwrite)" },
+            { value: "skip", label: "Pomijaj nadpisywanie (skip)" },
+          ],
+        });
 
-  const componentsFolder = assumeYes
-    ? "src/components/ui"
-    : await context.runtime.prompt.text({
-        message: "W jakim folderze trzymasz komponenty UI?",
-        placeholder: "src/components/ui",
-      });
+    const isOverwritePolicyCancel = yield* context.runtime.prompt.isCancel(overwritePolicy);
+    if (!assumeYes && isOverwritePolicyCancel) {
+      return yield* Effect.fail(appError("UserCancelled", "Operation cancelled."));
+    }
 
-  const isComponentsFolderCancel = await context.runtime.prompt.isCancel(componentsFolder);
-  if (!assumeYes && isComponentsFolderCancel) {
-    return err(appError("UserCancelled", "Operation cancelled."));
-  }
-
-  const overwritePolicy = assumeYes
-    ? "prompt"
-    : await context.runtime.prompt.select({
-        message: "Czy chcesz nadpisywać pliki automatycznie, czy wolisz być pytany?",
-        options: [
-          { value: "prompt", label: "Pytaj (prompt)" },
-          { value: "overwrite", label: "Zawsze nadpisuj (overwrite)" },
-          { value: "skip", label: "Pomijaj nadpisywanie (skip)" },
-        ],
-      });
-
-  const isOverwritePolicyCancel = await context.runtime.prompt.isCancel(overwritePolicy);
-  if (!assumeYes && isOverwritePolicyCancel) {
-    return err(appError("UserCancelled", "Operation cancelled."));
-  }
-
-  const newConfigRaw = {
-    ...state.existingConfig,
-    install: {
-      packageManager: String(packageManager),
-      overwritePolicy: String(overwritePolicy),
-    },
-    resolve: {
-      targets: {
-        ...state.existingConfig.resolve?.targets,
-        "registry:component": String(componentsFolder || "src/components/ui"),
-        "registry:file": String(componentsFolder || "src/components/ui"),
-        "registry:icon": `${String(componentsFolder || "src/components/ui")}/icons`,
+    const newConfigRaw = {
+      ...state.existingConfig,
+      install: {
+        packageManager: String(packageManager),
+        overwritePolicy: String(overwritePolicy),
       },
-    },
-  };
+      resolve: {
+        targets: {
+          ...state.existingConfig.resolve?.targets,
+          "registry:component": String(componentsFolder || "src/components/ui"),
+          "registry:file": String(componentsFolder || "src/components/ui"),
+          "registry:icon": `${String(componentsFolder || "src/components/ui")}/icons`,
+        },
+      },
+    };
 
-  const newConfig = v.parse(RegpickConfigSchema, newConfigRaw);
+    const newConfig = S.decodeUnknownSync(RegpickConfigSchema)(newConfigRaw);
 
-  return ok({
-    newConfig: newConfig as import("../types.js").RegpickConfig,
-    configPath: state.configPath,
-    isOverwrite: state.exists,
+    return {
+      newConfig: newConfig as import("../types.js").RegpickConfig,
+      configPath: state.configPath,
+      isOverwrite: state.exists,
+    } satisfies ApprovedInitPlan;
   });
-}
 
-/**
- * Main controller for the `init` command.
- * Orchestrates CQS flow: State Query -> Interaction -> Execution.
- *
- * @param context - Command context.
- * @returns Result indicating outcome.
- */
+const runInitCommandEff = (context: CommandContext) =>
+  Effect.gen(function* () {
+    const state = yield* queryInitState(context);
+    const plan = yield* interactInitPhase(context, state);
+
+    if (!plan)
+      return {
+        kind: "noop",
+        message: "Keeping existing configuration.",
+      } as CommandOutcome;
+
+    const ext = path.extname(plan.configPath).slice(1);
+    const format = ["ts", "mjs", "cjs", "js", "json"].includes(ext)
+      ? (ext as import("../shell/config.js").ConfigFormat)
+      : "json";
+
+    const content = generateConfigCode(plan.newConfig, format);
+
+    yield* Effect.catchAll(context.runtime.fs.writeFile(plan.configPath, content, "utf8"), (e) =>
+      Effect.gen(function* () {
+        yield* context.runtime.prompt.error(`Failed to write config file: ${plan.configPath}`);
+        return yield* Effect.fail(e);
+      }),
+    );
+
+    yield* context.runtime.prompt.success(
+      `${plan.isOverwrite ? "Overwrote" : "Created"} ${plan.configPath}`,
+    );
+
+    return {
+      kind: "success",
+      message: `${plan.isOverwrite ? "Overwrote" : "Created"} ${plan.configPath}`,
+    } as CommandOutcome;
+  });
+
 export async function runInitCommand(
   context: CommandContext,
-): Promise<Result<CommandOutcome, AppError>> {
-  const stateQ = await queryInitState(context);
-  if (!stateQ.ok) return err(stateQ.error);
-
-  const planQ = await interactInitPhase(context, stateQ.value);
-  if (!planQ.ok) return err(planQ.error);
-  if (!planQ.value) return ok({ kind: "noop", message: "Keeping existing configuration." });
-
-  const ext = path.extname(planQ.value.configPath).slice(1);
-  const format = ["ts", "mjs", "cjs", "js", "json"].includes(ext)
-    ? (ext as import("../shell/config.js").ConfigFormat)
-    : "json";
-
-  const content = generateConfigCode(planQ.value.newConfig, format);
-  const writeRes = await context.runtime.fs.writeFile(planQ.value.configPath, content, "utf8");
-
-  if (!writeRes.ok) {
-    context.runtime.prompt.error(`Failed to write config file: ${planQ.value.configPath}`);
-    return err(writeRes.error);
-  }
-
-  context.runtime.prompt.success(
-    `${planQ.value.isOverwrite ? "Overwrote" : "Created"} ${planQ.value.configPath}`,
-  );
-
-  return ok({
-    kind: "success",
-    message: `${planQ.value.isOverwrite ? "Overwrote" : "Created"} ${planQ.value.configPath}`,
-  });
+): Promise<Either.Either<CommandOutcome, AppError>> {
+  const res = await Effect.runPromise(Effect.either(runInitCommandEff(context)));
+  return res._tag === "Right" ? Either.right(res.right) : Either.left(res.left);
 }

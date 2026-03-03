@@ -1,3 +1,4 @@
+import { Either } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { extractItemReferences, normalizeManifestInline } from "@/domain/registryModel.js";
@@ -19,10 +20,10 @@ describe("registry model core", () => {
       type: "file",
       pluginState: { baseDir: "/registry" },
     });
-    expect(normalized.ok).toBe(true);
-    if (normalized.ok) {
-      expect(normalized.value).toHaveLength(1);
-      expect(normalized.value[0].name).toBe("check");
+    expect(Either.isRight(normalized)).toBe(true);
+    if (Either.isRight(normalized)) {
+      expect(normalized.right).toHaveLength(1);
+      expect(normalized.right[0].name).toBe("check");
     }
   });
 

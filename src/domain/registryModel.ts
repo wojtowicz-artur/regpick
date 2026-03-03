@@ -1,40 +1,63 @@
+import { Either } from "effect";
 import { appError, type AppError } from "@/core/errors.js";
-import { err, ok, type Result } from "@/core/result.js";
-import * as v from "valibot";
+import { Schema as S } from "effect";
 
-export const RegistryFileSchema = v.object({
-  path: v.optional(v.string()),
-  target: v.optional(v.string()),
-  type: v.optional(v.string(), "registry:file"),
-  content: v.optional(v.string()),
-  url: v.optional(v.string()),
+export const RegistryFileSchema = S.Struct({
+  path: S.optionalWith(S.String, { exact: true }),
+  target: S.optionalWith(S.String, { exact: true }),
+  type: S.optionalWith(S.String, {
+    exact: true,
+    default: () => "registry:file",
+  }),
+  content: S.optionalWith(S.String, { exact: true }),
+  url: S.optionalWith(S.String, { exact: true }),
 });
 
-export const RegistryItemSchema = v.object({
-  name: v.optional(v.string(), "unnamed-item"),
-  title: v.optional(v.string()),
-  description: v.optional(v.string(), ""),
-  type: v.optional(v.string(), "registry:file"),
-  dependencies: v.optional(v.array(v.string()), []),
-  devDependencies: v.optional(v.array(v.string()), []),
-  registryDependencies: v.optional(v.array(v.string()), []),
-  files: v.optional(v.array(RegistryFileSchema), []),
+export const RegistryItemSchema = S.Struct({
+  name: S.optionalWith(S.String, {
+    exact: true,
+    default: () => "unnamed-item",
+  }),
+  title: S.optionalWith(S.String, { exact: true }),
+  description: S.optionalWith(S.String, { exact: true, default: () => "" }),
+  type: S.optionalWith(S.String, {
+    exact: true,
+    default: () => "registry:file",
+  }),
+  dependencies: S.optionalWith(S.Array(S.String), {
+    exact: true,
+    default: () => [],
+  }),
+  devDependencies: S.optionalWith(S.Array(S.String), {
+    exact: true,
+    default: () => [],
+  }),
+  registryDependencies: S.optionalWith(S.Array(S.String), {
+    exact: true,
+    default: () => [],
+  }),
+  files: S.optionalWith(S.Array(RegistryFileSchema), {
+    exact: true,
+    default: () => [],
+  }),
 });
 
-export const RegistrySourceMetaSchema = v.object({
-  type: v.string(),
-  originalSource: v.optional(v.string()),
-  pluginState: v.optional(v.record(v.string(), v.unknown())),
+export const RegistrySourceMetaSchema = S.Struct({
+  type: S.String,
+  originalSource: S.optionalWith(S.String, { exact: true }),
+  pluginState: S.optionalWith(S.Record({ key: S.String, value: S.Unknown }), {
+    exact: true,
+  }),
 });
 
-export type RegistryFile = v.InferOutput<typeof RegistryFileSchema>;
-export type RegistrySourceMeta = v.InferOutput<typeof RegistrySourceMetaSchema>;
-export type RegistryItem = v.InferOutput<typeof RegistryItemSchema> & {
+export type RegistryFile = S.Schema.Type<typeof RegistryFileSchema>;
+export type RegistrySourceMeta = S.Schema.Type<typeof RegistrySourceMetaSchema>;
+export type RegistryItem = S.Schema.Type<typeof RegistryItemSchema> & {
   sourceMeta: RegistrySourceMeta;
 };
 
 export function normalizeItem(rawItem: unknown, sourceMeta: RegistrySourceMeta): RegistryItem {
-  const parsed = v.parse(RegistryItemSchema, rawItem);
+  const parsed = S.decodeUnknownSync(RegistryItemSchema)(rawItem);
 
   const name = parsed.name === "unnamed-item" && parsed.title ? parsed.title : parsed.name;
   const title = parsed.title ?? name;
@@ -53,24 +76,24 @@ export function normalizeItem(rawItem: unknown, sourceMeta: RegistrySourceMeta):
   };
 }
 
-const ReferenceItemSchema = v.object({
-  url: v.optional(v.string()),
-  href: v.optional(v.string()),
-  path: v.optional(v.string()),
-  files: v.optional(v.unknown()),
+const ReferenceItemSchema = S.Struct({
+  url: S.optionalWith(S.String, { exact: true }),
+  href: S.optionalWith(S.String, { exact: true }),
+  path: S.optionalWith(S.String, { exact: true }),
+  files: S.optionalWith(S.Unknown, { exact: true }),
 });
 
-const ManifestItemsSchema = v.object({
-  items: v.array(v.union([v.record(v.string(), v.unknown()), ReferenceItemSchema])),
+const ManifestItemsSchema = S.Struct({
+  items: S.Array(S.Union(S.Record({ key: S.String, value: S.Unknown }), ReferenceItemSchema)),
 });
 
 export function extractItemReferences(payload: unknown): string[] {
-  const result = v.safeParse(ManifestItemsSchema, payload);
-  if (!result.success) {
+  const result = S.decodeUnknownEither(ManifestItemsSchema)(payload);
+  if (result._tag === "Left") {
     return [];
   }
 
-  return result.output.items
+  return result.right.items
     .map((entry) => {
       const safeEntry = entry as Record<string, unknown>;
       if ("files" in safeEntry && Array.isArray(safeEntry.files)) {
@@ -87,42 +110,42 @@ export function extractItemReferences(payload: unknown): string[] {
     .filter((value): value is string => Boolean(value));
 }
 
-const SingleItemManifestSchema = v.object({
-  files: v.array(v.unknown()),
+const SingleItemManifestSchema = S.Struct({
+  files: S.Array(S.Unknown),
 });
 
 export function normalizeManifestInline(
   data: unknown,
   sourceMeta: RegistrySourceMeta,
-): Result<RegistryItem[], AppError> {
+): Either.Either<RegistryItem[], AppError> {
   try {
     if (Array.isArray(data)) {
       const items = data
         .filter((entry) => Boolean(entry && typeof entry === "object"))
         .map((entry) => normalizeItem(entry, sourceMeta));
-      return ok(items);
+      return Either.right(items);
     }
 
-    const hasItemsRes = v.safeParse(ManifestItemsSchema, data);
-    if (hasItemsRes.success) {
-      const entries = hasItemsRes.output.items.filter(
+    const hasItemsRes = S.decodeUnknownEither(ManifestItemsSchema)(data);
+    if (hasItemsRes._tag === "Right") {
+      const entries = hasItemsRes.right.items.filter(
         (entry) =>
           "files" in (entry as Record<string, unknown>) &&
           Array.isArray((entry as Record<string, unknown>).files),
       );
-      return ok(entries.map((entry) => normalizeItem(entry, sourceMeta)));
+      return Either.right(entries.map((entry) => normalizeItem(entry, sourceMeta)));
     }
 
-    const hasFilesRes = v.safeParse(SingleItemManifestSchema, data);
-    if (hasFilesRes.success) {
-      return ok([normalizeItem(data, sourceMeta)]);
+    const hasFilesRes = S.decodeUnknownEither(SingleItemManifestSchema)(data);
+    if (hasFilesRes._tag === "Right") {
+      return Either.right([normalizeItem(data, sourceMeta)]);
     }
 
-    return err(appError("RegistryError", "Unsupported manifest structure."));
-  } catch (e) {
-    if (v.isValiError(e)) {
-      return err(appError("ValidationError", `Manifest validation failed: ${e.message}`));
+    return Either.left(appError("RegistryError", "Unsupported manifest structure."));
+  } catch (e: any) {
+    if (e?.name === "ParseError") {
+      return Either.left(appError("ValidationError", `Manifest validation failed: ${e.message}`));
     }
-    return err(appError("RegistryError", "Failed to parse manifest"));
+    return Either.left(appError("RegistryError", "Failed to parse manifest"));
   }
 }

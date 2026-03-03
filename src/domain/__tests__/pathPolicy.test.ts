@@ -1,3 +1,4 @@
+import { Either } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { resolveOutputPathFromPolicy } from "@/domain/pathPolicy.js";
@@ -44,9 +45,9 @@ const item: RegistryItem = {
 describe("path policy core", () => {
   it("prefers manifest target by default", () => {
     const outputRes = resolveOutputPathFromPolicy(item, item.files[0], "/tmp/project", baseConfig);
-    expect(outputRes.ok).toBe(true);
-    if (outputRes.ok) {
-      expect(outputRes.value.relativeTarget).toBe("src/custom/check.tsx");
+    expect(Either.isRight(outputRes)).toBe(true);
+    if (Either.isRight(outputRes)) {
+      expect(outputRes.right.relativeTarget).toBe("src/custom/check.tsx");
     }
   });
 
@@ -59,9 +60,9 @@ describe("path policy core", () => {
         preferManifestTarget: false,
       },
     });
-    expect(outputRes.ok).toBe(true);
-    if (outputRes.ok) {
-      expect(outputRes.value.relativeTarget).toBe("src/components/ui/check.tsx");
+    expect(Either.isRight(outputRes)).toBe(true);
+    if (Either.isRight(outputRes)) {
+      expect(outputRes.right.relativeTarget).toBe("src/components/ui/check.tsx");
     }
   });
 
@@ -72,9 +73,9 @@ describe("path policy core", () => {
       "/tmp/project",
       baseConfig,
     );
-    expect(outputRes.ok).toBe(false);
-    if (!outputRes.ok) {
-      expect(outputRes.error.message).toMatch(/Refusing to write outside project/);
+    expect(Either.isRight(outputRes)).toBe(false);
+    if (Either.isLeft(outputRes)) {
+      expect(outputRes.left.message).toMatch(/Refusing to write outside project/);
     }
   });
 
@@ -104,9 +105,9 @@ describe("path policy core", () => {
       "/tmp/project",
       configWithResolvers,
     );
-    expect(outputRes.ok).toBe(true);
-    if (outputRes.ok) {
-      expect(outputRes.value.relativeTarget).toBe("tests/src/custom/check.test.tsx");
+    expect(Either.isRight(outputRes)).toBe(true);
+    if (Either.isRight(outputRes)) {
+      expect(outputRes.right.relativeTarget).toBe("tests/src/custom/check.test.tsx");
     }
   });
 
@@ -135,9 +136,9 @@ describe("path policy core", () => {
       "/tmp/project",
       configWithResolvers,
     );
-    expect(outputRes.ok).toBe(true);
-    if (outputRes.ok) {
-      expect(outputRes.value.relativeTarget).toBe("styles/theme.css");
+    expect(Either.isRight(outputRes)).toBe(true);
+    if (Either.isRight(outputRes)) {
+      expect(outputRes.right.relativeTarget).toBe("styles/theme.css");
     }
   });
 });

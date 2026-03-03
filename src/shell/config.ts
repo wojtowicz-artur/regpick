@@ -1,90 +1,116 @@
+import { Either } from "effect";
+import { Schema as S } from "effect";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { loadConfig } from "unconfig";
-import * as v from "valibot";
 
-const OverwritePolicySchema = v.union([
-  v.literal("prompt"),
-  v.literal("overwrite"),
-  v.literal("skip"),
-]);
+const OverwritePolicySchema = S.Union(
+  S.Literal("prompt"),
+  S.Literal("overwrite"),
+  S.Literal("skip"),
+);
 
-const PackageManagerSchema = v.string();
+const PackageManagerSchema = S.String;
 
 export const isFunction = (val: unknown) => typeof val === "function";
-export const FunctionSchema = v.custom<Function>(isFunction, "Expected a function");
+const FunctionType = S.declare(isFunction, {
+  identifier: "Function",
+}) as S.Schema<Function>;
+export const FunctionSchema = FunctionType;
 
-export const PluginSchema = v.objectWithRest(
-  {
-    name: v.string(),
-    start: v.optional(FunctionSchema),
-    resolveId: v.optional(FunctionSchema),
-    load: v.optional(FunctionSchema),
-    transform: v.optional(FunctionSchema),
-    finish: v.optional(FunctionSchema),
-    onError: v.optional(FunctionSchema),
-  },
-  v.any(),
-);
+export const PluginSchema = S.Struct({
+  name: S.String,
+  start: S.optionalWith(FunctionSchema, { exact: true }),
+  resolveId: S.optionalWith(FunctionSchema, { exact: true }),
+  load: S.optionalWith(FunctionSchema, { exact: true }),
+  transform: S.optionalWith(FunctionSchema, { exact: true }),
+  finish: S.optionalWith(FunctionSchema, { exact: true }),
+  onError: S.optionalWith(FunctionSchema, { exact: true }),
+}).pipe(S.typeSchema);
 
-export const PackageManagerPluginSchema = v.objectWithRest(
-  {
-    name: v.string(),
-    lockfiles: v.array(v.string()),
-    detect: FunctionSchema,
-    buildInstallCommands: FunctionSchema,
-  },
-  v.any(),
-);
+export const PackageManagerPluginSchema = S.Struct({
+  name: S.String,
+  lockfiles: S.Array(S.String),
+  detect: FunctionSchema,
+  buildInstallCommands: FunctionSchema,
+}).pipe(S.typeSchema);
 
-export const PathResolverPluginSchema = v.objectWithRest(
-  {
-    name: v.string(),
-    resolvePath: FunctionSchema,
-  },
-  v.any(),
-);
+export const PathResolverPluginSchema = S.Struct({
+  name: S.String,
+  resolvePath: FunctionSchema,
+}).pipe(S.typeSchema);
 
-export const RegpickConfigSchema = v.pipe(
-  v.object({
-    resolve: v.optional(
-      v.object({
-        targets: v.optional(v.record(v.string(), v.string()), {}),
-        aliases: v.optional(v.record(v.string(), v.string()), {}),
+const BaseRegpickConfigSchema = S.Struct({
+  resolve: S.optionalWith(
+    S.Struct({
+      targets: S.optionalWith(S.Record({ key: S.String, value: S.String }), {
+        exact: true,
+        default: () => ({}) as any,
       }),
-      {},
-    ),
-    registry: v.optional(
-      v.object({
-        sources: v.optional(v.record(v.string(), v.string()), {}),
-        preferManifestTarget: v.optional(v.boolean(), true),
+      aliases: S.optionalWith(S.Record({ key: S.String, value: S.String }), {
+        exact: true,
+        default: () => ({}) as any,
       }),
-      {},
-    ),
-    install: v.optional(
-      v.object({
-        packageManager: v.optional(PackageManagerSchema, "auto"),
-        overwritePolicy: v.optional(OverwritePolicySchema, "prompt"),
-        allowOutsideProject: v.optional(v.boolean(), false),
+    }),
+    { exact: true, default: () => ({}) as any },
+  ),
+  registry: S.optionalWith(
+    S.Struct({
+      sources: S.optionalWith(S.Record({ key: S.String, value: S.String }), {
+        exact: true,
+        default: () => ({}) as any,
       }),
-      {},
-    ),
-    plugins: v.optional(v.array(v.union([PluginSchema, v.string()])), []),
+      preferManifestTarget: S.optionalWith(S.Boolean, {
+        exact: true,
+        default: () => true,
+      }),
+    }),
+    { exact: true, default: () => ({}) as any },
+  ),
+  install: S.optionalWith(
+    S.Struct({
+      packageManager: S.optionalWith(PackageManagerSchema, {
+        exact: true,
+        default: () => "auto",
+      }),
+      overwritePolicy: S.optionalWith(OverwritePolicySchema, {
+        exact: true,
+        default: () => "prompt",
+      }),
+      allowOutsideProject: S.optionalWith(S.Boolean, {
+        exact: true,
+        default: () => false,
+      }),
+    }),
+    { exact: true, default: () => ({}) as any },
+  ),
+  plugins: S.optionalWith(S.Array(S.Union(S.Any, S.String)), {
+    exact: true,
+    default: () => [],
   }),
-  v.check((input) => {
-    if (!input.install?.allowOutsideProject) {
-      const targets = input.resolve?.targets || {};
-      for (const target of Object.values(targets)) {
-        if (typeof target === "string" && (target.startsWith("..") || path.isAbsolute(target))) {
-          return false;
+});
+
+export const RegpickConfigSchema = BaseRegpickConfigSchema.pipe(
+  S.filter(
+    (input) => {
+      if (!input.install?.allowOutsideProject) {
+        const targets = input.resolve?.targets || {};
+        for (const target of Object.values(targets)) {
+          if (typeof target === "string" && (target.startsWith("..") || path.isAbsolute(target))) {
+            return false;
+          }
         }
       }
-    }
-    return true;
-  }, "Target paths outside project are disallowed when install.allowOutsideProject is false"),
+      return true;
+    },
+    {
+      message: () =>
+        "Target paths outside project are disallowed when install.allowOutsideProject is false",
+    },
+  ),
 );
 
-type BaseRegpickConfig = v.InferOutput<typeof RegpickConfigSchema>;
+type BaseRegpickConfig = S.Schema.Type<typeof RegpickConfigSchema>;
 export type RegpickConfig = Omit<BaseRegpickConfig, "plugins"> & {
   plugins?: (string | import("../types.js").RegpickPlugin)[];
 };
@@ -228,7 +254,7 @@ export async function readConfig(cwd: string): Promise<{
     cwd,
   });
 
-  const validConfig = v.parse(RegpickConfigSchema, loadedConfig);
+  const validConfig = S.decodeUnknownSync(RegpickConfigSchema)(loadedConfig);
 
   return {
     config: validConfig as RegpickConfig,

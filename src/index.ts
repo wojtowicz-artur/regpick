@@ -1,8 +1,8 @@
+import { Either } from "effect";
 import path from "node:path";
 import { styleText } from "node:util";
 
 import { type AppError, toAppError } from "@/core/errors.js";
-import type { Result } from "@/core/result.js";
 import { parseCliArgs } from "@/shell/cli/args.js";
 import type { CommandContext, CommandOutcome } from "@/types.js";
 
@@ -70,7 +70,7 @@ async function run(): Promise<void> {
   runtime.prompt.intro(styleText("cyan", "regpick"));
 
   try {
-    let result: Result<CommandOutcome, AppError>;
+    let result: Either.Either<CommandOutcome, AppError>;
     if (command === "init") {
       result = await import("@/commands/init.js").then((mod) => mod.runInitCommand(context));
     } else if (command === "list") {
@@ -88,15 +88,15 @@ async function run(): Promise<void> {
       return;
     }
 
-    if (!result.ok) {
-      handleAppError(result.error, runtime.prompt.error);
+    if (Either.isLeft(result)) {
+      handleAppError(result.left, runtime.prompt.error);
       runtime.prompt.outro(styleText("red", "Failed."));
       process.exitCode = 1;
       return;
     }
 
-    if (result.value.kind === "noop") {
-      runtime.prompt.outro(styleText("yellow", result.value.message));
+    if (result.right.kind === "noop") {
+      runtime.prompt.outro(styleText("yellow", result.right.message));
       return;
     }
 

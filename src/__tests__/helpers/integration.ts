@@ -1,44 +1,40 @@
 import type { HttpPort, PromptPort } from "@/shell/runtime/ports.js";
+import { Context, Effect } from "effect";
 import { type Mock, vi } from "vitest";
 
 export const createMockHttp = (): {
-  getJson: Mock<HttpPort["getJson"]>;
-  getText: Mock<HttpPort["getText"]>;
+  [K in keyof Context.Tag.Service<HttpPort>]: Mock<Context.Tag.Service<HttpPort>[K]>;
 } => ({
-  getJson: vi.fn(),
-  getText: vi.fn(),
+  getJson: vi.fn<any>().mockReturnValue(Effect.void) as any,
+  getText: vi.fn<any>().mockReturnValue(Effect.void) as any,
 });
 
 export const createMockPrompt = (): {
-  [K in keyof PromptPort]: Mock<PromptPort[K]>;
+  [K in keyof Context.Tag.Service<PromptPort>]: Mock<Context.Tag.Service<PromptPort>[K]>;
 } => ({
-  intro: vi.fn(),
-  outro: vi.fn(),
-  cancel: vi.fn(),
-  isCancel: vi.fn().mockImplementation(async (v) => v === Symbol.for("cancel")),
-  info: vi.fn(),
-  warn: vi.fn(),
-  error: vi.fn(),
-  success: vi.fn(),
-  text: vi
+  intro: vi.fn().mockReturnValue(Effect.void),
+  outro: vi.fn().mockReturnValue(Effect.void),
+  cancel: vi.fn().mockReturnValue(Effect.void),
+  isCancel: vi
     .fn()
-    .mockImplementation(
-      async (options: Parameters<PromptPort["text"]>[0]) => options.defaultValue || "",
-    ),
-  confirm: vi.fn().mockImplementation(async () => true),
-  select: vi
+    .mockReturnValue(Effect.void)
+    .mockReturnValue(Effect.void)
+    .mockImplementation(((v: unknown) => Effect.succeed(v === Symbol.for("cancel"))) as any),
+  info: vi.fn().mockReturnValue(Effect.void),
+  warn: vi.fn().mockReturnValue(Effect.void),
+  error: vi.fn().mockReturnValue(Effect.void),
+  success: vi.fn().mockReturnValue(Effect.void),
+  text: vi.fn().mockImplementation((options: any) => Effect.succeed(options.defaultValue || "")),
+  confirm: vi
     .fn()
-    .mockImplementation(
-      async (options: Parameters<PromptPort["select"]>[0]) => options.options[0].value,
-    ),
+    .mockReturnValue(Effect.void)
+    .mockReturnValue(Effect.void)
+    .mockImplementation(() => Effect.succeed(true)),
+  select: vi.fn().mockImplementation((options: any) => Effect.succeed(options.options[0].value)),
   multiselect: vi
     .fn()
-    .mockImplementation(async (options: Parameters<PromptPort["multiselect"]>[0]) =>
-      options.options.map((o) => o.value),
-    ),
+    .mockImplementation((options: any) => Effect.succeed(options.options.map((o: any) => o.right))),
   autocompleteMultiselect: vi
     .fn()
-    .mockImplementation(async (options: Parameters<PromptPort["autocompleteMultiselect"]>[0]) =>
-      options.options.map((o) => o.value),
-    ),
+    .mockImplementation((options: any) => Effect.succeed(options.options.map((o: any) => o.right))),
 });

@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import type { RuntimePorts } from "../shell/runtime/ports.js";
 import { appError } from "./errors.js";
 
@@ -59,44 +60,6 @@ export interface Plugin extends PluginHooks {
   name: string;
 }
 
-/**
- * A simple lock mechanism to ensure operations on the same target ID
- * do not run concurrently, eliminating race conditions while allowing
- * other IDs to be processed in parallel.
- */
-class KeyedMutex {
-  private locks = new Map<string, Promise<void>>();
-
-  async runExclusive<T>(key: string, task: () => Promise<T>): Promise<T> {
-    const currentLock = this.locks.get(key) || Promise.resolve();
-
-    let release!: () => void;
-    const nextLock = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-
-    this.locks.set(
-      key,
-      currentLock.finally(() => nextLock),
-    );
-
-    try {
-      await currentLock;
-    } catch {
-      // safe to ignore previous task rejection here
-    }
-
-    try {
-      return await task();
-    } finally {
-      release();
-      if (this.locks.get(key) === nextLock) {
-        this.locks.delete(key);
-      }
-    }
-  }
-}
-
 export class PipelineRenderer {
   private plugins: Plugin[] = [];
 
@@ -108,119 +71,146 @@ export class PipelineRenderer {
     ctx: PipelineContext,
     files: { id: string; code: string | Uint8Array }[],
   ): Promise<void> {
-    try {
+    const effect = Effect.gen(this, function* () {
       // 1. Start Phase
       for (const plugin of this.plugins) {
         if (plugin.start) {
-          try {
-            await plugin.start(ctx);
-          } catch (e: unknown) {
-            const msg = e instanceof Error ? e.message : String(e);
-            throw appError("RuntimeError", `[${plugin.name}] Failed during start hook: ${msg}`);
-          }
+          yield* Effect.tryPromise({
+            try: () => plugin.start!(ctx),
+            catch: (e) =>
+              appError(
+                "RuntimeError",
+                `[${plugin.name}] Failed during start hook: ${e instanceof Error ? e.message : String(e)}`,
+              ),
+          });
         }
       }
 
-      // 2. Resolve, Load & Transform Phase (Concurrent mapping, synchronized per Target ID)
-      const fileMutex = new KeyedMutex();
-
-      await Promise.all(
-        files.map(async (file) => {
-          let currentId = file.id;
-          let currentCode: string | Uint8Array | null = file.code;
-
-          // resolveId (Wait-free execution)
-          for (const plugin of this.plugins) {
-            if (plugin.resolveId) {
-              try {
-                const resolved = await plugin.resolveId(currentId, undefined, ctx);
+      // 2. Resolve Phase
+      const resolvedFiles = yield* Effect.forEach(
+        files,
+        (file) =>
+          Effect.gen(this, function* () {
+            let currentId = file.id;
+            for (const plugin of this.plugins) {
+              if (plugin.resolveId) {
+                const resolved = yield* Effect.tryPromise({
+                  try: () => plugin.resolveId!(currentId, undefined, ctx),
+                  catch: (e) =>
+                    appError(
+                      "RuntimeError",
+                      `[${plugin.name}] Failed to resolveId for '${currentId}': ${e instanceof Error ? e.message : String(e)}`,
+                    ),
+                });
                 if (resolved) {
                   currentId = resolved;
-                  break; // Stop at first resolver that claims it
+                  break;
                 }
-              } catch (e: unknown) {
-                const msg = e instanceof Error ? e.message : String(e);
-                throw appError(
-                  "RuntimeError",
-                  `[${plugin.name}] Failed to resolveId for '${currentId}': ${msg}`,
-                );
               }
             }
-          }
+            return { file, currentId };
+          }),
+        { concurrency: "unbounded" },
+      );
 
-          // Lock modifications and assertions to strictly this `currentId`
-          await fileMutex.runExclusive(currentId, async () => {
-            // load
-            for (const plugin of this.plugins) {
-              if (plugin.load) {
-                try {
-                  const loaded = await plugin.load(currentId, ctx);
+      const groups = new Map<string, typeof resolvedFiles>();
+      for (const rf of resolvedFiles) {
+        if (!groups.has(rf.currentId)) groups.set(rf.currentId, []);
+        groups.get(rf.currentId)!.push(rf);
+      }
+
+      // Load & Transform Phase (Concurrent mapping between groups, synchronized per Target ID)
+      yield* Effect.forEach(
+        groups.values(),
+        (group) =>
+          Effect.gen(this, function* () {
+            for (const rf of group) {
+              let currentCode: string | Uint8Array | null = rf.file.code;
+              const currentId = rf.currentId;
+
+              // load
+              for (const plugin of this.plugins) {
+                if (plugin.load) {
+                  const loaded = yield* Effect.tryPromise({
+                    try: () => plugin.load!(currentId, ctx),
+                    catch: (e) =>
+                      appError(
+                        "RuntimeError",
+                        `[${plugin.name}] Failed to load '${currentId}': ${e instanceof Error ? e.message : String(e)}`,
+                      ),
+                  });
                   if (loaded !== null && loaded !== undefined) {
                     currentCode = loaded;
-                    break; // Stop at first loader that claims it
+                    break;
                   }
-                } catch (e: unknown) {
-                  const msg = e instanceof Error ? e.message : String(e);
-                  throw appError(
-                    "RuntimeError",
-                    `[${plugin.name}] Failed to load '${currentId}': ${msg}`,
-                  );
                 }
               }
-            }
 
-            // transform
-            if (currentCode !== null) {
-              if (typeof currentCode === "string") {
-                for (const plugin of this.plugins) {
-                  if (plugin.transform) {
-                    try {
-                      const transformed = await plugin.transform(currentCode, currentId, ctx);
+              // transform
+              if (currentCode !== null) {
+                if (typeof currentCode === "string") {
+                  for (const plugin of this.plugins) {
+                    if (plugin.transform) {
+                      const transformed = yield* Effect.tryPromise({
+                        try: () => plugin.transform!(currentCode as string, currentId, ctx),
+                        catch: (e) =>
+                          appError(
+                            "RuntimeError",
+                            `[${plugin.name}] Failed to transform '${currentId}': ${e instanceof Error ? e.message : String(e)}`,
+                          ),
+                      });
                       if (transformed !== null && transformed !== undefined) {
                         currentCode = transformed;
                       }
-                    } catch (e: unknown) {
-                      const msg = e instanceof Error ? e.message : String(e);
-                      throw appError(
-                        "RuntimeError",
-                        `[${plugin.name}] Failed to transform '${currentId}': ${msg}`,
-                      );
                     }
                   }
                 }
+                yield* Effect.tryPromise({
+                  try: () => ctx.vfs.writeFile(currentId, currentCode!),
+                  catch: (e) =>
+                    appError(
+                      "RuntimeError",
+                      `Failed to write ${currentId}: ${e instanceof Error ? e.message : String(e)}`,
+                    ),
+                });
               }
-
-              // write result to VFS
-              await ctx.vfs.writeFile(currentId, currentCode);
             }
-          });
-        }),
+          }),
+        { concurrency: "unbounded" },
       );
 
       // 3. Finish Phase
       for (const plugin of this.plugins) {
         if (plugin.finish) {
-          try {
-            await plugin.finish(ctx);
-          } catch (e: unknown) {
-            const msg = e instanceof Error ? e.message : String(e);
-            throw appError("RuntimeError", `[${plugin.name}] Failed during finish hook: ${msg}`);
-          }
+          yield* Effect.tryPromise({
+            try: () => plugin.finish!(ctx),
+            catch: (e) =>
+              appError(
+                "RuntimeError",
+                `[${plugin.name}] Failed during finish hook: ${e instanceof Error ? e.message : String(e)}`,
+              ),
+          });
         }
       }
-    } catch (error: unknown) {
-      // 4. Error Hook On Failure
-      const actualError = error instanceof Error ? error : new Error(String(error));
-      for (const plugin of this.plugins) {
-        if (plugin.onError) {
-          try {
-            await plugin.onError(actualError, ctx);
-          } catch {
-            // Ignore nested errors during cleanup
+    }).pipe(
+      Effect.catchAll((err) =>
+        Effect.gen(this, function* () {
+          for (const plugin of this.plugins) {
+            if (plugin.onError) {
+              yield* Effect.tryPromise({
+                try: () => plugin.onError!(err as Error, ctx),
+                catch: () => {}, // Ignore nested errors during cleanup
+              }).pipe(Effect.ignore);
+            }
           }
-        }
-      }
-      throw error;
+          return yield* Effect.fail(err);
+        }),
+      ),
+    );
+
+    const exit = await Effect.runPromiseExit(effect);
+    if (exit._tag === "Failure") {
+      throw (exit.cause as any).errors?.[0] || (exit.cause as any).failure || exit.cause;
     }
   }
 }

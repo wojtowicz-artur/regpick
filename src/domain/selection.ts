@@ -1,5 +1,5 @@
+import { Either } from "effect";
 import { appError, type AppError } from "@/core/errors.js";
-import { err, ok, type Result } from "@/core/result.js";
 import type { CommandContext, RegistryItem } from "@/types.js";
 
 export function parseSelectedNames(rawSelectFlag: string | boolean | undefined): string[] {
@@ -31,20 +31,22 @@ export function filterItemsByQuery(items: RegistryItem[], query: string): Regist
 export function selectItemsFromFlags(
   items: RegistryItem[],
   context: CommandContext,
-): Result<RegistryItem[] | null, AppError> {
+): Either.Either<RegistryItem[] | null, AppError> {
   const { flags } = context.args;
   const explicit = parseSelectedNames(flags.select);
   if (flags.all) {
-    return ok(items);
+    return Either.right(items);
   }
 
   if (explicit.length) {
     const selected = items.filter((item) => explicit.includes(item.name));
     if (!selected.length) {
-      return err(appError("ValidationError", `No items matched --select=${String(flags.select)}`));
+      return Either.left(
+        appError("ValidationError", `No items matched --select=${String(flags.select)}`),
+      );
     }
-    return ok(selected);
+    return Either.right(selected);
   }
 
-  return ok(null);
+  return Either.right(null);
 }

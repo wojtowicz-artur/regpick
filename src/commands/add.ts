@@ -1,6 +1,5 @@
 import { appError, type AppError } from "@/core/errors.js";
 import { PipelineRenderer } from "@/core/pipeline.js";
-import { err, ok, type Result } from "@/core/result.js";
 import { MemoryVFS } from "@/core/vfs.js";
 import { buildInstallPlan, resolveRegistryDependencies } from "@/domain/addPlan.js";
 import { applyAliases } from "@/domain/aliasCore.js";
@@ -19,6 +18,7 @@ import type {
   RegpickConfig,
   RegpickPlugin,
 } from "@/types.js";
+import { Effect, Either } from "effect";
 
 type AddPlanInteractionState = {
   selectedItems: RegistryItem[];
@@ -49,17 +49,17 @@ type HydratedAddPlan = ApprovedAddPlan & {
  * Pure query phase.
  *
  * @param context - Command context.
- * @returns Result with configuration and path.
+ * @returns Either with configuration and path.
  */
 async function queryLoadConfiguration(
   context: CommandContext,
-): Promise<Result<{ config: RegpickConfig; configPath: string }, AppError>> {
+): Promise<Either.Either<{ config: RegpickConfig; configPath: string }, AppError>> {
   const result = await readConfig(context.cwd);
   if (!result.configPath) {
     context.runtime.prompt.error("No regpick.json configuration found. Please run 'init' first.");
-    return err(appError("ValidationError", "No config file found"));
+    return Either.left(appError("ValidationError", "No config file found"));
   }
-  return ok(result as { config: RegpickConfig; configPath: string });
+  return Either.right(result as { config: RegpickConfig; configPath: string });
 }
 
 /**
@@ -67,17 +67,17 @@ async function queryLoadConfiguration(
  *
  * @param context - Command context.
  * @param config - Application configuration.
- * @returns Result with the registry source string.
+ * @returns Either with the registry source string.
  */
 async function queryResolveRegistrySource(
   context: CommandContext,
   config: RegpickConfig,
-): Promise<Result<string | null, AppError>> {
+): Promise<Either.Either<string | null, AppError>> {
   const sourcePosIdx = context.args.positionals[0] === "add" ? 1 : 0;
   const argValue = context.args.positionals[sourcePosIdx];
 
   if (argValue) {
-    return ok(resolveRegistrySource(argValue, config));
+    return Either.right(resolveRegistrySource(argValue, config));
   }
 
   const aliases = Object.entries(config.registry?.sources || {} || {}).map(([alias, value]) => ({
@@ -86,32 +86,36 @@ async function queryResolveRegistrySource(
   }));
 
   if (aliases.length) {
-    const picked = await context.runtime.prompt.multiselect({
-      message: "Pick registry alias (or cancel and provide URL/path manually)",
-      options: aliases,
-      maxItems: 1,
-      required: false,
-    });
+    const picked = await Effect.runPromise(
+      context.runtime.prompt.multiselect({
+        message: "Pick registry alias (or cancel and provide URL/path manually)",
+        options: aliases,
+        maxItems: 1,
+        required: false,
+      }),
+    );
 
-    if (await context.runtime.prompt.isCancel(picked)) {
-      return err(appError("UserCancelled", "Operation cancelled."));
+    if (await Effect.runPromise(context.runtime.prompt.isCancel(picked))) {
+      return Either.left(appError("UserCancelled", "Operation cancelled."));
     }
 
     if (Array.isArray(picked) && picked.length > 0) {
-      return ok(resolveRegistrySource(String(picked[0]), config));
+      return Either.right(resolveRegistrySource(String(picked[0]), config));
     }
   }
 
-  const manual = await context.runtime.prompt.text({
-    message: "Registry URL/path:",
-    placeholder: "https://example.com/registry.json",
-  });
+  const manual = await Effect.runPromise(
+    context.runtime.prompt.text({
+      message: "Registry URL/path:",
+      placeholder: "https://example.com/registry.json",
+    }),
+  );
 
-  if (await context.runtime.prompt.isCancel(manual)) {
-    return err(appError("UserCancelled", "Operation cancelled."));
+  if (await Effect.runPromise(context.runtime.prompt.isCancel(manual))) {
+    return Either.left(appError("UserCancelled", "Operation cancelled."));
   }
 
-  return ok(String(manual));
+  return Either.right(String(manual));
 }
 
 interface QueryItemsResult {
@@ -124,23 +128,23 @@ interface QueryItemsResult {
  *
  * @param context - Command context.
  * @param source - Registry HTTP URL or local path.
- * @returns Result containing selected items and missing dependencies.
+ * @returns Either containing selected items and missing dependencies.
  */
 async function queryRegistryItemsToProcess(
   context: CommandContext,
   source: string,
   plugins: RegpickPlugin[],
-): Promise<Result<QueryItemsResult, AppError>> {
+): Promise<Either.Either<QueryItemsResult, AppError>> {
   const sourcePosIdx = context.args.positionals[0] === "add" ? 1 : 0;
   const itemPosIdx = sourcePosIdx + 1;
 
   const registryResult = await loadRegistry(source, context.cwd, context.runtime, plugins);
-  if (!registryResult.ok) return registryResult;
+  if (Either.isLeft(registryResult)) return Either.left(registryResult.left);
 
-  const { items } = registryResult.value;
+  const { items } = registryResult.right;
   if (!items.length) {
     context.runtime.prompt.warn("No installable items in registry.");
-    return err(appError("ValidationError", "No installable items in registry."));
+    return Either.left(appError("ValidationError", "No installable items in registry."));
   }
 
   const itemName = context.args.positionals[itemPosIdx];
@@ -151,24 +155,26 @@ async function queryRegistryItemsToProcess(
   const preselected = selectItemsFromFlags(items, context);
   let selectedItems: RegistryItem[];
 
-  if (preselected.ok && preselected.value) {
-    selectedItems = preselected.value;
-  } else if (!preselected.ok) {
-    return err(preselected.error);
+  if (Either.isRight(preselected) && preselected.right) {
+    selectedItems = preselected.right;
+  } else if (Either.isLeft(preselected)) {
+    return Either.left(preselected.left);
   } else {
-    const selectedNames = await context.runtime.prompt.autocompleteMultiselect({
-      message: "Select items to install",
-      options: items.map((item) => ({
-        value: item.name,
-        label: `${item.name} (${item.type || "registry:file"})`,
-        hint: item.description || `${item.files.length} file(s)`,
-      })),
-      maxItems: 10,
-      required: true,
-    });
+    const selectedNames = await Effect.runPromise(
+      context.runtime.prompt.autocompleteMultiselect({
+        message: "Select items to install",
+        options: items.map((item) => ({
+          value: item.name,
+          label: `${item.name} (${item.type || "registry:file"})`,
+          hint: item.description || `${item.files.length} file(s)`,
+        })),
+        maxItems: 10,
+        required: true,
+      }),
+    );
 
-    if (await context.runtime.prompt.isCancel(selectedNames)) {
-      return err(appError("UserCancelled", "Operation cancelled."));
+    if (await Effect.runPromise(context.runtime.prompt.isCancel(selectedNames))) {
+      return Either.left(appError("UserCancelled", "Operation cancelled."));
     }
 
     const selectedSet = new Set((Array.isArray(selectedNames) ? selectedNames : []).map(String));
@@ -177,7 +183,7 @@ async function queryRegistryItemsToProcess(
 
   if (!selectedItems.length) {
     context.runtime.prompt.warn("No items selected.");
-    return err(appError("ValidationError", "No items selected."));
+    return Either.left(appError("ValidationError", "No items selected."));
   }
 
   const { resolvedItems, missingDependencies: missingRegistryDeps } = resolveRegistryDependencies(
@@ -185,7 +191,7 @@ async function queryRegistryItemsToProcess(
     items,
   );
 
-  return ok({ selectedItems: resolvedItems, missingRegistryDeps });
+  return Either.right({ selectedItems: resolvedItems, missingRegistryDeps });
 }
 
 /**
@@ -194,26 +200,26 @@ async function queryRegistryItemsToProcess(
  * @param context - Command context.
  * @param config - Application configuration.
  * @param selectedItems - Registry items to install.
- * @returns Result with interaction state payload.
+ * @returns Either with interaction state payload.
  */
 async function queryInstallPlanState(
   context: CommandContext,
   config: RegpickConfig,
   selectedItems: RegistryItem[],
-): Promise<Result<AddPlanInteractionState, AppError>> {
+): Promise<Either.Either<AddPlanInteractionState, AppError>> {
   const installPlanProbeRes = buildInstallPlan(selectedItems, context.cwd, config);
-  if (!installPlanProbeRes.ok) return err(installPlanProbeRes.error);
+  if (Either.isLeft(installPlanProbeRes)) return Either.left(installPlanProbeRes.left);
 
   const existingTargets = new Set<string>();
-  const probeWrites = installPlanProbeRes.value.plannedWrites;
+  const probeWrites = installPlanProbeRes.right.plannedWrites;
 
   for (const write of probeWrites) {
-    const exists = await context.runtime.fs.pathExists(write.absoluteTarget);
+    const exists = await Effect.runPromise(context.runtime.fs.pathExists(write.absoluteTarget));
     if (exists) existingTargets.add(write.absoluteTarget);
   }
 
   const finalInstallPlanRes = buildInstallPlan(selectedItems, context.cwd, config, existingTargets);
-  if (!finalInstallPlanRes.ok) return err(finalInstallPlanRes.error);
+  if (Either.isLeft(finalInstallPlanRes)) return Either.left(finalInstallPlanRes.left);
 
   const { missingDependencies, missingDevDependencies } = collectMissingDependencies(
     selectedItems,
@@ -221,11 +227,11 @@ async function queryInstallPlanState(
     context.runtime,
   );
 
-  return ok({
+  return Either.right({
     selectedItems,
     missingDependencies,
     missingDevDependencies,
-    plannedWrites: finalInstallPlanRes.value.plannedWrites,
+    plannedWrites: finalInstallPlanRes.right.plannedWrites,
     existingTargets,
   });
 }
@@ -237,23 +243,25 @@ async function queryInstallPlanState(
  * @param context - Command context.
  * @param config - Application configuration.
  * @param state - The current pre-calculated installation state.
- * @returns Result with an approved action plan.
+ * @returns Either with an approved action plan.
  */
 async function interactApprovalPhase(
   context: CommandContext,
   config: RegpickConfig,
   state: AddPlanInteractionState,
-): Promise<Result<ApprovedAddPlan, AppError>> {
+): Promise<Either.Either<ApprovedAddPlan, AppError>> {
   const assumeYes = Boolean(context.args.flags.yes);
 
   // 1. Confirm overall installation
   if (!assumeYes) {
-    const proceed = await context.runtime.prompt.confirm({
-      message: `Install ${state.selectedItems.length} item(s)?`,
-      initialValue: true,
-    });
-    if ((await context.runtime.prompt.isCancel(proceed)) || !proceed) {
-      return err(appError("UserCancelled", "Operation cancelled."));
+    const proceed = await Effect.runPromise(
+      context.runtime.prompt.confirm({
+        message: `Install ${state.selectedItems.length} item(s)?`,
+        initialValue: true,
+      }),
+    );
+    if ((await Effect.runPromise(context.runtime.prompt.isCancel(proceed))) || !proceed) {
+      return Either.left(appError("UserCancelled", "Operation cancelled."));
     }
   }
 
@@ -266,17 +274,22 @@ async function interactApprovalPhase(
       } else if ((config.install?.overwritePolicy || "prompt") === "skip") {
         context.runtime.prompt.warn(`Skipped existing file: ${write.absoluteTarget}`);
       } else {
-        const answer = await context.runtime.prompt.select({
-          message: `File exists: ${write.absoluteTarget}`,
-          options: [
-            { value: "overwrite", label: "Overwrite this file" },
-            { value: "skip", label: "Skip this file" },
-            { value: "abort", label: "Abort installation" },
-          ],
-        });
+        const answer = await Effect.runPromise(
+          context.runtime.prompt.select({
+            message: `File exists: ${write.absoluteTarget}`,
+            options: [
+              { value: "overwrite", label: "Overwrite this file" },
+              { value: "skip", label: "Skip this file" },
+              { value: "abort", label: "Abort installation" },
+            ],
+          }),
+        );
 
-        if ((await context.runtime.prompt.isCancel(answer)) || answer === "abort") {
-          return err(appError("UserCancelled", "Installation aborted by user."));
+        if (
+          (await Effect.runPromise(context.runtime.prompt.isCancel(answer))) ||
+          answer === "abort"
+        ) {
+          return Either.left(appError("UserCancelled", "Installation aborted by user."));
         }
         if (answer === "overwrite") finalWrites.push(write);
       }
@@ -302,13 +315,15 @@ async function interactApprovalPhase(
       if (state.missingDevDependencies.length)
         msgParts.push(`devDependencies: ${state.missingDevDependencies.join(", ")}`);
 
-      const proceedDep = await context.runtime.prompt.confirm({
-        message: `Install missing packages with ${pm}? (${msgParts.join(" | ")})`,
-        initialValue: true,
-      });
+      const proceedDep = await Effect.runPromise(
+        context.runtime.prompt.confirm({
+          message: `Install missing packages with ${pm}? (${msgParts.join(" | ")})`,
+          initialValue: true,
+        }),
+      );
 
-      if (await context.runtime.prompt.isCancel(proceedDep)) {
-        return err(appError("UserCancelled", "Dependency installation cancelled by user."));
+      if (await Effect.runPromise(context.runtime.prompt.isCancel(proceedDep))) {
+        return Either.left(appError("UserCancelled", "Dependency installation cancelled by user."));
       }
       shouldInstallDeps = Boolean(proceedDep);
       if (!shouldInstallDeps) {
@@ -317,7 +332,7 @@ async function interactApprovalPhase(
     }
   }
 
-  return ok({
+  return Either.right({
     selectedItems: state.selectedItems,
     shouldInstallDeps,
     finalWrites,
@@ -335,14 +350,14 @@ async function interactApprovalPhase(
  * @param context - Command context.
  * @param config - Application configuration.
  * @param approved - The user-approved installation plan.
- * @returns Result with hydrated payload containing raw file texts.
+ * @returns Either with hydrated payload containing raw file texts.
  */
 async function queryHydrateContents(
   context: CommandContext,
   config: RegpickConfig,
   approved: ApprovedAddPlan,
   plugins: RegpickPlugin[],
-): Promise<Result<HydratedAddPlan, AppError>> {
+): Promise<Either.Either<HydratedAddPlan, AppError>> {
   const hydratedWrites = [];
 
   for (const write of approved.finalWrites) {
@@ -356,9 +371,9 @@ async function queryHydrateContents(
       context.runtime,
       plugins,
     );
-    if (!contentResult.ok) return err(contentResult.error);
+    if (Either.isLeft(contentResult)) return Either.left(contentResult.left);
 
-    const finalContent = applyAliases(contentResult.value, config);
+    const finalContent = applyAliases(contentResult.right, config);
 
     hydratedWrites.push({
       absoluteTarget: write.absoluteTarget,
@@ -367,55 +382,55 @@ async function queryHydrateContents(
     });
   }
 
-  return ok({ ...approved, hydratedWrites });
+  return Either.right({ ...approved, hydratedWrites });
 }
 
 export async function runAddCommand(
   context: CommandContext,
-): Promise<Result<CommandOutcome, AppError>> {
+): Promise<Either.Either<CommandOutcome, AppError>> {
   const configQ = await queryLoadConfiguration(context);
-  if (!configQ.ok) return err(configQ.error);
+  if (Either.isLeft(configQ)) return Either.left(configQ.left);
 
-  const sourceQ = await queryResolveRegistrySource(context, configQ.value.config);
-  if (!sourceQ.ok) return err(sourceQ.error);
-  if (!sourceQ.value) return ok({ kind: "noop", message: "No source provided." });
+  const sourceQ = await queryResolveRegistrySource(context, configQ.right.config);
+  if (Either.isLeft(sourceQ)) return Either.left(sourceQ.left);
+  if (!sourceQ.right) return Either.right({ kind: "noop", message: "No source provided." });
 
-  const customPlugins = await loadPlugins(configQ.value.config.plugins || [], context.cwd);
+  const customPlugins = await loadPlugins(configQ.right.config.plugins || [], context.cwd);
   const plugins = [...customPlugins, HttpPlugin(), FilePlugin(), DirectoryPlugin()];
 
-  const itemsQ = await queryRegistryItemsToProcess(context, sourceQ.value, plugins);
-  if (!itemsQ.ok) return err(itemsQ.error);
+  const itemsQ = await queryRegistryItemsToProcess(context, sourceQ.right, plugins);
+  if (Either.isLeft(itemsQ)) return Either.left(itemsQ.left);
 
-  for (const depName of itemsQ.value.missingRegistryDeps) {
+  for (const depName of itemsQ.right.missingRegistryDeps) {
     context.runtime.prompt.warn(`Registry dependency "${depName}" not found in current registry.`);
   }
 
   const planStateQ = await queryInstallPlanState(
     context,
-    configQ.value.config,
-    itemsQ.value.selectedItems,
+    configQ.right.config,
+    itemsQ.right.selectedItems,
   );
-  if (!planStateQ.ok) return err(planStateQ.error);
+  if (Either.isLeft(planStateQ)) return Either.left(planStateQ.left);
 
-  const approvedPlan = await interactApprovalPhase(context, configQ.value.config, planStateQ.value);
-  if (!approvedPlan.ok) return err(approvedPlan.error);
+  const approvedPlan = await interactApprovalPhase(context, configQ.right.config, planStateQ.right);
+  if (Either.isLeft(approvedPlan)) return Either.left(approvedPlan.left);
 
   const hydratedPlan = await queryHydrateContents(
     context,
-    configQ.value.config,
-    approvedPlan.value,
+    configQ.right.config,
+    approvedPlan.right,
     plugins,
   );
-  if (!hydratedPlan.ok) return err(hydratedPlan.error);
+  if (Either.isLeft(hydratedPlan)) return Either.left(hydratedPlan.left);
 
-  const vfsFiles = hydratedPlan.value.hydratedWrites.map((write) => ({
+  const vfsFiles = hydratedPlan.right.hydratedWrites.map((write) => ({
     id: write.absoluteTarget,
     code: write.finalContent,
   }));
 
   const installedItemsInfo: RegistryItem[] = [];
-  for (const write of hydratedPlan.value.hydratedWrites) {
-    const originalItem = hydratedPlan.value.selectedItems.find((i) => i.name === write.itemName);
+  for (const write of hydratedPlan.right.hydratedWrites) {
+    const originalItem = hydratedPlan.right.selectedItems.find((i) => i.name === write.itemName);
     if (originalItem && !installedItemsInfo.some((i) => i.name === originalItem.name)) {
       installedItemsInfo.push(originalItem);
     }
@@ -423,13 +438,13 @@ export async function runAddCommand(
 
   const vfs = new MemoryVFS();
 
-  const userPlugins = configQ.value.config.plugins?.filter((p) => typeof p === "object") || [];
+  const userPlugins = configQ.right.config.plugins?.filter((p) => typeof p === "object") || [];
 
   const pipeline = new PipelineRenderer([
     ...(userPlugins as import("../core/pipeline.js").Plugin[]),
     coreAddPlugin(
-      hydratedPlan.value.dependencyPlan,
-      configQ.value.config,
+      hydratedPlan.right.dependencyPlan,
+      configQ.right.config,
       context.runtime,
       installedItemsInfo,
     ) as import("../core/pipeline.js").Plugin,
@@ -440,14 +455,14 @@ export async function runAddCommand(
   } catch (error) {
     vfs.rollback();
     context.runtime.prompt.error(`[Failed] Installation aborted: ${error}`);
-    return err(appError("RuntimeError", String(error)));
+    return Either.left(appError("RuntimeError", String(error)));
   }
 
   context.runtime.prompt.info(
-    `Installed ${hydratedPlan.value.selectedItems.length} item(s), wrote ${hydratedPlan.value.hydratedWrites.length} file(s).`,
+    `Installed ${hydratedPlan.right.selectedItems.length} item(s), wrote ${hydratedPlan.right.hydratedWrites.length} file(s).`,
   );
-  return ok({
+  return Either.right({
     kind: "success",
-    message: `Installed ${hydratedPlan.value.selectedItems.length} item(s), wrote ${hydratedPlan.value.hydratedWrites.length} file(s).`,
+    message: `Installed ${hydratedPlan.right.selectedItems.length} item(s), wrote ${hydratedPlan.right.hydratedWrites.length} file(s).`,
   });
 }

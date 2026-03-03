@@ -1,3 +1,4 @@
+import { Either } from "effect";
 import { type PersistableVFS, type PipelineContext, type Plugin } from "@/core/pipeline.js";
 import { installDependencies } from "@/shell/installer.js";
 import { readLockfile, writeLockfile } from "@/shell/lockfile.js";
@@ -42,8 +43,8 @@ export function coreAddPlugin(
           config,
         );
 
-        if (!result.ok) {
-          throw new Error(`Failed to install dependencies: ${result.error.message}`);
+        if (Either.isLeft(result)) {
+          throw new Error(`Failed to install dependencies: ${result.left.message}`);
         }
       }
 

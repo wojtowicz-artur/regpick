@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import type { PluginContext, RegpickPlugin } from "@/types.js";
 
 export function HttpPlugin(): RegpickPlugin {
@@ -20,13 +21,11 @@ export function HttpPlugin(): RegpickPlugin {
       if (!id.startsWith("http://") && !id.startsWith("https://")) return null;
       if (!ctx) return null;
 
-      const res = await ctx.runtime.http.getText(id);
-      if (!res || !res.ok) throw res?.error || new Error("Failed");
-
+      const res = await Effect.runPromise(ctx.runtime.http.getText(id));
       try {
-        return JSON.parse(res.value);
+        return JSON.parse(res);
       } catch {
-        return res.value;
+        return res;
       }
     },
   };
