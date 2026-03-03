@@ -1,7 +1,7 @@
 import type { AppError } from "@/core/errors.js";
-import { ok, type Result } from "@/core/result.js";
 import { resolveOutputPathFromPolicy } from "@/domain/pathPolicy.js";
 import type { InstallPlan, PlannedWrite, RegistryItem, RegpickConfig } from "@/types.js";
+import { Either } from "effect";
 
 function unique(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))];
@@ -51,16 +51,16 @@ export function buildInstallPlan(
   cwd: string,
   config: RegpickConfig,
   existingTargets: Set<string> = new Set(),
-): Result<InstallPlan, AppError> {
+): Either.Either<InstallPlan, AppError> {
   const plannedWrites: PlannedWrite[] = [];
   const conflicts: PlannedWrite[] = [];
 
   for (const item of selectedItems) {
     for (const file of item.files) {
       const outputRes = resolveOutputPathFromPolicy(item, file, cwd, config);
-      if (!outputRes.ok) return outputRes;
+      if (Either.isLeft(outputRes)) return Either.left(outputRes.left);
 
-      const { absoluteTarget, relativeTarget } = outputRes.value;
+      const { absoluteTarget, relativeTarget } = outputRes.right;
       const planned: PlannedWrite = {
         itemName: item.name,
         sourceFile: file,
@@ -74,7 +74,7 @@ export function buildInstallPlan(
     }
   }
 
-  return ok({
+  return Either.right({
     selectedItems,
     plannedWrites,
     dependencyPlan: buildDependencyPlan(selectedItems),

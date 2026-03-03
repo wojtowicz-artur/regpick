@@ -2,7 +2,7 @@ import mockRegistry from "@/__tests__/fixtures/shadcn-registry.json" with { type
 import { createMockHttp, createMockPrompt } from "@/__tests__/helpers/integration.js";
 import { runAddCommand } from "@/commands/add.js";
 import { createRuntimePorts, type RuntimePorts } from "@/shell/runtime/ports.js";
-import { Effect } from "effect";
+import { Effect, Either } from "effect";
 import * as fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
@@ -68,8 +68,8 @@ describe("add integration with shadcn compatibility", () => {
     });
 
     // 4. Assertions
-    if (!result.ok) console.log(result.error);
-    expect(result.ok).toBe(true);
+    if (Either.isLeft(result)) console.log(result.left);
+    expect(Either.isRight(result)).toBe(true);
 
     // Verify file existence in real FS
     const targetPath = path.join(testDir, "components/ui/button.tsx");
@@ -130,8 +130,8 @@ describe("add integration with shadcn compatibility", () => {
     });
 
     // 3. Assertions
-    if (!result.ok) console.log(result.error);
-    expect(result.ok).toBe(true);
+    if (Either.isLeft(result)) console.log(result.left);
+    expect(Either.isRight(result)).toBe(true);
     // Verify BOTH files were installed
     const cardPath = path.join(testDir, "components/ui/card.tsx");
     const buttonPath = path.join(testDir, "components/ui/button.tsx");
@@ -196,9 +196,9 @@ describe("add integration with shadcn compatibility", () => {
       },
     });
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toMatchObject({
+    expect(Either.isRight(result)).toBe(false);
+    if (Either.isLeft(result)) {
+      expect(result.left).toMatchObject({
         kind: "UserCancelled",
         message: expect.stringContaining("Dependency installation cancelled"),
       });
@@ -218,9 +218,9 @@ describe("add integration with shadcn compatibility", () => {
       },
     });
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toMatchObject({
+    expect(Either.isRight(result)).toBe(false);
+    if (Either.isLeft(result)) {
+      expect(result.left).toMatchObject({
         kind: "ValidationError",
         message: "No config file found",
       });
@@ -250,10 +250,10 @@ describe("add integration with shadcn compatibility", () => {
       },
     });
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error.kind).toBe("RegistryError");
-      expect(result.error.message).toContain("HTTP error! status: 500");
+    expect(Either.isRight(result)).toBe(false);
+    if (Either.isLeft(result)) {
+      expect(result.left.kind).toBe("RegistryError");
+      expect(result.left.message).toContain("HTTP error! status: 500");
     }
   });
 
@@ -287,9 +287,9 @@ describe("add integration with shadcn compatibility", () => {
       },
     });
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error.kind).toBe("RuntimeError");
+    expect(Either.isRight(result)).toBe(false);
+    if (Either.isLeft(result)) {
+      expect(result.left.kind).toBe("RuntimeError");
     }
 
     // Restore permissions so cleanup works
@@ -317,10 +317,10 @@ describe("add integration with shadcn compatibility", () => {
       },
     });
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error.kind).toBe("RegistryError");
-      expect(result.error.message).toContain("Unsupported manifest structure");
+    expect(Either.isRight(result)).toBe(false);
+    if (Either.isLeft(result)) {
+      expect(result.left.kind).toBe("RegistryError");
+      expect(result.left.message).toContain("Unsupported manifest structure");
     }
   });
 });

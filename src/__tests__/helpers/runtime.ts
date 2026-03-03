@@ -1,6 +1,5 @@
-import { Context, Effect } from "effect";
-import { err, ok } from "@/core/result.js";
 import { type RuntimePorts, HttpPort } from "@/shell/runtime/ports.js";
+import { Context, Effect } from "effect";
 import * as path from "path";
 import { type Mock, vi } from "vitest";
 
@@ -99,4 +98,3 @@ export function createMockRuntime(initialFiles: Record<string, string> = {}): {
 
   return { runtime, fs: fileSystem, mockHttp };
 }
-export { err, ok };

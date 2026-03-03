@@ -1,3 +1,4 @@
+import { Either } from "effect";
 import { AppError, appError } from "@/core/errors.js";
 import { Context, Effect } from "effect";
 import { spawnSync } from "node:child_process";

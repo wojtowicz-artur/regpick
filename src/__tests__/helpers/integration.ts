@@ -33,8 +33,8 @@ export const createMockPrompt = (): {
   select: vi.fn().mockImplementation((options: any) => Effect.succeed(options.options[0].value)),
   multiselect: vi
     .fn()
-    .mockImplementation((options: any) => Effect.succeed(options.options.map((o: any) => o.value))),
+    .mockImplementation((options: any) => Effect.succeed(options.options.map((o: any) => o.right))),
   autocompleteMultiselect: vi
     .fn()
-    .mockImplementation((options: any) => Effect.succeed(options.options.map((o: any) => o.value))),
+    .mockImplementation((options: any) => Effect.succeed(options.options.map((o: any) => o.right))),
 });

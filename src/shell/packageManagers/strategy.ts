@@ -1,3 +1,4 @@
+import { Either } from "effect";
 import type { InstallCommand, PackageManagerPlugin, RegpickConfig } from "@/types.js";
 import path from "node:path";
 

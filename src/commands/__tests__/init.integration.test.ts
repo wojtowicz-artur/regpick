@@ -1,7 +1,7 @@
 import { createMockPrompt } from "@/__tests__/helpers/integration.js";
 import { runInitCommand } from "@/commands/init.js";
 import { createRuntimePorts, type RuntimePorts } from "@/shell/runtime/ports.js";
-import { Effect } from "effect";
+import { Effect, Either } from "effect";
 import * as fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
@@ -46,7 +46,7 @@ describe("init integration", () => {
     });
 
     // 3. Assertions
-    expect(result.ok).toBe(true);
+    expect(Either.isRight(result)).toBe(true);
 
     // Check if config file was created
     const configPath = path.join(testDir, "regpick.config.mjs");
@@ -71,7 +71,7 @@ describe("init integration", () => {
       args: { flags: { yes: true }, positionals: [] },
     });
 
-    expect(result.ok).toBe(true);
+    expect(Either.isRight(result)).toBe(true);
     const configPath = path.join(testDir, "regpick.config.mjs");
     const exists = await fs
       .access(configPath)
@@ -93,9 +93,9 @@ describe("init integration", () => {
       args: { flags: { yes: false }, positionals: [] },
     });
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toMatchObject({ kind: "UserCancelled" });
+    expect(Either.isRight(result)).toBe(false);
+    if (Either.isLeft(result)) {
+      expect(result.left).toMatchObject({ kind: "UserCancelled" });
     }
 
     // Check that config file was NOT created
@@ -121,7 +121,7 @@ describe("init integration", () => {
       args: { flags: { yes: false }, positionals: [] },
     });
 
-    expect(result.ok).toBe(true);
+    expect(Either.isRight(result)).toBe(true);
 
     const configPath = path.join(testDir, "regpick.config.mjs");
     const configContent = await fs.readFile(configPath, "utf8");
@@ -142,10 +142,10 @@ describe("init integration", () => {
       args: { flags: { yes: true }, positionals: [] },
     });
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toMatchObject({ kind: "RuntimeError" });
-      expect(result.error.message).toContain("Failed to write file");
+    expect(Either.isRight(result)).toBe(false);
+    if (Either.isLeft(result)) {
+      expect(result.left).toMatchObject({ kind: "RuntimeError" });
+      expect(result.left.message).toContain("Failed to write file");
     }
 
     expect(mockPrompt.error).toHaveBeenCalledWith(

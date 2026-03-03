@@ -1,8 +1,8 @@
+import { Either } from "effect";
 import { Effect, Schema as S } from "effect";
 import path from "node:path";
 
 import { appError, type AppError } from "@/core/errors.js";
-import { err, ok, type Result } from "@/core/result.js";
 import { getPackageManagerPlugin } from "@/shell/packageManagers/strategy.js";
 import type { RuntimePorts } from "@/shell/runtime/ports.js";
 import type { RegistryItem, RegpickConfig } from "@/types.js";
@@ -67,20 +67,20 @@ export function installDependencies(
   devDependencies: string[],
   runtime: RuntimePorts,
   config: RegpickConfig,
-): Result<void, AppError> {
+): Either.Either<void, AppError> {
   if (!dependencies.length && !devDependencies.length) {
-    return ok(undefined);
+    return Either.right(undefined);
   }
 
   const strategy = getPackageManagerPlugin(packageManager, config);
   if (!strategy) {
-    return err(appError("InstallError", `Unknown package manager: ${packageManager}`));
+    return Either.left(appError("InstallError", `Unknown package manager: ${packageManager}`));
   }
   const commands = strategy.buildInstallCommands(dependencies, devDependencies);
   for (const command of commands) {
     const result = runtime.process.run(command.command, command.args, cwd);
     if (result.status !== 0) {
-      return err(
+      return Either.left(
         appError(
           "InstallError",
           `Dependency install failed: ${command.command} ${command.args.join(" ")}`,
@@ -88,5 +88,5 @@ export function installDependencies(
       );
     }
   }
-  return ok(undefined);
+  return Either.right(undefined);
 }

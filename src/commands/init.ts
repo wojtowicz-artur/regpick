@@ -1,5 +1,4 @@
 import { appError, type AppError } from "@/core/errors.js";
-import { err, ok, type Result } from "@/core/result.js";
 import { decideInitAfterOverwritePrompt } from "@/domain/initCore.js";
 import {
   generateConfigCode,
@@ -8,7 +7,7 @@ import {
   resolveTargetConfigPath,
 } from "@/shell/config.js";
 import type { CommandContext, CommandOutcome, RegpickConfig } from "@/types.js";
-import { Effect, Schema as S } from "effect";
+import { Effect, Either, Schema as S } from "effect";
 import path from "node:path";
 
 type InitQueryState = {
@@ -172,7 +171,7 @@ const runInitCommandEff = (context: CommandContext) =>
 
 export async function runInitCommand(
   context: CommandContext,
-): Promise<Result<CommandOutcome, AppError>> {
+): Promise<Either.Either<CommandOutcome, AppError>> {
   const res = await Effect.runPromise(Effect.either(runInitCommandEff(context)));
-  return res._tag === "Right" ? ok(res.right) : err(res.left);
+  return res._tag === "Right" ? Either.right(res.right) : Either.left(res.left);
 }

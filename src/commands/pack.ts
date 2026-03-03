@@ -1,8 +1,7 @@
 import { appError, type AppError } from "@/core/errors.js";
-import { err, ok, type Result } from "@/core/result.js";
 import { buildRegistryItemFromFile } from "@/domain/packCore.js";
 import type { CommandContext, CommandOutcome, RegistryItem } from "@/types.js";
-import { Effect } from "effect";
+import { Effect, Either } from "effect";
 import path from "node:path";
 
 type PackQueryState = {
@@ -162,7 +161,9 @@ function runPackCommandEff(context: CommandContext): Effect.Effect<CommandOutcom
 
 export async function runPackCommand(
   context: CommandContext,
-): Promise<Result<CommandOutcome, AppError>> {
+): Promise<Either.Either<CommandOutcome, AppError>> {
   const res = await Effect.runPromise(Effect.either(runPackCommandEff(context)));
-  return res._tag === "Right" ? ok(res.right as CommandOutcome) : err(res.left as AppError);
+  return res._tag === "Right"
+    ? Either.right(res.right as CommandOutcome)
+    : Either.left(res.left as AppError);
 }
