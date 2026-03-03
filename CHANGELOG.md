@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.16.0](https://github.com/wojtowicz-artur/regpick/compare/v0.15.0...v0.16.0) (2026-03-03)
+
+### Features
+
+* enhance flushToDisk method to handle directory creation and error reporting ([3849e65](https://github.com/wojtowicz-artur/regpick/commit/3849e658291032ecc35d4ed3e2e9d0c7203fb24a))
+
 ## [0.15.0](https://github.com/wojtowicz-artur/regpick/compare/v0.14.0...v0.15.0) (2026-03-03)
 
 ### Features
