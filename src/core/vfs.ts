@@ -64,21 +64,45 @@ export class MemoryVFS implements PersistableVFS {
    */
   async flushToDisk(): Promise<void> {
     const files = this.memory.toJSON();
-    const writePromises = Object.entries(files).map(async ([filePath, content]) => {
-      if (content !== null) {
-        // We write to real FS using the system's path semantics, but read from VFS
-        // using the normPath we get natively from iterating memfs
-        // Although toJSON might give POSIX paths anyway, we pass the raw system filePath
-        const realTargetPath = path.normalize(filePath);
-        await fs.mkdir(path.dirname(realTargetPath), { recursive: true });
+    const entries = Object.entries(files).filter(([_, content]) => content !== null);
 
+    if (entries.length === 0) return;
+
+    // 1. Gather unique directories to create
+    const dirsToCreate = new Set<string>();
+    for (const [filePath] of entries) {
+      const realTargetPath = path.normalize(filePath);
+      dirsToCreate.add(path.dirname(realTargetPath));
+    }
+
+    // 2. Create directories sequentially to strictly avoid any structural race conditions
+    try {
+      // Sorting ensures predictable path crawling (top-level folders before deeply nested ones)
+      for (const dir of Array.from(dirsToCreate).sort()) {
+        await fs.mkdir(dir, { recursive: true });
+      }
+    } catch (err) {
+      throw new Error(`Failed to create physical filesystem directories during flush: ${err}`);
+    }
+
+    // 3. Dump files safely handling all outcomes via Promise.allSettled
+    const writeResults = await Promise.allSettled(
+      entries.map(async ([filePath]) => {
+        const realTargetPath = path.normalize(filePath);
         // Read raw buffer from memfs to avoid encoding corruptions
         const raw = this.memory.readFileSync(filePath);
         await fs.writeFile(realTargetPath, raw as Buffer);
-      }
-    });
+      }),
+    );
 
-    await Promise.all(writePromises);
+    const failures = writeResults.filter(
+      (res): res is PromiseRejectedResult => res.status === "rejected",
+    );
+
+    if (failures.length > 0) {
+      const errorMessages = failures.map((f) => f.reason?.message || String(f.reason)).join("\n");
+      throw new Error(`flushToDisk failed with ${failures.length} errors:\n${errorMessages}`);
+    }
   }
 
   /**
