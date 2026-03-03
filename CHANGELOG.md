@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.13.0](https://github.com/wojtowicz-artur/regpick/compare/v0.12.0...v0.13.0) (2026-03-03)
+
+### Features
+
+* add registry adapter schema validation and improve adapter loading logic ([4993b4d](https://github.com/wojtowicz-artur/regpick/commit/4993b4d3f5bf7ec22c86083a18a0b9fcea672b61))
+
+### Bug Fixes
+
+* **vfs:** implement onError hooks, strict path normalizing, and support buffers ([7ff3f1f](https://github.com/wojtowicz-artur/regpick/commit/7ff3f1ff767151ff4a7c8d53ae05134901f57dd4))
+
+### Code Refactoring
+
+* format async function parameters and improve comments in VFS and PipelineRenderer ([89162e5](https://github.com/wojtowicz-artur/regpick/commit/89162e561f9e9f581a1091435379feba0cd368fb))
+* remove saga steps and implementing direct file operations ([3cd863f](https://github.com/wojtowicz-artur/regpick/commit/3cd863fa9157b3a860cbcaa7d8efb4c27f7b6e54))
+
 ## [0.12.0](https://github.com/wojtowicz-artur/regpick/compare/v0.11.0...v0.12.0) (2026-03-02)
 
 ### Features
