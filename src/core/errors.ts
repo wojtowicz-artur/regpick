@@ -6,17 +6,23 @@ export type AppErrorKind =
   | "ValidationError"
   | "RuntimeError";
 
-export type AppError = {
-  kind: AppErrorKind;
-  message: string;
-  cause?: unknown;
-};
+import { Data } from "effect";
+
+export class AppError extends Data.TaggedError("AppError")<{
+  readonly kind: AppErrorKind;
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
 
 export function appError(kind: AppErrorKind, message: string, cause?: unknown): AppError {
-  return { kind, message, cause };
+  return new AppError({ kind, message, cause });
 }
 
 export function toAppError(error: unknown, fallbackKind: AppErrorKind = "RuntimeError"): AppError {
+  if (error instanceof AppError) {
+    return error;
+  }
+
   if (
     typeof error === "object" &&
     error !== null &&
@@ -25,7 +31,11 @@ export function toAppError(error: unknown, fallbackKind: AppErrorKind = "Runtime
     typeof (error as { kind?: unknown }).kind === "string" &&
     typeof (error as { message?: unknown }).message === "string"
   ) {
-    return error as AppError;
+    return new AppError({
+      kind: (error as any).kind,
+      message: (error as any).message,
+      cause: (error as any).cause,
+    });
   }
 
   if (error instanceof Error) {

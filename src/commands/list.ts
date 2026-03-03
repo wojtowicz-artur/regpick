@@ -52,12 +52,14 @@ async function interactSourcePhase(
     return ok(state.source);
   }
 
-  const response = await context.runtime.prompt.text({
-    message: "Registry URL/path:",
-    placeholder: "https://example.com/registry.json",
-  });
+  const response = await Effect.runPromise(
+    context.runtime.prompt.text({
+      message: "Registry URL/path:",
+      placeholder: "https://example.com/registry.json",
+    }),
+  );
 
-  if (await context.runtime.prompt.isCancel(response)) {
+  if (await Effect.runPromise(context.runtime.prompt.isCancel(response))) {
     return err(appError("UserCancelled", "Operation cancelled."));
   }
 

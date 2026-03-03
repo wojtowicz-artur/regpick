@@ -1,9 +1,9 @@
-import path from "node:path";
-
 import { appError, type AppError } from "@/core/errors.js";
 import { err, ok, type Result } from "@/core/result.js";
 import { buildRegistryItemFromFile } from "@/domain/packCore.js";
 import type { CommandContext, CommandOutcome, RegistryItem } from "@/types.js";
+import { Effect } from "effect";
+import path from "node:path";
 
 type PackQueryState = {
   targetDir: string;
@@ -23,44 +23,36 @@ type PackGeneratedRegistry = {
  * @param context - Command context.
  * @returns Matched typescript files within the target space.
  */
-async function getFilesRecursive(
+const getFilesRecursive = (
   dir: string,
   context: CommandContext,
-): Promise<Result<string[], AppError>> {
-  const result: string[] = [];
+): Effect.Effect<string[], AppError> =>
+  Effect.gen(function* () {
+    const result: string[] = [];
 
-  async function scan(currentDir: string): Promise<Result<void, AppError>> {
-    const dirRes = await context.runtime.fs.readdir(currentDir);
-    if (!dirRes.ok) return dirRes;
+    const scan = (currentDir: string): Effect.Effect<void, AppError> =>
+      Effect.gen(function* () {
+        const files = yield* context.runtime.fs.readdir(currentDir);
 
-    const fileChecks = await Promise.all(
-      dirRes.value.map(async (file) => {
-        const fullPath = path.join(currentDir, file);
-        const statRes = await context.runtime.fs.stat(fullPath);
-        if (!statRes.ok) return statRes;
+        yield* Effect.forEach(
+          files,
+          (file) =>
+            Effect.gen(function* () {
+              const fullPath = path.join(currentDir, file);
+              const stat = yield* context.runtime.fs.stat(fullPath);
+              if (stat.isDirectory()) {
+                yield* scan(fullPath);
+              } else if (fullPath.endsWith(".ts") || fullPath.endsWith(".tsx")) {
+                result.push(fullPath);
+              }
+            }),
+          { concurrency: 1 },
+        );
+      });
 
-        if (statRes.value.isDirectory()) {
-          const scanRes = await scan(fullPath);
-          if (!scanRes.ok) return scanRes;
-        } else {
-          if (fullPath.endsWith(".ts") || fullPath.endsWith(".tsx")) {
-            result.push(fullPath);
-          }
-        }
-        return ok(undefined);
-      }),
-    );
-
-    for (const check of fileChecks) {
-      if (!check.ok) return check;
-    }
-    return ok(undefined);
-  }
-
-  const scanRes = await scan(dir);
-  if (!scanRes.ok) return err(scanRes.error);
-  return ok(result);
-}
+    yield* scan(dir);
+    return result;
+  });
 
 /**
  * Inspects folder state and evaluates component registry targets available.
@@ -68,25 +60,25 @@ async function getFilesRecursive(
  * @param context - Command context.
  * @returns Verified target scan list paths.
  */
-async function queryPackState(context: CommandContext): Promise<Result<PackQueryState, AppError>> {
-  const targetDirArg = context.args.positionals[1] || ".";
-  const targetDir = path.resolve(context.cwd, targetDirArg);
+const queryPackState = (context: CommandContext): Effect.Effect<PackQueryState, AppError> =>
+  Effect.gen(function* () {
+    const targetDirArg = context.args.positionals[1] || ".";
+    const targetDir = path.resolve(context.cwd, targetDirArg);
 
-  const statRes = await context.runtime.fs.stat(targetDir);
-  if (!statRes.ok || !statRes.value.isDirectory()) {
-    return err(appError("ValidationError", `Target is not a directory: ${targetDir}`));
-  }
+    const stat = yield* context.runtime.fs.stat(targetDir);
+    if (!stat.isDirectory()) {
+      yield* Effect.fail(appError("ValidationError", `Target is not a directory: ${targetDir}`));
+    }
 
-  context.runtime.prompt.info(`Scanning ${targetDir} for components...`);
+    yield* context.runtime.prompt.info(`Scanning ${targetDir} for components...`);
 
-  const filesRes = await getFilesRecursive(targetDir, context);
-  if (!filesRes.ok) return filesRes;
+    const files = yield* getFilesRecursive(targetDir, context);
 
-  return ok({
-    targetDir,
-    files: filesRes.value,
+    return {
+      targetDir,
+      files,
+    };
   });
-}
 
 /**
  * Maps scanned directories mapping payloads against raw content sources.
@@ -95,40 +87,33 @@ async function queryPackState(context: CommandContext): Promise<Result<PackQuery
  * @param state - Scanned folder parameters result schema.
  * @returns Final collection mapped parameters target states.
  */
-async function generateRegistryItems(
+const generateRegistryItems = (
   context: CommandContext,
   state: PackQueryState,
-): Promise<Result<PackGeneratedRegistry, AppError>> {
-  const items: RegistryItem[] = [];
-
-  const fileResults = await Promise.all(
-    state.files.map(async (file) => {
-      const contentRes = await context.runtime.fs.readFile(file, "utf8");
-      if (!contentRes.ok) return contentRes;
-
-      return ok(
-        buildRegistryItemFromFile({
-          path: file,
-          content: contentRes.value,
-          targetDir: state.targetDir,
+): Effect.Effect<PackGeneratedRegistry, AppError> =>
+  Effect.gen(function* () {
+    const items = yield* Effect.forEach(
+      state.files,
+      (file) =>
+        Effect.gen(function* () {
+          const content = yield* context.runtime.fs.readFile(file, "utf8");
+          return buildRegistryItemFromFile({
+            path: file,
+            content,
+            targetDir: state.targetDir,
+          });
         }),
-      );
-    }),
-  );
+      { concurrency: 10 },
+    );
 
-  for (const res of fileResults) {
-    if (!res.ok) return err(res.error);
-    items.push(res.value);
-  }
+    const outPath = path.join(context.cwd, "registry.json");
 
-  const outPath = path.join(context.cwd, "registry.json");
-
-  return ok({
-    items,
-    outPath,
-    fileCount: state.files.length,
+    return {
+      items: Array.from(items),
+      outPath,
+      fileCount: state.files.length,
+    };
   });
-}
 
 /**
  * Main controller for the `pack` command.
@@ -137,41 +122,47 @@ async function generateRegistryItems(
  * @param context - Command context.
  * @returns Completion confirmation schema wrapper.
  */
+function runPackCommandEff(context: CommandContext): Effect.Effect<CommandOutcome, AppError> {
+  return Effect.gen(function* () {
+    const state = yield* queryPackState(context);
+
+    if (state.files.length === 0) {
+      yield* context.runtime.prompt.warn("No .ts or .tsx files found.");
+      return { kind: "noop", message: "No files found." } as CommandOutcome;
+    }
+
+    const registry = yield* generateRegistryItems(context, state);
+
+    const content = JSON.stringify(
+      {
+        name: "my-registry",
+        items: registry.items,
+      },
+      null,
+      2,
+    );
+
+    yield* Effect.catchAll(context.runtime.fs.writeFile(registry.outPath, content, "utf8"), (e) =>
+      Effect.gen(function* () {
+        yield* context.runtime.prompt.error(`Failed to write registry file: ${registry.outPath}`);
+        return yield* Effect.fail(e);
+      }),
+    );
+
+    yield* context.runtime.prompt.success(
+      `Packed ${registry.items.length} components into registry.json`,
+    );
+
+    return {
+      kind: "success",
+      message: `Generated registry.json`,
+    } as CommandOutcome;
+  });
+}
+
 export async function runPackCommand(
   context: CommandContext,
 ): Promise<Result<CommandOutcome, AppError>> {
-  const stateQ = await queryPackState(context);
-  if (!stateQ.ok) return err(stateQ.error);
-
-  if (stateQ.value.files.length === 0) {
-    context.runtime.prompt.warn("No .ts or .tsx files found.");
-    return ok({ kind: "noop", message: "No files found." });
-  }
-
-  const registryQ = await generateRegistryItems(context, stateQ.value);
-  if (!registryQ.ok) return err(registryQ.error);
-
-  const content = JSON.stringify(
-    {
-      name: "my-registry",
-      items: registryQ.value.items,
-    },
-    null,
-    2,
-  );
-  const writeRes = await context.runtime.fs.writeFile(registryQ.value.outPath, content, "utf8");
-
-  if (!writeRes.ok) {
-    context.runtime.prompt.error(`Failed to write registry file: ${registryQ.value.outPath}`);
-    return err(writeRes.error);
-  }
-
-  context.runtime.prompt.success(
-    `Packed ${registryQ.value.items.length} components into registry.json`,
-  );
-
-  return ok({
-    kind: "success",
-    message: `Generated registry.json`,
-  });
+  const res = await Effect.runPromise(Effect.either(runPackCommandEff(context)));
+  return res._tag === "Right" ? ok(res.right as CommandOutcome) : err(res.left as AppError);
 }

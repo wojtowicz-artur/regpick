@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import { styleText } from "node:util";
 
 import { appError, type AppError } from "@/core/errors.js";
@@ -123,11 +124,16 @@ async function queryAvailableUpdates(
         // Hydrate local contents immediately so the interaction phase is 100% pure IO with user
         const filesWithLocal: DetectedUpdateFile[] = [];
         for (const rf of updateAction.files) {
-          const localContentRes = await context.runtime.fs.readFile(rf.target, "utf8");
+          let localContent = "";
+          try {
+            localContent = await Effect.runPromise(context.runtime.fs.readFile(rf.target, "utf8"));
+          } catch {
+            localContent = "";
+          }
           filesWithLocal.push({
             target: rf.target,
             remoteContent: rf.content,
-            localContent: localContentRes.ok ? localContentRes.value : "",
+            localContent,
           });
         }
 
@@ -181,16 +187,18 @@ async function interactApprovalPhase(
   for (const update of availableUpdates) {
     context.runtime.prompt.info(`Update available for ${update.itemName}`);
 
-    const action = await context.runtime.prompt.select({
-      message: `What do you want to do with ${update.itemName}?`,
-      options: [
-        { value: "diff", label: "Show diff" },
-        { value: "update", label: "Update" },
-        { value: "skip", label: "Skip" },
-      ],
-    });
+    const action = await Effect.runPromise(
+      context.runtime.prompt.select({
+        message: `What do you want to do with ${update.itemName}?`,
+        options: [
+          { value: "diff", label: "Show diff" },
+          { value: "update", label: "Update" },
+          { value: "skip", label: "Skip" },
+        ],
+      }),
+    );
 
-    const isActionCancel = await context.runtime.prompt.isCancel(action);
+    const isActionCancel = await Effect.runPromise(context.runtime.prompt.isCancel(action));
     if (isActionCancel || action === "skip") {
       continue;
     }
@@ -201,12 +209,14 @@ async function interactApprovalPhase(
         await printDiff(rf.localContent, rf.remoteContent);
       }
 
-      const confirm = await context.runtime.prompt.confirm({
-        message: `Update ${update.itemName} now?`,
-        initialValue: true,
-      });
+      const confirm = await Effect.runPromise(
+        context.runtime.prompt.confirm({
+          message: `Update ${update.itemName} now?`,
+          initialValue: true,
+        }),
+      );
 
-      const isConfirmCancel = await context.runtime.prompt.isCancel(confirm);
+      const isConfirmCancel = await Effect.runPromise(context.runtime.prompt.isCancel(confirm));
       if (isConfirmCancel || !confirm) {
         continue;
       }

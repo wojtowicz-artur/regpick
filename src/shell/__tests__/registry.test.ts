@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import { pathToFileURL } from "node:url";
 
 import { ok } from "@/core/result.js";
@@ -26,8 +27,8 @@ describe("registry loader", () => {
   });
 
   it("should normalize GitHub blob/tree URLs to raw.githubusercontent.com", async () => {
-    vi.mocked(mockRuntime.http.getText).mockResolvedValue(
-      ok(
+    vi.mocked(mockRuntime.http.getText).mockReturnValue(
+      Effect.succeed(
         JSON.stringify({
           name: "gh-registry",
           items: [{ name: "comp", files: [{ path: "comp.ts", content: "x" }] }],
@@ -49,9 +50,11 @@ describe("registry loader", () => {
   });
 
   it("should load a registry from a local json file", async () => {
-    vi.mocked(mockRuntime.fs.stat).mockResolvedValue(ok({ isDirectory: () => false } as any));
-    vi.mocked(mockRuntime.fs.readFile).mockResolvedValue(
-      ok(
+    vi.mocked(mockRuntime.fs.stat).mockReturnValue(
+      Effect.succeed({ isDirectory: () => false } as any),
+    );
+    vi.mocked(mockRuntime.fs.readFile).mockReturnValue(
+      Effect.succeed(
         JSON.stringify({
           items: [
             {
@@ -72,21 +75,23 @@ describe("registry loader", () => {
   });
 
   it("should resolve a directory registry containing multiple json files", async () => {
-    vi.mocked(mockRuntime.fs.stat).mockResolvedValue(ok({ isDirectory: () => true } as any));
-    vi.mocked(mockRuntime.fs.readdir).mockResolvedValue(
-      ok(["button.json", "input.json", "not.txt"]),
+    vi.mocked(mockRuntime.fs.stat).mockReturnValue(
+      Effect.succeed({ isDirectory: () => true } as any),
+    );
+    vi.mocked(mockRuntime.fs.readdir).mockReturnValue(
+      Effect.succeed(["button.json", "input.json", "not.txt"]),
     );
 
-    vi.mocked(mockRuntime.fs.readFile).mockImplementation(async (filePath: string) => {
+    vi.mocked(mockRuntime.fs.readFile).mockImplementation((filePath: string) => {
       if (filePath.endsWith("button.json")) {
-        return ok(
+        return Effect.succeed(
           JSON.stringify({
             name: "button",
             files: [{ path: "b.ts", content: "b" }],
           }),
         );
       }
-      return ok(
+      return Effect.succeed(
         JSON.stringify({
           name: "input",
           files: [{ path: "i.ts", content: "i" }],
@@ -105,7 +110,7 @@ describe("registry loader", () => {
   });
 
   it("should fetch related file content over HTTP using baseUrl", async () => {
-    vi.mocked(mockRuntime.http.getText).mockResolvedValue(ok("remote-content"));
+    vi.mocked(mockRuntime.http.getText).mockReturnValue(Effect.succeed("remote-content"));
 
     const item = {
       name: "net-comp",

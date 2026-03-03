@@ -31,3 +31,14 @@ export function flatMap<T, U, E>(result: Result<T, E>, fn: (val: T) => Result<U,
   }
   return result;
 }
+import { Effect } from "effect";
+export const toResult = async <T, E>(eff: Effect.Effect<T, E, never>): Promise<Result<T, E>> => {
+  const exit = await Effect.runPromiseExit(eff);
+  if (exit._tag === "Success") return ok(exit.value);
+  return err((exit.cause as any).errors?.[0] || (exit.cause as any).failure);
+};
+export const toResultSync = <T, E>(eff: Effect.Effect<T, E, never>): Result<T, E> => {
+  const exit = Effect.runSyncExit(eff);
+  if (exit._tag === "Success") return ok(exit.value);
+  return err((exit.cause as any).errors?.[0] || (exit.cause as any).failure);
+};

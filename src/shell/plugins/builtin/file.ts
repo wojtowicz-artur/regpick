@@ -1,6 +1,7 @@
+import type { PluginContext, RegpickPlugin } from "@/types.js";
+import { Effect } from "effect";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import type { PluginContext, RegpickPlugin } from "@/types.js";
 
 function isFileUrl(value: string): boolean {
   return /^file:\/\//i.test(value);
@@ -37,24 +38,23 @@ export function FilePlugin(): RegpickPlugin {
 
       const fileSystemPath = fileURLToPath(new URL(id));
 
-      const statsRes = ctx.runtime?.fs
-        ? await ctx.runtime.fs.stat(fileSystemPath)
-        : { ok: false, value: null };
-      if (!statsRes || !statsRes.ok || !statsRes.value) {
-        return null;
-      }
-
-      if (statsRes.value.isDirectory()) {
-        return null;
-      }
-
-      const readRes = await ctx.runtime.fs.readFile(fileSystemPath, "utf8");
-      if (!readRes.ok) throw new Error(readRes.error.message);
+      if (!ctx.runtime?.fs) return null;
 
       try {
-        return JSON.parse(readRes.value);
+        const stats = await Effect.runPromise(ctx.runtime.fs.stat(fileSystemPath));
+        if (stats.isDirectory()) {
+          return null;
+        }
+
+        const readValue = await Effect.runPromise(ctx.runtime.fs.readFile(fileSystemPath, "utf8"));
+
+        try {
+          return JSON.parse(readValue);
+        } catch {
+          return readValue;
+        }
       } catch {
-        return readRes.value;
+        return null;
       }
     },
   };

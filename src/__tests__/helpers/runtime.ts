@@ -1,4 +1,4 @@
-import { appError } from "@/core/errors.js";
+import { Context, Effect } from "effect";
 import { err, ok } from "@/core/result.js";
 import { type RuntimePorts, HttpPort } from "@/shell/runtime/ports.js";
 import * as path from "path";
@@ -44,64 +44,29 @@ export function createMockRuntime(initialFiles: Record<string, string> = {}): {
   }
 
   const mockHttp = {
-    getJson: vi.fn<HttpPort["getJson"]>(async () => ok({} as any)),
-    getText: vi.fn<HttpPort["getText"]>(async (_url: string) => {
-      return ok("");
-    }),
+    getJson: vi.fn<Context.Tag.Service<HttpPort>["getJson"]>(() => Effect.succeed({} as any)),
+    getText: vi.fn<Context.Tag.Service<HttpPort>["getText"]>(() => Effect.succeed("")),
   };
 
   const runtime: RuntimePorts = {
     fs: {
-      existsSync: (filePath: string) => fileSystem.exists(filePath),
-      pathExists: async (filePath: string) => fileSystem.exists(filePath),
-      ensureDir: async () => ok(undefined),
-      remove: async (filePath: string) => {
-        fileSystem.removeFile(filePath);
-        return ok(undefined);
-      },
-      writeFile: async (filePath: string, content: string) => {
-        fileSystem.writeFile(filePath, content);
-        return ok(undefined);
-      },
-      readFile: async (filePath: string) => {
-        const content = fileSystem.readFile(filePath);
-        return content !== null
-          ? ok(content)
-          : err(appError("RuntimeError", `File not found: ${filePath}`));
-      },
-      readJsonSync: (filePath: string) => {
-        const content = fileSystem.readFile(filePath);
-        if (content === null) return err(appError("RuntimeError", `File not found: ${filePath}`));
-        try {
-          return ok(JSON.parse(content));
-        } catch {
-          return err(appError("RuntimeError", "Invalid JSON"));
-        }
-      },
-      writeJson: async (filePath: string, value: unknown) => {
-        fileSystem.writeFile(filePath, JSON.stringify(value, null, 2));
-        return ok(undefined);
-      },
-      stat: async (filePath: string) => {
-        if (!fileSystem.exists(filePath)) return err(appError("RuntimeError", "Not found"));
-        return ok({
-          isDirectory: () => false,
-          isFile: () => true,
-          size: 0,
-        } as any);
-      },
-      readdir: async () => ok([]),
-    },
-    http: mockHttp as unknown as HttpPort,
+      pathExists: (filePath: string) => Effect.succeed(fileSystem.exists(filePath)),
+      ensureDir: () => Effect.succeed(undefined),
+      remove: (filePath: string) => Effect.succeed(undefined),
+      writeFile: (filePath: string, content: string) => Effect.succeed(undefined),
+      readFile: (filePath: string) => Effect.succeed({ isDirectory: () => false } as any),
+      readdir: () => Effect.succeed([]),
+    } as any,
+    http: mockHttp as unknown as Context.Tag.Service<HttpPort>,
     prompt: {
-      intro: async () => {},
-      outro: async () => {},
-      cancel: async () => {},
-      isCancel: async (v: unknown) => v === Symbol.for("cancel"),
-      info: async () => {},
-      warn: async () => {},
-      error: async () => {},
-      success: async () => {},
+      intro: () => Effect.void,
+      outro: () => Effect.void,
+      cancel: () => Effect.void,
+      isCancel: (v: unknown) => Effect.succeed(v === Symbol.for("cancel")),
+      info: () => Effect.void,
+      warn: () => Effect.void,
+      error: () => Effect.void,
+      success: () => Effect.void,
       text: vi
         .fn()
         .mockImplementation(
@@ -126,10 +91,10 @@ export function createMockRuntime(initialFiles: Record<string, string> = {}): {
           async (options: Parameters<RuntimePorts["prompt"]["autocompleteMultiselect"]>[0]) =>
             options.options.map((o) => o.value),
         ),
-    },
+    } as any,
     process: {
       run: (_command: string, _args: string[], _cwd: string) => ({ status: 0 }),
-    },
+    } as any,
   };
 
   return { runtime, fs: fileSystem, mockHttp };

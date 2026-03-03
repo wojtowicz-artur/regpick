@@ -1,8 +1,8 @@
 import mockRegistry from "@/__tests__/fixtures/shadcn-registry.json" with { type: "json" };
 import { createMockHttp, createMockPrompt } from "@/__tests__/helpers/integration.js";
 import { runAddCommand } from "@/commands/add.js";
-import { ok } from "@/core/result.js";
 import { createRuntimePorts, type RuntimePorts } from "@/shell/runtime/ports.js";
+import { Effect } from "effect";
 import * as fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
@@ -47,14 +47,14 @@ describe("add integration with shadcn compatibility", () => {
     );
 
     // 2. Setup mock network responses
-    mockHttp.getText.mockImplementation(async (url: string) => {
+    mockHttp.getText.mockImplementation((url: string) => {
       if (url === "https://example.com/registry.json") {
-        return ok(JSON.stringify(mockRegistry));
+        return Effect.succeed(JSON.stringify(mockRegistry));
       }
       if (url.includes("button.tsx")) {
-        return ok("export function Button() { return <button /> }");
+        return Effect.succeed("export function Button() { return <button /> }");
       }
-      return ok("");
+      return Effect.succeed("");
     });
 
     // 3. Run add command
@@ -110,13 +110,13 @@ describe("add integration with shadcn compatibility", () => {
       JSON.stringify({ targetsByType: { "registry:ui": "components/ui" } }),
     );
 
-    mockHttp.getText.mockImplementation(async (url: string) => {
+    mockHttp.getText.mockImplementation((url: string) => {
       if (url === "https://example.com/registry.json") {
-        return ok(JSON.stringify(mockRegistry));
+        return Effect.succeed(JSON.stringify(mockRegistry));
       }
-      if (url.includes("card.tsx")) return ok("CardContent");
-      if (url.includes("button.tsx")) return ok("ButtonContent");
-      return ok("");
+      if (url.includes("card.tsx")) return Effect.succeed("CardContent");
+      if (url.includes("button.tsx")) return Effect.succeed("ButtonContent");
+      return Effect.succeed("");
     });
 
     // 2. Run add card
@@ -176,16 +176,16 @@ describe("add integration with shadcn compatibility", () => {
       ],
     };
 
-    mockHttp.getText.mockImplementation(async (url: string) => {
+    mockHttp.getText.mockImplementation((url: string) => {
       if (url === "https://example.com/registry.json") {
-        return ok(JSON.stringify(fakeRegistryWithDeps));
+        return Effect.succeed(JSON.stringify(fakeRegistryWithDeps));
       }
-      return ok("fake text");
+      return Effect.succeed("fake text");
     });
 
     // allow installation confirm but deny dependency install
-    mockPrompt.confirm.mockResolvedValueOnce(true); // "Install 1 item(s)?"
-    mockPrompt.confirm.mockResolvedValueOnce(Symbol.for("cancel")); // "Install missing packages with npm?"
+    mockPrompt.confirm.mockReturnValueOnce(Effect.succeed(true)); // "Install 1 item(s)?"
+    mockPrompt.confirm.mockReturnValueOnce(Effect.succeed(Symbol.for("cancel"))); // "Install missing packages with npm?"
 
     const result = await runAddCommand({
       cwd: testDir,
@@ -234,13 +234,12 @@ describe("add integration with shadcn compatibility", () => {
       JSON.stringify({ targetsByType: { "registry:ui": "components/ui" } }),
     );
 
-    mockHttp.getText.mockResolvedValueOnce({
-      ok: false,
-      error: {
+    mockHttp.getText.mockReturnValueOnce(
+      Effect.fail({
         kind: "RuntimeError",
         message: "HTTP error! status: 500 when fetching JSON",
-      },
-    });
+      } as any),
+    );
 
     const result = await runAddCommand({
       cwd: testDir,
@@ -253,7 +252,7 @@ describe("add integration with shadcn compatibility", () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
-      expect(result.error.kind).toBe("RuntimeError");
+      expect(result.error.kind).toBe("RegistryError");
       expect(result.error.message).toContain("HTTP error! status: 500");
     }
   });
@@ -265,13 +264,13 @@ describe("add integration with shadcn compatibility", () => {
       JSON.stringify({ targetsByType: { "registry:ui": "components/ui" } }),
     );
 
-    mockHttp.getText.mockImplementation(async (url: string) => {
+    mockHttp.getText.mockImplementation((url: string) => {
       if (url === "https://example.com/registry.json") {
-        return ok(JSON.stringify(mockRegistry));
+        return Effect.succeed(JSON.stringify(mockRegistry));
       }
-      if (url.includes("card.tsx")) return ok("CardContent");
-      if (url.includes("button.tsx")) return ok("ButtonContent");
-      return ok("");
+      if (url.includes("card.tsx")) return Effect.succeed("CardContent");
+      if (url.includes("button.tsx")) return Effect.succeed("ButtonContent");
+      return Effect.succeed("");
     });
 
     // Make the UI directory read-only to crash the install
@@ -305,7 +304,9 @@ describe("add integration with shadcn compatibility", () => {
     );
 
     // Send malformed data that isn't an array of items or proper registry object
-    mockHttp.getText.mockResolvedValue(ok(JSON.stringify({ unexpectedField: "invalid dataset" })));
+    mockHttp.getText.mockReturnValue(
+      Effect.succeed(JSON.stringify({ unexpectedField: "invalid dataset" })),
+    );
 
     const result = await runAddCommand({
       cwd: testDir,

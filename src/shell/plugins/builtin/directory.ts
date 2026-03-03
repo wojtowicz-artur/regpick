@@ -1,4 +1,5 @@
 import type { PluginContext, RegpickPlugin } from "@/types.js";
+import { Effect } from "effect";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -36,31 +37,29 @@ export function DirectoryPlugin(): RegpickPlugin {
 
       const fileSystemPath = fileURLToPath(new URL(id));
 
-      const statsRes = ctx.runtime?.fs
-        ? await ctx.runtime.fs.stat(fileSystemPath)
-        : { ok: false, value: null };
-      if (!statsRes || !statsRes.ok || !statsRes.value) {
+      if (!ctx.runtime?.fs) return null;
+      let statsRes;
+      try {
+        statsRes = await Effect.runPromise(ctx.runtime.fs.stat(fileSystemPath));
+      } catch {
         return null;
       }
 
-      if (!statsRes.value.isDirectory()) {
+      if (!statsRes.isDirectory()) {
         return null;
       }
 
-      const dirRes = await ctx.runtime.fs.readdir(fileSystemPath);
-      if (!dirRes.ok) throw new Error(dirRes.error.message);
-
-      const jsonFiles = dirRes.value.filter((file) => file.endsWith(".json"));
+      const dirRes = await Effect.runPromise(ctx.runtime.fs.readdir(fileSystemPath));
+      const jsonFiles = dirRes.filter((file: string) => file.endsWith(".json"));
 
       const items: unknown[] = [];
 
       for (const fileName of jsonFiles) {
         const fullPath = path.join(fileSystemPath, fileName);
-        const readRes = await ctx.runtime.fs.readFile(fullPath, "utf8");
-        if (!readRes.ok) continue;
 
         try {
-          const parsed = JSON.parse(readRes.value);
+          const readRes = await Effect.runPromise(ctx.runtime.fs.readFile(fullPath, "utf8"));
+          const parsed = JSON.parse(readRes);
           if (
             parsed &&
             typeof parsed === "object" &&

@@ -1,6 +1,7 @@
 import { createMockPrompt } from "@/__tests__/helpers/integration.js";
 import { runInitCommand } from "@/commands/init.js";
 import { createRuntimePorts, type RuntimePorts } from "@/shell/runtime/ports.js";
+import { Effect } from "effect";
 import * as fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import * as path from "node:path";
@@ -81,10 +82,10 @@ describe("init integration", () => {
 
   it("should fail gracefully if user cancels the prompt", async () => {
     // Simulate cancelling the package manager prompt
-    mockPrompt.isCancel.mockImplementation(
-      async (v: unknown) => v === Symbol.for("cancel") || v === "cancelled",
+    mockPrompt.isCancel.mockImplementation((v: unknown) =>
+      Effect.succeed(v === Symbol.for("cancel") || v === "cancelled"),
     );
-    mockPrompt.select.mockResolvedValueOnce("cancelled");
+    mockPrompt.select.mockReturnValueOnce(Effect.succeed("cancelled"));
 
     const result = await runInitCommand({
       cwd: testDir,
@@ -110,9 +111,9 @@ describe("init integration", () => {
     const packageJsonContent = JSON.stringify({ name: "test-project", dependencies: {} }, null, 2);
     await fs.writeFile(path.join(testDir, "package.json"), packageJsonContent);
 
-    mockPrompt.select.mockResolvedValueOnce("npm");
-    mockPrompt.text.mockResolvedValueOnce("src/custom-ui");
-    mockPrompt.select.mockResolvedValueOnce("prompt");
+    mockPrompt.select.mockReturnValueOnce(Effect.succeed("npm"));
+    mockPrompt.text.mockReturnValueOnce(Effect.succeed("src/custom-ui"));
+    mockPrompt.select.mockReturnValueOnce(Effect.succeed("prompt"));
 
     const result = await runInitCommand({
       cwd: testDir,

@@ -1,6 +1,6 @@
 import type { RegpickPlugin } from "@/types.js";
+import { Schema as S } from "effect";
 import path from "node:path";
-import * as v from "valibot";
 import { PluginSchema } from "../config.js";
 
 export async function loadPlugins(
@@ -8,6 +8,7 @@ export async function loadPlugins(
   cwd: string,
 ): Promise<RegpickPlugin[]> {
   const plugins: RegpickPlugin[] = [];
+  const decodePlugin = S.decodeUnknownSync(PluginSchema);
 
   for (const plugin of configuredPlugins) {
     if (typeof plugin === "string") {
@@ -20,7 +21,7 @@ export async function loadPlugins(
         const imported = await import(importPath);
         const resolved = imported.default || imported.plugin || imported;
 
-        const validPlugin = v.parse(PluginSchema, resolved);
+        const validPlugin = decodePlugin(resolved);
         plugins.push(validPlugin as unknown as RegpickPlugin);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -28,7 +29,7 @@ export async function loadPlugins(
       }
     } else {
       try {
-        const validPlugin = v.parse(PluginSchema, plugin);
+        const validPlugin = decodePlugin(plugin);
         plugins.push(validPlugin as unknown as RegpickPlugin);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);

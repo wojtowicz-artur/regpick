@@ -1,4 +1,3 @@
-import { Effect } from "effect";
 import { appError, type AppError } from "@/core/errors.js";
 import { PipelineRenderer } from "@/core/pipeline.js";
 import { err, ok, type Result } from "@/core/result.js";
@@ -87,16 +86,14 @@ async function queryResolveRegistrySource(
   }));
 
   if (aliases.length) {
-    const picked = await Effect.runPromise(
-      context.runtime.prompt.multiselect({
-        message: "Pick registry alias (or cancel and provide URL/path manually)",
-        options: aliases,
-        maxItems: 1,
-        required: false,
-      }),
-    );
+    const picked = await context.runtime.prompt.multiselect({
+      message: "Pick registry alias (or cancel and provide URL/path manually)",
+      options: aliases,
+      maxItems: 1,
+      required: false,
+    });
 
-    if (await Effect.runPromise(context.runtime.prompt.isCancel(picked))) {
+    if (await context.runtime.prompt.isCancel(picked)) {
       return err(appError("UserCancelled", "Operation cancelled."));
     }
 
@@ -105,14 +102,12 @@ async function queryResolveRegistrySource(
     }
   }
 
-  const manual = await Effect.runPromise(
-    context.runtime.prompt.text({
-      message: "Registry URL/path:",
-      placeholder: "https://example.com/registry.json",
-    }),
-  );
+  const manual = await context.runtime.prompt.text({
+    message: "Registry URL/path:",
+    placeholder: "https://example.com/registry.json",
+  });
 
-  if (await Effect.runPromise(context.runtime.prompt.isCancel(manual))) {
+  if (await context.runtime.prompt.isCancel(manual)) {
     return err(appError("UserCancelled", "Operation cancelled."));
   }
 
@@ -161,20 +156,18 @@ async function queryRegistryItemsToProcess(
   } else if (!preselected.ok) {
     return err(preselected.error);
   } else {
-    const selectedNames = await Effect.runPromise(
-      context.runtime.prompt.autocompleteMultiselect({
-        message: "Select items to install",
-        options: items.map((item) => ({
-          value: item.name,
-          label: `${item.name} (${item.type || "registry:file"})`,
-          hint: item.description || `${item.files.length} file(s)`,
-        })),
-        maxItems: 10,
-        required: true,
-      }),
-    );
+    const selectedNames = await context.runtime.prompt.autocompleteMultiselect({
+      message: "Select items to install",
+      options: items.map((item) => ({
+        value: item.name,
+        label: `${item.name} (${item.type || "registry:file"})`,
+        hint: item.description || `${item.files.length} file(s)`,
+      })),
+      maxItems: 10,
+      required: true,
+    });
 
-    if (await Effect.runPromise(context.runtime.prompt.isCancel(selectedNames))) {
+    if (await context.runtime.prompt.isCancel(selectedNames)) {
       return err(appError("UserCancelled", "Operation cancelled."));
     }
 
@@ -215,7 +208,7 @@ async function queryInstallPlanState(
   const probeWrites = installPlanProbeRes.value.plannedWrites;
 
   for (const write of probeWrites) {
-    const exists = await Effect.runPromise(context.runtime.fs.pathExists(write.absoluteTarget));
+    const exists = await context.runtime.fs.pathExists(write.absoluteTarget);
     if (exists) existingTargets.add(write.absoluteTarget);
   }
 
@@ -255,13 +248,11 @@ async function interactApprovalPhase(
 
   // 1. Confirm overall installation
   if (!assumeYes) {
-    const proceed = await Effect.runPromise(
-      context.runtime.prompt.confirm({
-        message: `Install ${state.selectedItems.length} item(s)?`,
-        initialValue: true,
-      }),
-    );
-    if ((await Effect.runPromise(context.runtime.prompt.isCancel(proceed))) || !proceed) {
+    const proceed = await context.runtime.prompt.confirm({
+      message: `Install ${state.selectedItems.length} item(s)?`,
+      initialValue: true,
+    });
+    if ((await context.runtime.prompt.isCancel(proceed)) || !proceed) {
       return err(appError("UserCancelled", "Operation cancelled."));
     }
   }
@@ -275,21 +266,16 @@ async function interactApprovalPhase(
       } else if ((config.install?.overwritePolicy || "prompt") === "skip") {
         context.runtime.prompt.warn(`Skipped existing file: ${write.absoluteTarget}`);
       } else {
-        const answer = await Effect.runPromise(
-          context.runtime.prompt.select({
-            message: `File exists: ${write.absoluteTarget}`,
-            options: [
-              { value: "overwrite", label: "Overwrite this file" },
-              { value: "skip", label: "Skip this file" },
-              { value: "abort", label: "Abort installation" },
-            ],
-          }),
-        );
+        const answer = await context.runtime.prompt.select({
+          message: `File exists: ${write.absoluteTarget}`,
+          options: [
+            { value: "overwrite", label: "Overwrite this file" },
+            { value: "skip", label: "Skip this file" },
+            { value: "abort", label: "Abort installation" },
+          ],
+        });
 
-        if (
-          (await Effect.runPromise(context.runtime.prompt.isCancel(answer))) ||
-          answer === "abort"
-        ) {
+        if ((await context.runtime.prompt.isCancel(answer)) || answer === "abort") {
           return err(appError("UserCancelled", "Installation aborted by user."));
         }
         if (answer === "overwrite") finalWrites.push(write);
@@ -316,14 +302,12 @@ async function interactApprovalPhase(
       if (state.missingDevDependencies.length)
         msgParts.push(`devDependencies: ${state.missingDevDependencies.join(", ")}`);
 
-      const proceedDep = await Effect.runPromise(
-        context.runtime.prompt.confirm({
-          message: `Install missing packages with ${pm}? (${msgParts.join(" | ")})`,
-          initialValue: true,
-        }),
-      );
+      const proceedDep = await context.runtime.prompt.confirm({
+        message: `Install missing packages with ${pm}? (${msgParts.join(" | ")})`,
+        initialValue: true,
+      });
 
-      if (await Effect.runPromise(context.runtime.prompt.isCancel(proceedDep))) {
+      if (await context.runtime.prompt.isCancel(proceedDep)) {
         return err(appError("UserCancelled", "Dependency installation cancelled by user."));
       }
       shouldInstallDeps = Boolean(proceedDep);
