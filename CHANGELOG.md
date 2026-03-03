@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.16.3](https://github.com/wojtowicz-artur/regpick/compare/v0.16.2...v0.16.3) (2026-03-03)
+
+### Code Refactoring
+
+* migrate from Result type to Either in command functions ([b5dcb58](https://github.com/wojtowicz-artur/regpick/commit/b5dcb5893945dc322e6ef560c10758433db76377))
+* migrate from valibot to effect for schema validation and error handling ([1138231](https://github.com/wojtowicz-artur/regpick/commit/11382314125d5a1ec386f067ab3f98aaa613ca28))
+* replace Result type with Either in various modules ([1636562](https://github.com/wojtowicz-artur/regpick/commit/163656272a5810d85583e70d3621d62afed019a5))
+
 ## [0.16.2](https://github.com/wojtowicz-artur/regpick/compare/v0.16.1...v0.16.2) (2026-03-03)
 
 ### Performance Improvements
