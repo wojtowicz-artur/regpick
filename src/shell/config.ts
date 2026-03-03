@@ -138,8 +138,89 @@ const DEFAULT_CONFIG: RegpickConfig = {
   plugins: [],
 };
 
-export function getConfigPath(cwd: string): string {
-  return path.join(cwd, "regpick.json");
+export type ConfigFormat = "ts" | "mjs" | "cjs" | "js" | "json";
+
+export async function detectConfigFormat(cwd: string): Promise<ConfigFormat> {
+  try {
+    // Check if typescript exists in the project
+    await fs.access(path.join(cwd, "tsconfig.json"));
+    return "ts";
+  } catch {}
+
+  try {
+    // Check if type: module is specified
+    const pkgRaw = await fs.readFile(path.join(cwd, "package.json"), "utf-8");
+    const pkg = JSON.parse(pkgRaw);
+    if (pkg.type === "module") return "mjs";
+    if (pkg.type === "commonjs") return "cjs";
+  } catch {}
+
+  return "mjs"; // fallback
+}
+
+function serializeObjectToJS(obj: any, indentLevel = 1): string {
+  if (obj === null) return "null";
+  if (typeof obj === "string") return `"${obj}"`;
+  if (typeof obj === "number" || typeof obj === "boolean") return String(obj);
+
+  if (Array.isArray(obj)) {
+    if (obj.length === 0) return "[]";
+    const indent = "  ".repeat(indentLevel);
+    const inner = obj.map((val) => serializeObjectToJS(val, indentLevel + 1)).join(`,\n${indent}`);
+    return `[\n${indent}${inner}\n${"  ".repeat(indentLevel - 1)}]`;
+  }
+
+  if (typeof obj === "object") {
+    const keys = Object.keys(obj);
+    if (keys.length === 0) return "{}";
+
+    const indent = "  ".repeat(indentLevel);
+    const inner = keys
+      .map((key) => {
+        const isIdentifier = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(key);
+        const safeKey = isIdentifier ? key : `"${key}"`;
+        return `${safeKey}: ${serializeObjectToJS(obj[key], indentLevel + 1)}`;
+      })
+      .join(`,\n${indent}`);
+
+    return `{\n${indent}${inner}\n${"  ".repeat(indentLevel - 1)}}`;
+  }
+
+  return "undefined";
+}
+
+export function generateConfigCode(config: RegpickConfig, format: ConfigFormat): string {
+  if (format === "json") {
+    return JSON.stringify(config, null, 2);
+  }
+
+  const objectCode = serializeObjectToJS(config, 1);
+
+  if (format === "cjs") {
+    return `const { defineConfig } = require("regpick");\n\nmodule.exports = defineConfig(${objectCode});\n`;
+  }
+
+  return `import { defineConfig } from "regpick";\n\nexport default defineConfig(${objectCode});\n`;
+}
+
+export async function resolveTargetConfigPath(cwd: string): Promise<string> {
+  // Check if unconfig finds an existing config
+  const { sources } = await loadConfig<unknown>({
+    sources: [
+      {
+        files: ["regpick", ".regpickrc", "regpickrc"],
+        extensions: ["json", "js", "ts", "mjs", "cjs", ""],
+      },
+    ],
+    cwd,
+  });
+
+  if (sources.length > 0) {
+    return sources[0];
+  }
+
+  const format = await detectConfigFormat(cwd);
+  return path.join(cwd, `regpick.config.${format}`);
 }
 
 export async function readConfig(cwd: string): Promise<{
@@ -185,7 +266,7 @@ export async function writeConfig(
   config: RegpickConfig,
   { overwrite = false }: { overwrite?: boolean } = {},
 ): Promise<{ filePath: string; written: boolean }> {
-  const filePath = getConfigPath(cwd);
+  const filePath = await resolveTargetConfigPath(cwd);
 
   let exists = false;
   try {
@@ -197,7 +278,10 @@ export async function writeConfig(
     return { filePath, written: false };
   }
 
-  await fs.writeFile(filePath, JSON.stringify(config, null, 2), "utf8");
+  const ext = path.extname(filePath).slice(1);
+  const format = ["ts", "mjs", "cjs", "js", "json"].includes(ext) ? (ext as any) : "json";
+
+  await fs.writeFile(filePath, generateConfigCode(config, format), "utf8");
   return { filePath, written: true };
 }
 

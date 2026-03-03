@@ -1,8 +1,14 @@
 import { appError, type AppError } from "@/core/errors.js";
 import { err, ok, type Result } from "@/core/result.js";
 import { decideInitAfterOverwritePrompt } from "@/domain/initCore.js";
-import { getConfigPath, readConfig, RegpickConfigSchema } from "@/shell/config.js";
+import {
+  generateConfigCode,
+  readConfig,
+  RegpickConfigSchema,
+  resolveTargetConfigPath,
+} from "@/shell/config.js";
 import type { CommandContext, CommandOutcome, RegpickConfig } from "@/types.js";
+import path from "node:path";
 import * as v from "valibot";
 
 type InitQueryState = {
@@ -24,7 +30,7 @@ type ApprovedInitPlan = {
  * @returns Result with existing configuration states.
  */
 async function queryInitState(context: CommandContext): Promise<Result<InitQueryState, AppError>> {
-  const configPath = getConfigPath(context.cwd);
+  const configPath = await resolveTargetConfigPath(context.cwd);
   const existsRes = await context.runtime.fs.stat(configPath);
   const exists = existsRes.ok;
 
@@ -157,7 +163,10 @@ export async function runInitCommand(
   if (!planQ.ok) return err(planQ.error);
   if (!planQ.value) return ok({ kind: "noop", message: "Keeping existing configuration." });
 
-  const content = JSON.stringify(planQ.value.newConfig, null, 2);
+  const ext = path.extname(planQ.value.configPath).slice(1);
+  const format = ["ts", "mjs", "cjs", "js", "json"].includes(ext) ? (ext as any) : "json";
+
+  const content = generateConfigCode(planQ.value.newConfig, format);
   const writeRes = await context.runtime.fs.writeFile(planQ.value.configPath, content, "utf8");
 
   if (!writeRes.ok) {

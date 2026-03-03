@@ -48,7 +48,7 @@ describe("init integration", () => {
     expect(result.ok).toBe(true);
 
     // Check if config file was created
-    const configPath = path.join(testDir, "regpick.json");
+    const configPath = path.join(testDir, "regpick.config.mjs");
     const exists = await fs
       .access(configPath)
       .then(() => true)
@@ -56,14 +56,11 @@ describe("init integration", () => {
     expect(exists).toBe(true);
 
     const configContent = await fs.readFile(configPath, "utf8");
-    const configData = JSON.parse(configContent);
-    expect(configData).toMatchObject({
-      install: {
-        packageManager: "auto",
-        overwritePolicy: "prompt",
-        allowOutsideProject: false,
-      },
-    });
+    expect(configContent).toContain('import { defineConfig } from "regpick";');
+    expect(configContent).toContain("export default defineConfig(");
+    expect(configContent).toContain('packageManager: "auto"');
+    expect(configContent).toContain('overwritePolicy: "prompt"');
+    expect(configContent).toContain("allowOutsideProject: false");
   });
 
   it("should work even if package.json is missing", async () => {
@@ -74,7 +71,7 @@ describe("init integration", () => {
     });
 
     expect(result.ok).toBe(true);
-    const configPath = path.join(testDir, "regpick.json");
+    const configPath = path.join(testDir, "regpick.config.mjs");
     const exists = await fs
       .access(configPath)
       .then(() => true)
@@ -101,7 +98,7 @@ describe("init integration", () => {
     }
 
     // Check that config file was NOT created
-    const configPath = path.join(testDir, "regpick.json");
+    const configPath = path.join(testDir, "regpick.config.mjs");
     const exists = await fs
       .access(configPath)
       .then(() => true)
@@ -125,20 +122,13 @@ describe("init integration", () => {
 
     expect(result.ok).toBe(true);
 
-    const configPath = path.join(testDir, "regpick.json");
+    const configPath = path.join(testDir, "regpick.config.mjs");
     const configContent = await fs.readFile(configPath, "utf8");
-    const configData = JSON.parse(configContent);
-    expect(configData).toMatchObject({
-      install: {
-        packageManager: "npm",
-        overwritePolicy: "prompt",
-      },
-      resolve: {
-        targets: expect.objectContaining({
-          "registry:component": "src/custom-ui",
-        }),
-      },
-    });
+    expect(configContent).toContain('import { defineConfig } from "regpick";');
+    expect(configContent).toContain("export default defineConfig(");
+    expect(configContent).toContain('packageManager: "npm"');
+    expect(configContent).toContain('overwritePolicy: "prompt"');
+    expect(configContent).toContain('"registry:component": "src/custom-ui"');
   });
 
   it("should fail with a RuntimeError when lacking filesystem permissions", async () => {
