@@ -2,9 +2,7 @@ import path from "node:path";
 
 import { appError, type AppError } from "@/core/errors.js";
 import { err, ok, type Result } from "@/core/result.js";
-import { runSaga, type TransactionStep } from "@/core/saga.js";
 import { buildRegistryItemFromFile } from "@/domain/packCore.js";
-import { WriteFileStep } from "@/domain/saga/index.js";
 import type { CommandContext, CommandOutcome, RegistryItem } from "@/types.js";
 
 type PackQueryState = {
@@ -133,23 +131,6 @@ async function generateRegistryItems(
 }
 
 /**
- * Formulates atom transaction structure to commit assembled JSON configs.
- *
- * @param context - Command context.
- * @param registryData - Mapped generation structures.
- * @returns Packed execution operations flow schemas.
- */
-function buildPackCommand(
-  context: CommandContext,
-  registryData: PackGeneratedRegistry,
-): TransactionStep<any>[] {
-  const registryPayload = { items: registryData.items };
-  const content = JSON.stringify(registryPayload, null, 2);
-
-  return [new WriteFileStep(registryData.outPath, content, context.runtime)];
-}
-
-/**
  * Main controller for the `pack` command.
  * Manages mapping file sources to custom targeted JSON schemas dynamically.
  *
@@ -159,7 +140,6 @@ function buildPackCommand(
 export async function runPackCommand(
   context: CommandContext,
 ): Promise<Result<CommandOutcome, AppError>> {
-  // 1. Initial State (Filesystem scan)
   const stateQ = await queryPackState(context);
   if (!stateQ.ok) return err(stateQ.error);
 
@@ -168,21 +148,23 @@ export async function runPackCommand(
     return ok({ kind: "noop", message: "No files found." });
   }
 
-  // 2. Map scanned data into registry in-memory models
   const registryQ = await generateRegistryItems(context, stateQ.value);
   if (!registryQ.ok) return err(registryQ.error);
 
-  // 3. Assemble Transaction (Ensure atomic write to registry.json)
-  const sagaSteps = buildPackCommand(context, registryQ.value);
+  const content = JSON.stringify(
+    {
+      name: "my-registry",
+      items: registryQ.value.items,
+    },
+    null,
+    2,
+  );
+  const writeRes = await context.runtime.fs.writeFile(registryQ.value.outPath, content, "utf8");
 
-  // 4. Execute Saga
-  const runRes = await runSaga(sagaSteps, (stepName, status) => {
-    if (status === "failed") {
-      context.runtime.prompt.error(`Failed to write registry file: ${registryQ.value.outPath}`);
-    }
-  });
-
-  if (!runRes.ok) return runRes;
+  if (!writeRes.ok) {
+    context.runtime.prompt.error(`Failed to write registry file: ${registryQ.value.outPath}`);
+    return err(writeRes.error);
+  }
 
   context.runtime.prompt.success(
     `Packed ${registryQ.value.items.length} components into registry.json`,

@@ -1,10 +1,11 @@
 import { appError, type AppError } from "@/core/errors.js";
+import { PipelineRenderer } from "@/core/pipeline.js";
 import { err, ok, type Result } from "@/core/result.js";
-import { runSaga, type TransactionStep } from "@/core/saga.js";
+import { MemoryVFS } from "@/core/vfs.js";
 import { buildInstallPlan, resolveRegistryDependencies } from "@/domain/addPlan.js";
 import { applyAliases } from "@/domain/aliasCore.js";
-import { InstallDependenciesStep, UpdateLockfileStep, WriteFileStep } from "@/domain/saga/index.js";
 import { selectItemsFromFlags } from "@/domain/selection.js";
+import { coreAddPlugin } from "@/plugins/coreAddPlugin.js";
 import { readConfig, resolveRegistrySource } from "@/shell/config.js";
 import { collectMissingDependencies } from "@/shell/installer.js";
 import { resolvePackageManager } from "@/shell/packageManagers/resolver.js";
@@ -330,7 +331,7 @@ async function interactApprovalPhase(
 
 /**
  * Resolves and fetches the targeted file contents over network or disk.
- * Pre-loads all required remote IO before executing Saga transactions.
+ * Pre-loads all required remote IO before executing pipeline runtime.
  *
  * @param context - Command context.
  * @param config - Application configuration.
@@ -370,65 +371,12 @@ async function queryHydrateContents(
   return ok({ ...approved, hydratedWrites });
 }
 
-/**
- * Translates the hydrated user plan into a list of atomic transaction steps.
- *
- * @param context - Command context.
- * @param hydrated - Hydrated installation plan.
- * @returns Array of Saga transaction steps.
- */
-function buildTransactionsCommand(
-  context: CommandContext,
-  config: RegpickConfig,
-  hydrated: HydratedAddPlan,
-): TransactionStep<any>[] {
-  const sagaSteps: TransactionStep<any>[] = [];
-  const installedItemsInfo: RegistryItem[] = [];
-
-  // Write files
-  for (const write of hydrated.hydratedWrites) {
-    sagaSteps.push(new WriteFileStep(write.absoluteTarget, write.finalContent, context.runtime));
-
-    const originalItem = hydrated.selectedItems.find((i) => i.name === write.itemName);
-    if (originalItem && !installedItemsInfo.some((i) => i.name === originalItem.name)) {
-      installedItemsInfo.push(originalItem);
-    }
-  }
-
-  // Save Lockfile
-  if (installedItemsInfo.length > 0) {
-    sagaSteps.push(new UpdateLockfileStep(installedItemsInfo, context.cwd, context.runtime));
-  }
-
-  // Install Dependencies
-  if (
-    hydrated.shouldInstallDeps &&
-    (hydrated.dependencyPlan.dependencies.length > 0 ||
-      hydrated.dependencyPlan.devDependencies.length > 0)
-  ) {
-    sagaSteps.push(
-      new InstallDependenciesStep(hydrated.dependencyPlan, context.cwd, context.runtime, config),
-    );
-  }
-
-  return sagaSteps;
-}
-
-/**
- * Main controller for the `add` command.
- * Orchestrates CQS flow: State -> Interaction -> Hydration -> Command Builder -> Execution.
- *
- * @param context - Command context.
- * @returns Result indicating command outcome.
- */
 export async function runAddCommand(
   context: CommandContext,
 ): Promise<Result<CommandOutcome, AppError>> {
-  // 1. Initial State
   const configQ = await queryLoadConfiguration(context);
   if (!configQ.ok) return err(configQ.error);
 
-  // 2. Discover Source & Targets
   const sourceQ = await queryResolveRegistrySource(context, configQ.value.config);
   if (!sourceQ.ok) return err(sourceQ.error);
   if (!sourceQ.value) return ok({ kind: "noop", message: "No source provided." });
@@ -448,7 +396,6 @@ export async function runAddCommand(
     context.runtime.prompt.warn(`Registry dependency "${depName}" not found in current registry.`);
   }
 
-  // 3. Plan & Interaction State Computation
   const planStateQ = await queryInstallPlanState(
     context,
     configQ.value.config,
@@ -456,11 +403,9 @@ export async function runAddCommand(
   );
   if (!planStateQ.ok) return err(planStateQ.error);
 
-  // 4. Resolve conflicts / prompts via User Interactions
   const approvedPlan = await interactApprovalPhase(context, configQ.value.config, planStateQ.value);
   if (!approvedPlan.ok) return err(approvedPlan.error);
 
-  // 5. Hydrate Plan (Fetch network contents dynamically to avoid interrupting Saga runtime)
   const hydratedPlan = await queryHydrateContents(
     context,
     configQ.value.config,
@@ -469,25 +414,40 @@ export async function runAddCommand(
   );
   if (!hydratedPlan.ok) return err(hydratedPlan.error);
 
-  // 6. Assemble Transactions
-  const sagaSteps = buildTransactionsCommand(context, configQ.value.config, hydratedPlan.value);
+  const vfsFiles = hydratedPlan.value.hydratedWrites.map((write) => ({
+    id: write.absoluteTarget,
+    code: write.finalContent,
+  }));
 
-  // 7. Execute
-  const runRes = await runSaga(sagaSteps, (stepName, status) => {
-    if (status === "executing") {
-      // Option to print executing
-    } else if (status === "completed") {
-      context.runtime.prompt.success(`[Success] ${stepName}`);
-    } else if (status === "failed") {
-      context.runtime.prompt.error(`[Failed] ${stepName}`);
-    } else if (status === "compensating") {
-      context.runtime.prompt.warn(`[Rollback] ${stepName}`);
-    } else if (status === "interrupted") {
-      context.runtime.prompt.error(`[Interrupted] Rolling back ${stepName}`);
+  const installedItemsInfo: RegistryItem[] = [];
+  for (const write of hydratedPlan.value.hydratedWrites) {
+    const originalItem = hydratedPlan.value.selectedItems.find((i) => i.name === write.itemName);
+    if (originalItem && !installedItemsInfo.some((i) => i.name === originalItem.name)) {
+      installedItemsInfo.push(originalItem);
     }
-  });
+  }
 
-  if (!runRes.ok) return runRes;
+  const vfs = new MemoryVFS();
+
+  const userPlugins = configQ.value.config.plugins || [];
+
+  const pipeline = new PipelineRenderer([
+    ...userPlugins,
+    coreAddPlugin(
+      hydratedPlan.value.dependencyPlan,
+      configQ.value.config,
+      context.runtime,
+      installedItemsInfo,
+    ),
+  ]);
+
+  try {
+    await pipeline.run({ vfs, cwd: context.cwd }, vfsFiles);
+  } catch (error) {
+    vfs.rollback();
+    context.runtime.prompt.error(`[Failed] Installation aborted: ${error}`);
+    return err(appError("RuntimeError", String(error)));
+  }
 
   context.runtime.prompt.info(
     `Installed ${hydratedPlan.value.selectedItems.length} item(s), wrote ${hydratedPlan.value.hydratedWrites.length} file(s).`,

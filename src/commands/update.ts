@@ -1,13 +1,12 @@
 import { styleText } from "node:util";
 
 import { appError, type AppError } from "@/core/errors.js";
+import { PipelineRenderer, type PersistableVFS } from "@/core/pipeline.js";
 import { err, ok, type Result } from "@/core/result.js";
-import { runSaga, type TransactionStep } from "@/core/saga.js";
-import { SaveLockfileStep } from "@/domain/saga/saveLockfileStep.js";
-import { UpdateFileStep } from "@/domain/saga/updateFileStep.js";
+import { MemoryVFS } from "@/core/vfs.js";
 import { buildUpdatePlanForItem, groupBySource } from "@/domain/updatePlan.js";
 import { readConfig } from "@/shell/config.js";
-import { readLockfile } from "@/shell/lockfile.js";
+import { readLockfile, writeLockfile } from "@/shell/lockfile.js";
 import { loadRegistry, resolveFileContent } from "@/shell/registry.js";
 import {
   DirectoryAdapter,
@@ -224,42 +223,6 @@ async function interactApprovalPhase(
   return ok({ approvedUpdates });
 }
 
-type UpdateTransactionPayload = {
-  sagaSteps: TransactionStep<any>[];
-  updatedLockfile: RegpickLockfile;
-};
-
-/**
- * Wraps final decision changes payloads safely directly within transaction structures.
- *
- * @param context - Command context.
- * @param initialLockfile - Fallback lock tracking structure constraints.
- * @param approvedPlan - Hand-picked decisions wrapper schemas.
- * @returns Object holding transaction actions plus mapped target hash keys updates.
- */
-function buildUpdateCommand(
-  context: CommandContext,
-  initialLockfile: RegpickLockfile,
-  approvedPlan: ApprovedUpdatePlan,
-): UpdateTransactionPayload {
-  const sagaSteps: TransactionStep<any>[] = [];
-  const updatedLockfile = JSON.parse(JSON.stringify(initialLockfile)) as RegpickLockfile;
-
-  for (const update of approvedPlan.approvedUpdates) {
-    for (const file of update.files) {
-      sagaSteps.push(new UpdateFileStep(file.target, file.remoteContent, context.runtime));
-    }
-    // Record the newly computed hash in the deeply cloned lockfile object
-    updatedLockfile.components[update.itemName].hash = update.newHash;
-  }
-
-  if (approvedPlan.approvedUpdates.length > 0) {
-    sagaSteps.push(new SaveLockfileStep(context.cwd, updatedLockfile, context.runtime));
-  }
-
-  return { sagaSteps, updatedLockfile };
-}
-
 /**
  * Main controller for the `update` command.
  * Automates pulling modifications using active lock tracking references.
@@ -270,7 +233,6 @@ function buildUpdateCommand(
 export async function runUpdateCommand(
   context: CommandContext,
 ): Promise<Result<CommandOutcome, AppError>> {
-  // 1. Initial State
   const stateQ = await queryLoadState(context);
   if (!stateQ.ok) return err(stateQ.error);
 
@@ -280,7 +242,6 @@ export async function runUpdateCommand(
     return ok({ kind: "noop", message: "No components to update." });
   }
 
-  // 2. Discover Targets (Network & Local disk reads)
   const customAdapters = await loadAdapters(stateQ.value.config.adapters || [], context.cwd);
   const adapters = [
     ...customAdapters,
@@ -301,7 +262,6 @@ export async function runUpdateCommand(
     return ok({ kind: "noop", message: "All components are up to date." });
   }
 
-  // 3. Resolve conflicts / prompts via User Interactions
   let approvedPlanQ: Result<ApprovedUpdatePlan, AppError>;
 
   if (context.args?.flags?.yes) {
@@ -317,25 +277,41 @@ export async function runUpdateCommand(
     return ok({ kind: "noop", message: "No updates approved." });
   }
 
-  // 4. Assemble Transactions
-  const { sagaSteps } = buildUpdateCommand(context, stateQ.value.lockfile, approvedPlanQ.value);
+  const updatedLockfile = JSON.parse(JSON.stringify(stateQ.value.lockfile));
+  const vfsFiles = [];
 
-  // 5. Execute!
-  const runRes = await runSaga(sagaSteps, (stepName, status) => {
-    if (status === "executing") {
-      // Intentionally quiet while executing tasks
-    } else if (status === "completed") {
-      context.runtime.prompt.success(`[Success] ${stepName}`);
-    } else if (status === "failed") {
-      context.runtime.prompt.error(`[Failed] ${stepName}`);
-    } else if (status === "compensating") {
-      context.runtime.prompt.warn(`[Rollback] ${stepName}`);
-    } else if (status === "interrupted") {
-      context.runtime.prompt.error(`[Interrupted] Rolling back ${stepName}`);
+  for (const update of approvedPlanQ.value.approvedUpdates) {
+    for (const file of update.files) {
+      vfsFiles.push({
+        id: file.target,
+        code: file.remoteContent,
+      });
     }
-  });
+    updatedLockfile.components[update.itemName].hash = update.newHash;
+  }
 
-  if (!runRes.ok) return runRes;
+  const userPlugins = stateQ.value.config.plugins || [];
+  const vfs = new MemoryVFS();
+  const pipeline = new PipelineRenderer([
+    ...userPlugins,
+    {
+      name: "regpick:core-update",
+      async finish(ctx) {
+        if ("flushToDisk" in ctx.vfs) {
+          await (ctx.vfs as PersistableVFS).flushToDisk();
+        }
+        await writeLockfile(ctx.cwd, updatedLockfile, context.runtime);
+      },
+    },
+  ]);
+
+  try {
+    await pipeline.run({ vfs, cwd: context.cwd }, vfsFiles);
+  } catch (error) {
+    vfs.rollback();
+    context.runtime.prompt.error(`[Failed] Update aborted: ${error}`);
+    return err(appError("RuntimeError", String(error)));
+  }
 
   return ok({
     kind: "success",

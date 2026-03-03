@@ -11,17 +11,51 @@ const OverwritePolicySchema = v.union([
 
 const PackageManagerSchema = v.string();
 
+export const isFunction = (val: unknown) => typeof val === "function";
+export const FunctionSchema = v.custom<Function>(isFunction, "Expected a function");
+
+export const PluginSchema = v.object({
+  name: v.string(),
+  start: v.optional(FunctionSchema),
+  resolveId: v.optional(FunctionSchema),
+  load: v.optional(FunctionSchema),
+  transform: v.optional(FunctionSchema),
+  finish: v.optional(FunctionSchema),
+  onError: v.optional(FunctionSchema),
+});
+
+export const RegistryAdapterSchema = v.object({
+  name: v.string(),
+  match: FunctionSchema,
+  resolveManifest: FunctionSchema,
+  resolveItemReference: FunctionSchema,
+  resolveFile: FunctionSchema,
+});
+
+export const PackageManagerPluginSchema = v.object({
+  name: v.string(),
+  lockfiles: v.array(v.string()),
+  detect: FunctionSchema,
+  buildInstallCommands: FunctionSchema,
+});
+
+export const PathResolverPluginSchema = v.object({
+  name: v.string(),
+  resolve: FunctionSchema,
+});
+
 export const RegpickConfigSchema = v.object({
   registries: v.record(v.string(), v.string()),
   targetsByType: v.record(v.string(), v.string()),
   aliases: v.optional(v.record(v.string(), v.string()), {}),
   overwritePolicy: OverwritePolicySchema,
   packageManager: PackageManagerSchema,
-  packageManagers: v.optional(v.array(v.any()), []),
-  pathResolvers: v.optional(v.array(v.any()), []),
+  packageManagers: v.optional(v.array(PackageManagerPluginSchema), []),
+  pathResolvers: v.optional(v.array(PathResolverPluginSchema), []),
+  plugins: v.optional(v.array(PluginSchema), []),
   preferManifestTarget: v.boolean(),
   allowOutsideProject: v.boolean(),
-  adapters: v.optional(v.array(v.union([v.string(), v.any()])), []),
+  adapters: v.optional(v.array(v.union([v.string(), RegistryAdapterSchema])), []),
 });
 
 export type RegpickConfig = v.InferOutput<typeof RegpickConfigSchema>;
@@ -40,6 +74,7 @@ const DEFAULT_CONFIG: RegpickConfig = {
   packageManager: "auto",
   packageManagers: [],
   pathResolvers: [],
+  plugins: [],
   preferManifestTarget: true,
   allowOutsideProject: false,
   adapters: [],

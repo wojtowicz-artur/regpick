@@ -129,11 +129,9 @@ function presentItems(context: CommandContext, items: RegistryItem[]): void {
 export async function runListCommand(
   context: CommandContext,
 ): Promise<Result<CommandOutcome, AppError>> {
-  // 1. Initial State
   const stateQ = await queryListSourceState(context);
   if (!stateQ.ok) return err(stateQ.error);
 
-  // 2. User Interaction (Resolve Source)
   const sourceQ = await interactSourcePhase(context, stateQ.value);
   if (!sourceQ.ok) return err(sourceQ.error);
 
@@ -141,13 +139,11 @@ export async function runListCommand(
     return ok({ kind: "noop", message: "No registry source provided." });
   }
 
-  // 3. Fetch Data
   const itemsQ = await queryRegistryItems(context, sourceQ.value, stateQ.value.adapters);
   if (!itemsQ.ok) return err(itemsQ.error);
 
   const items = itemsQ.value;
 
-  // 4. Present Data & Finish
   if (!items.length) {
     context.runtime.prompt.warn("No items found in registry.");
     return ok({ kind: "noop", message: "No items found in registry." });
