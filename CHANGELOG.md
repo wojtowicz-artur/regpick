@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.16.2](https://github.com/wojtowicz-artur/regpick/compare/v0.16.1...v0.16.2) (2026-03-03)
+
+### Performance Improvements
+
+* implement KeyedMutex for concurrent and thread-safe VFS processing ([8c9053a](https://github.com/wojtowicz-artur/regpick/commit/8c9053a6f5994d76976a360e4f4305cada984c93))
+
 ## [0.16.1](https://github.com/wojtowicz-artur/regpick/compare/v0.16.0...v0.16.1) (2026-03-03)
 
 ### Code Refactoring
