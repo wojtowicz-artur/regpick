@@ -21,7 +21,7 @@ import type {
 type DetectedUpdateFile = {
   target: string;
   remoteContent: string;
-  localContent: string; // Used for pure diffing interaction without side-effects
+  localContent: string;
 };
 
 type DetectedUpdate = {
@@ -36,287 +36,294 @@ type ApprovedUpdatePlan = {
 
 /**
  * Evaluates local lockfile dependencies against root config boundaries.
- *
- * @param context - Command context.
- * @returns Valid active configuration structures alongside locked manifests.
  */
-async function queryLoadState(
+function queryLoadState(
   context: CommandContext,
-): Promise<Either.Either<{ config: RegpickConfig; lockfile: RegpickLockfile }, AppError>> {
-  // Read config and lockfile concurrently
-  const [configRes, lockfile] = await Promise.all([
-    readConfig(context.cwd),
-    readLockfile(context.cwd, context.runtime),
-  ]);
+): Effect.Effect<{ config: RegpickConfig; lockfile: RegpickLockfile }, AppError> {
+  return Effect.gen(function* () {
+    const configRes = yield* Effect.tryPromise({
+      try: () => readConfig(context.cwd),
+      catch: (e): AppError => appError("RuntimeError", String(e)),
+    });
 
-  if (!configRes.configPath) {
-    context.runtime.prompt.error("No regpick.json configuration found. Please run 'init' first.");
-    return Either.left(appError("ValidationError", "No config file found"));
-  }
+    const lockfile = yield* Effect.tryPromise({
+      try: () => readLockfile(context.cwd, context.runtime),
+      catch: (e): AppError => appError("RuntimeError", String(e)),
+    });
 
-  return Either.right({ config: configRes.config as RegpickConfig, lockfile });
+    if (!configRes.configPath) {
+      yield* context.runtime.prompt.error(
+        "No regpick.json configuration found. Please run 'init' first.",
+      );
+      return yield* Effect.fail(appError("ValidationError", "No config file found"));
+    }
+
+    return { config: configRes.config as RegpickConfig, lockfile };
+  });
 }
 
 /**
  * Scans all defined component origins matching hashes to registry states.
- *
- * @param context - Command context.
- * @param config - Main structural configurations constraints.
- * @param lockfile - Component lock structures payload.
- * @returns Calculated diff schemas ready for target execution branches.
  */
-async function queryAvailableUpdates(
+function queryAvailableUpdates(
   context: CommandContext,
   config: RegpickConfig,
   lockfile: RegpickLockfile,
   plugins: RegpickPlugin[],
-): Promise<Either.Either<DetectedUpdate[], AppError>> {
-  const bySource = groupBySource(lockfile);
-  const availableUpdates: DetectedUpdate[] = [];
+): Effect.Effect<DetectedUpdate[], AppError> {
+  return Effect.gen(function* () {
+    const bySource = groupBySource(lockfile);
+    const availableUpdates: DetectedUpdate[] = [];
 
-  for (const [source, itemsToUpdate] of Object.entries(bySource)) {
-    const registryRes = await loadRegistry(source, context.cwd, context.runtime, plugins);
-    if (Either.isLeft(registryRes)) {
-      context.runtime.prompt.warn(`Failed to load registry ${source}`);
-      continue;
-    }
+    for (const [source, itemsToUpdate] of Object.entries(bySource)) {
+      const registryRes = yield* Effect.tryPromise({
+        try: () => loadRegistry(source, context.cwd, context.runtime, plugins),
+        catch: (e): AppError => appError("RuntimeError", String(e)),
+      });
 
-    const registryItems = registryRes.right.items;
+      if (Either.isLeft(registryRes)) {
+        yield* context.runtime.prompt.warn(`Failed to load registry ${source}`);
+        continue;
+      }
 
-    for (const itemName of itemsToUpdate) {
-      const registryItem = registryItems.find((i) => i.name === itemName);
-      if (!registryItem) continue;
+      const registryItems = registryRes.right.items;
 
-      const fileContentResults = await Promise.all(
-        registryItem.files.map(async (file) => {
-          const contentRes = await resolveFileContent(
-            file,
-            registryItem,
-            context.cwd,
-            context.runtime,
-            plugins,
-          );
-          if (Either.isLeft(contentRes)) return null;
-          return { file, content: contentRes.right };
-        }),
-      );
+      for (const itemName of itemsToUpdate) {
+        const registryItem = registryItems.find((i) => i.name === itemName);
+        if (!registryItem) continue;
 
-      const resolvedFiles = fileContentResults.filter(
-        (r): r is { file: RegistryFile; content: string } => r !== null,
-      );
+        const fileContentResults = yield* Effect.tryPromise({
+          try: () =>
+            Promise.all(
+              registryItem.files.map(async (file) => {
+                const contentRes = await resolveFileContent(
+                  file,
+                  registryItem,
+                  context.cwd,
+                  context.runtime,
+                  plugins,
+                );
+                if (Either.isLeft(contentRes)) return null;
+                return { file, content: contentRes.right };
+              }),
+            ),
+          catch: (e): AppError => appError("RuntimeError", String(e)),
+        });
 
-      const currentHash = lockfile.components[itemName].hash;
-      const updatePlanRes = buildUpdatePlanForItem(
-        itemName,
-        registryItem,
-        resolvedFiles,
-        currentHash,
-        context.cwd,
-        config,
-      );
+        const resolvedFiles = fileContentResults.filter(
+          (r): r is { file: RegistryFile; content: string } => r !== null,
+        );
 
-      if (Either.isLeft(updatePlanRes)) continue;
+        const currentHash = lockfile.components[itemName].hash;
+        const updatePlanRes = buildUpdatePlanForItem(
+          itemName,
+          registryItem,
+          resolvedFiles,
+          currentHash,
+          context.cwd,
+          config,
+        );
 
-      const updateAction = updatePlanRes.right;
+        if (Either.isLeft(updatePlanRes)) continue;
 
-      if (updateAction.status === "requires-diff-prompt") {
-        // Hydrate local contents immediately so the interaction phase is 100% pure IO with user
-        const filesWithLocal: DetectedUpdateFile[] = [];
-        for (const rf of updateAction.files) {
-          let localContent = "";
-          try {
-            localContent = await Effect.runPromise(context.runtime.fs.readFile(rf.target, "utf8"));
-          } catch {
-            localContent = "";
+        const updateAction = updatePlanRes.right;
+
+        if (updateAction.status === "requires-diff-prompt") {
+          const filesWithLocal: DetectedUpdateFile[] = [];
+          for (const rf of updateAction.files) {
+            const localContent = yield* Effect.catchAll(
+              context.runtime.fs.readFile(rf.target, "utf8"),
+              () => Effect.succeed(""),
+            );
+            filesWithLocal.push({
+              target: rf.target,
+              remoteContent: rf.content,
+              localContent,
+            });
           }
-          filesWithLocal.push({
-            target: rf.target,
-            remoteContent: rf.content,
-            localContent,
+
+          availableUpdates.push({
+            itemName,
+            newHash: updateAction.newHash,
+            files: filesWithLocal,
           });
         }
-
-        availableUpdates.push({
-          itemName,
-          newHash: updateAction.newHash,
-          files: filesWithLocal,
-        });
       }
     }
-  }
 
-  return Either.right(availableUpdates);
+    return availableUpdates;
+  });
 }
 
 /**
  * Outputs standard diffing structures inside terminal consoles inline.
- *
- * @param oldContent - Base payload node text.
- * @param newContent - Received targeted remote elements node strings.
  */
-async function printDiff(oldContent: string, newContent: string) {
-  // TODO: Use a native diff implementation to avoid the dependency. This is a temporary solution. WHEN: implement when ecosystem will move further from Node 20, because native diff landad in Node 22.15
-  const changes = await import("diff").then(({ diffLines }) => {
-    return diffLines(oldContent, newContent);
-  });
+function printDiff(oldContent: string, newContent: string): Effect.Effect<void, AppError> {
+  return Effect.gen(function* () {
+    const changes = yield* Effect.tryPromise({
+      try: () => import("diff").then(({ diffLines }) => diffLines(oldContent, newContent)),
+      catch: (e): AppError => appError("RuntimeError", String(e)),
+    });
 
-  for (const part of changes) {
-    const format = part.added ? "green" : part.removed ? "red" : "gray";
-    const prefix = part.added ? "+ " : part.removed ? "- " : "  ";
-    const lines = part.value.replace(/\n$/, "").split("\n");
-    for (const line of lines) {
-      console.log(styleText(format, `${prefix}${line}`));
+    for (const part of changes) {
+      const format = part.added ? "green" : part.removed ? "red" : "gray";
+      const prefix = part.added ? "+ " : part.removed ? "- " : "  ";
+      const lines = part.value.replace(/\n$/, "").split("\n");
+      for (const line of lines) {
+        console.log(styleText(format, `${prefix}${line}`));
+      }
     }
-  }
+  });
 }
 
 /**
  * Determines final decisions on diff changes required by targeted registries.
- *
- * @param context - Command context.
- * @param availableUpdates - Raw detected updates payload.
- * @returns Sanctioned overrides execution plans constraints.
  */
-async function interactApprovalPhase(
+function interactApprovalPhase(
   context: CommandContext,
   availableUpdates: DetectedUpdate[],
-): Promise<Either.Either<ApprovedUpdatePlan, AppError>> {
-  const approvedUpdates: DetectedUpdate[] = [];
+): Effect.Effect<ApprovedUpdatePlan, AppError> {
+  return Effect.gen(function* () {
+    const approvedUpdates: DetectedUpdate[] = [];
 
-  for (const update of availableUpdates) {
-    context.runtime.prompt.info(`Update available for ${update.itemName}`);
+    for (const update of availableUpdates) {
+      yield* context.runtime.prompt.info(`Update available for ${update.itemName}`);
 
-    const action = await Effect.runPromise(
-      context.runtime.prompt.select({
+      const action = yield* context.runtime.prompt.select({
         message: `What do you want to do with ${update.itemName}?`,
         options: [
           { value: "diff", label: "Show diff" },
           { value: "update", label: "Update" },
           { value: "skip", label: "Skip" },
         ],
-      }),
-    );
+      });
 
-    const isActionCancel = await Effect.runPromise(context.runtime.prompt.isCancel(action));
-    if (isActionCancel || action === "skip") {
-      continue;
-    }
+      const isActionCancel = yield* context.runtime.prompt.isCancel(action);
 
-    if (action === "diff") {
-      for (const rf of update.files) {
-        console.log(styleText("bold", `\nDiff for ${rf.target}:`));
-        await printDiff(rf.localContent, rf.remoteContent);
-      }
-
-      const confirm = await Effect.runPromise(
-        context.runtime.prompt.confirm({
-          message: `Update ${update.itemName} now?`,
-          initialValue: true,
-        }),
-      );
-
-      const isConfirmCancel = await Effect.runPromise(context.runtime.prompt.isCancel(confirm));
-      if (isConfirmCancel || !confirm) {
+      if (isActionCancel || action === "skip") {
         continue;
       }
+
+      if (action === "diff") {
+        for (const rf of update.files) {
+          console.log(styleText("bold", `\nDiff for ${rf.target}:`));
+          yield* printDiff(rf.localContent, rf.remoteContent);
+        }
+
+        const confirm = yield* context.runtime.prompt.confirm({
+          message: `Update ${update.itemName} now?`,
+          initialValue: true,
+        });
+
+        const isConfirmCancel = yield* context.runtime.prompt.isCancel(confirm);
+
+        if (isConfirmCancel || !confirm) {
+          continue;
+        }
+      }
+
+      approvedUpdates.push(update);
     }
 
-    approvedUpdates.push(update);
-  }
-
-  return Either.right({ approvedUpdates });
+    return { approvedUpdates };
+  });
 }
 
 /**
- * Main controller for the `update` command.
- * Automates pulling modifications using active lock tracking references.
- *
- * @param context - Command context.
- * @returns Process completion payload constraints wrapper.
+ * Main controller for the `update` command effect loop.
  */
+function runUpdateCommandEff(context: CommandContext): Effect.Effect<CommandOutcome, AppError> {
+  return Effect.gen(function* () {
+    const state = yield* queryLoadState(context);
+
+    const componentNames = Object.keys(state.lockfile.components);
+    if (componentNames.length === 0) {
+      yield* context.runtime.prompt.info("No components installed. Nothing to update.");
+      return {
+        kind: "noop",
+        message: "No components to update.",
+      } as CommandOutcome;
+    }
+
+    const customPlugins = yield* Effect.tryPromise({
+      try: () => loadPlugins(state.config.plugins || [], context.cwd),
+      catch: (e): AppError => appError("RuntimeError", String(e)),
+    });
+
+    const plugins = [...customPlugins, HttpPlugin(), FilePlugin(), DirectoryPlugin()];
+
+    const updates = yield* queryAvailableUpdates(context, state.config, state.lockfile, plugins);
+
+    if (updates.length === 0) {
+      return {
+        kind: "noop",
+        message: "All components are up to date.",
+      } as CommandOutcome;
+    }
+
+    let approvedPlan: ApprovedUpdatePlan;
+
+    if (context.args?.flags?.yes) {
+      approvedPlan = { approvedUpdates: updates };
+    } else {
+      approvedPlan = yield* interactApprovalPhase(context, updates);
+    }
+
+    const approvedCount = approvedPlan.approvedUpdates.length;
+    if (approvedCount === 0) {
+      return {
+        kind: "noop",
+        message: "No updates approved.",
+      } as CommandOutcome;
+    }
+
+    const updatedLockfile = JSON.parse(JSON.stringify(state.lockfile));
+    const vfsFiles: { id: string; code: string }[] = [];
+
+    for (const update of approvedPlan.approvedUpdates) {
+      for (const file of update.files) {
+        vfsFiles.push({
+          id: file.target,
+          code: file.remoteContent,
+        });
+      }
+      updatedLockfile.components[update.itemName].hash = update.newHash;
+    }
+
+    const userPlugins = state.config.plugins?.filter((p) => typeof p === "object") || [];
+    const vfs = new MemoryVFS();
+
+    const pipeline = new PipelineRenderer([
+      ...(userPlugins as import("../core/pipeline.js").Plugin[]),
+      {
+        name: "regpick:core-update",
+        async finish(ctx) {
+          if ("flushToDisk" in ctx.vfs) {
+            await (ctx.vfs as PersistableVFS).flushToDisk();
+          }
+          await writeLockfile(ctx.cwd, updatedLockfile, context.runtime);
+        },
+      },
+    ]);
+
+    yield* Effect.tryPromise({
+      try: () => pipeline.run({ vfs, cwd: context.cwd, runtime: context.runtime }, vfsFiles),
+      catch: (error): AppError => {
+        vfs.rollback();
+        Effect.runPromise(context.runtime.prompt.error(`[Failed] Update aborted: ${error}`));
+        return appError("RuntimeError", String(error));
+      },
+    });
+
+    return {
+      kind: "success",
+      message: `Updated ${approvedCount} components.`,
+    } as CommandOutcome;
+  });
+}
+
 export async function runUpdateCommand(
   context: CommandContext,
 ): Promise<Either.Either<CommandOutcome, AppError>> {
-  const stateQ = await queryLoadState(context);
-  if (Either.isLeft(stateQ)) return Either.left(stateQ.left);
-
-  const componentNames = Object.keys(stateQ.right.lockfile.components);
-  if (componentNames.length === 0) {
-    context.runtime.prompt.info("No components installed. Nothing to update.");
-    return Either.right({ kind: "noop", message: "No components to update." });
-  }
-
-  const customPlugins = await loadPlugins(stateQ.right.config.plugins || [], context.cwd);
-  const plugins = [...customPlugins, HttpPlugin(), FilePlugin(), DirectoryPlugin()];
-
-  const updatesQ = await queryAvailableUpdates(
-    context,
-    stateQ.right.config,
-    stateQ.right.lockfile,
-    plugins,
-  );
-  if (Either.isLeft(updatesQ)) return Either.left(updatesQ.left);
-
-  if (updatesQ.right.length === 0) {
-    return Either.right({
-      kind: "noop",
-      message: "All components are up to date.",
-    });
-  }
-
-  let approvedPlanQ: Either.Either<ApprovedUpdatePlan, AppError>;
-
-  if (context.args?.flags?.yes) {
-    approvedPlanQ = Either.right({ approvedUpdates: updatesQ.right });
-  } else {
-    approvedPlanQ = await interactApprovalPhase(context, updatesQ.right);
-  }
-
-  if (Either.isLeft(approvedPlanQ)) return Either.left(approvedPlanQ.left);
-
-  const approvedCount = approvedPlanQ.right.approvedUpdates.length;
-  if (approvedCount === 0) {
-    return Either.right({ kind: "noop", message: "No updates approved." });
-  }
-
-  const updatedLockfile = JSON.parse(JSON.stringify(stateQ.right.lockfile));
-  const vfsFiles = [];
-
-  for (const update of approvedPlanQ.right.approvedUpdates) {
-    for (const file of update.files) {
-      vfsFiles.push({
-        id: file.target,
-        code: file.remoteContent,
-      });
-    }
-    updatedLockfile.components[update.itemName].hash = update.newHash;
-  }
-
-  const userPlugins = stateQ.right.config.plugins?.filter((p) => typeof p === "object") || [];
-  const vfs = new MemoryVFS();
-  const pipeline = new PipelineRenderer([
-    ...(userPlugins as import("../core/pipeline.js").Plugin[]),
-    {
-      name: "regpick:core-update",
-      async finish(ctx) {
-        if ("flushToDisk" in ctx.vfs) {
-          await (ctx.vfs as PersistableVFS).flushToDisk();
-        }
-        await writeLockfile(ctx.cwd, updatedLockfile, context.runtime);
-      },
-    },
-  ]);
-
-  try {
-    await pipeline.run({ vfs, cwd: context.cwd, runtime: context.runtime }, vfsFiles);
-  } catch (error) {
-    vfs.rollback();
-    context.runtime.prompt.error(`[Failed] Update aborted: ${error}`);
-    return Either.left(appError("RuntimeError", String(error)));
-  }
-
-  return Either.right({
-    kind: "success",
-    message: `Updated ${approvedCount} components.`,
-  });
+  return await Effect.runPromise(Effect.either(runUpdateCommandEff(context)));
 }
