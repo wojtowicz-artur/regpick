@@ -134,6 +134,7 @@ export default {
 export default {
   name: "external-proto",
   match: ({ source }) => source.startsWith("external-proto://"),
+  resolveItemReference: async () => ({ ok: false, error: new Error("Not implemented") }),
   resolveManifest: async ({ source }) => {
     return {
       ok: true,
