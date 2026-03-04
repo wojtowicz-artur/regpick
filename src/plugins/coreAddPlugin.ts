@@ -1,10 +1,19 @@
 import { type PersistableVFS, type PipelineContext, type Plugin } from "@/core/pipeline.js";
 import { installDependencies } from "@/shell/installer.js";
-import { readLockfile, writeLockfile } from "@/shell/lockfile.js";
+import { computeTreeHash, readLockfile, writeLockfile } from "@/shell/lockfile.js";
 import { resolvePackageManager } from "@/shell/packageManagers/resolver.js";
 import { type RuntimePorts } from "@/shell/runtime/ports.js";
-import { type RegistryItem, type RegpickConfig } from "@/types.js";
+import { type RegistryFile, type RegistryItem, type RegpickConfig } from "@/types.js";
 import { Effect } from "effect";
+
+type HydratedWriteInfo = {
+  itemName: string;
+  absoluteTarget: string;
+  relativeTarget: string;
+  sourceFile: RegistryFile;
+  originalContent: string;
+  finalContent: string;
+};
 
 /**
  * Core Plugin that bridges the gap between the `InstallPlan` resulting from
@@ -18,6 +27,7 @@ export function coreAddPlugin(
   config: RegpickConfig,
   runtime: RuntimePorts,
   installedItemsInfo: RegistryItem[] = [],
+  hydratedWrites: HydratedWriteInfo[] = [],
 ): Plugin {
   return {
     name: "regpick:core-add",
@@ -57,9 +67,36 @@ export function coreAddPlugin(
         const lockfile = await Effect.runPromise(readLockfile(ctx.cwd, runtime));
         for (const item of installedItemsInfo) {
           if (!lockfile.components) lockfile.components = {};
+
+          const itemWrites = hydratedWrites.filter((w) => w.itemName === item.name);
+
+          const remoteFiles = itemWrites.map((w) => ({
+            path: w.relativeTarget,
+            content: w.originalContent,
+          }));
+          const remoteHash = computeTreeHash(remoteFiles);
+
+          const localFiles = [];
+          for (const w of itemWrites) {
+            try {
+              const localBuffer = await ctx.vfs.readFile(w.absoluteTarget, "utf-8");
+              localFiles.push({
+                path: w.relativeTarget,
+                content: localBuffer.toString(),
+              });
+            } catch {
+              localFiles.push({
+                path: w.relativeTarget,
+                content: w.originalContent,
+              });
+            }
+          }
+          const localHash = computeTreeHash(localFiles);
+
           lockfile.components[item.name] = {
             source: item.sourceMeta?.originalSource ?? "unknown",
-            hash: "pending", // Hash integration handled post-transform or left pending
+            remoteHash,
+            localHash,
           };
         }
         await Effect.runPromise(writeLockfile(ctx.cwd, lockfile, runtime));

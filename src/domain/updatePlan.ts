@@ -1,8 +1,14 @@
 import type { AppError } from "@/core/errors.js";
 import { applyAliases } from "@/domain/aliasCore.js";
 import { resolveOutputPathFromPolicy } from "@/domain/pathPolicy.js";
-import { computeHash } from "@/shell/lockfile.js";
-import type { RegistryFile, RegistryItem, RegpickConfig, RegpickLockfile } from "@/types.js";
+import { computeTreeHash } from "@/shell/lockfile.js";
+import type {
+  LockfileItem,
+  RegistryFile,
+  RegistryItem,
+  RegpickConfig,
+  RegpickLockfile,
+} from "@/types.js";
 import { Effect } from "effect";
 
 export type UpdateFile = {
@@ -33,17 +39,16 @@ export const buildUpdatePlanForItem = (
   itemName: string,
   registryItem: RegistryItem,
   resolvedFiles: { file: RegistryFile; content: string }[],
-  currentHash: string,
+  lockfileItem: LockfileItem,
   cwd: string,
   config: RegpickConfig,
 ): Effect.Effect<UpdateAction, AppError> =>
   Effect.gen(function* () {
-    const remoteContents: string[] = [];
     const remoteFiles: UpdateFile[] = [];
+    const treeFiles: { path: string; content: string }[] = [];
 
     for (const { file, content: rawContent } of resolvedFiles) {
       const content = applyAliases(rawContent, config);
-      remoteContents.push(content);
 
       const outputRes = yield* resolveOutputPathFromPolicy(registryItem, file, cwd, config);
 
@@ -51,16 +56,26 @@ export const buildUpdatePlanForItem = (
         target: outputRes.absoluteTarget,
         content: content,
       });
+
+      treeFiles.push({
+        path: outputRes.relativeTarget,
+        content: content,
+      });
     }
 
-    const newHash = computeHash(remoteContents.sort().join(""));
+    const newRemoteHash = computeTreeHash(treeFiles);
+
+    // If the lockfile matches the remote state, no incoming changes exist
+    // If it's a legacy lockfile (hash only and pending), we will prompt to update it
+    const storedHash = lockfileItem.remoteHash || lockfileItem.hash;
+    const isPending = storedHash === "pending";
     const status: "requires-diff-prompt" | "up-to-date" =
-      newHash !== currentHash ? "requires-diff-prompt" : "up-to-date";
+      isPending || newRemoteHash !== storedHash ? "requires-diff-prompt" : "up-to-date";
 
     return yield* Effect.succeed({
       itemName,
       status,
-      newHash,
+      newHash: newRemoteHash,
       files: remoteFiles,
     });
   });

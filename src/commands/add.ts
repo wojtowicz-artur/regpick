@@ -25,6 +25,7 @@ import { Effect } from "effect";
 type HydratedWrite = {
   itemName: string;
   absoluteTarget: string;
+  relativeTarget: string;
   sourceFile: RegistryFile;
   originalContent: string;
   finalContent: string;
@@ -375,6 +376,7 @@ function resolveContents(
           writes.push({
             itemName: write.itemName,
             absoluteTarget: write.absoluteTarget,
+            relativeTarget: write.relativeTarget,
             sourceFile: write.sourceFile,
             originalContent: content,
             finalContent,
@@ -453,6 +455,7 @@ export function runAddCommand(): Effect.Effect<
           yield* ConfigTag,
           runtime,
           installedItemsInfo,
+          hydratedWrites,
         ) as import("../core/pipeline.js").Plugin,
       ]);
 

@@ -7,7 +7,7 @@ import { PipelineRenderer, type PersistableVFS } from "@/core/pipeline.js";
 import { MemoryVFS } from "@/core/vfs.js";
 import { buildUpdatePlanForItem, groupBySource } from "@/domain/updatePlan.js";
 import { readConfig } from "@/shell/config.js";
-import { readLockfile, writeLockfile } from "@/shell/lockfile.js";
+import { computeTreeHash, readLockfile, writeLockfile } from "@/shell/lockfile.js";
 import { DirectoryPlugin, FilePlugin, HttpPlugin, loadPlugins } from "@/shell/plugins/index.js";
 import { loadRegistry, resolveFileContent } from "@/shell/registry.js";
 import { Runtime } from "@/shell/runtime/ports.js";
@@ -18,6 +18,7 @@ import type {
   RegpickLockfile,
   RegpickPlugin,
 } from "@/types.js";
+import path from "node:path";
 
 type DetectedUpdateFile = {
   target: string;
@@ -106,13 +107,13 @@ function queryAvailableUpdates(
                   ),
                 );
 
-                const currentHash = lockfile.components[itemName].hash;
+                const lockfileItem = lockfile.components[itemName];
                 const updatePlanRes = yield* Effect.catchAll(
                   buildUpdatePlanForItem(
                     itemName,
                     registryItem,
                     resolvedFiles,
-                    currentHash,
+                    lockfileItem,
                     context.cwd,
                     config,
                   ),
@@ -318,7 +319,7 @@ export function runUpdateCommand(): Effect.Effect<
                 code: file.remoteContent,
               });
             });
-            updatedLockfile.components[update.itemName].hash = update.newHash;
+            updatedLockfile.components[update.itemName].remoteHash = update.newHash;
           }),
         { concurrency: "unbounded" },
       );
@@ -334,6 +335,27 @@ export function runUpdateCommand(): Effect.Effect<
             if ("flushToDisk" in ctx.vfs) {
               await (ctx.vfs as PersistableVFS).flushToDisk();
             }
+
+            for (const update of approvedPlan.approvedUpdates) {
+              const localFiles = [];
+              for (const file of update.files) {
+                const relativeTarget = path.relative(ctx.cwd, file.target);
+                try {
+                  const localContent = await ctx.vfs.readFile(file.target, "utf-8");
+                  localFiles.push({
+                    path: relativeTarget,
+                    content: localContent.toString(),
+                  });
+                } catch {
+                  localFiles.push({
+                    path: relativeTarget,
+                    content: file.remoteContent,
+                  });
+                }
+              }
+              updatedLockfile.components[update.itemName].localHash = computeTreeHash(localFiles);
+            }
+
             await Effect.runPromise(writeLockfile(ctx.cwd, updatedLockfile, runtime));
           },
         },
