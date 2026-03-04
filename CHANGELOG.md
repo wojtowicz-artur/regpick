@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.17.0](https://github.com/wojtowicz-artur/regpick/compare/v0.16.8...v0.17.0) (2026-03-04)
+
+### Features
+
+* implement crash journal for partial failure recovery ([5a90fc3](https://github.com/wojtowicz-artur/regpick/commit/5a90fc3b28ee3e94e8fa7b6d0b08610effaff853))
+
 ## [0.16.8](https://github.com/wojtowicz-artur/regpick/compare/v0.16.7...v0.16.8) (2026-03-04)
 
 ### Code Refactoring
