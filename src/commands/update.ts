@@ -2,7 +2,7 @@ import { Effect, Either } from "effect";
 import { styleText } from "node:util";
 
 import { CommandContextTag, ConfigTag } from "@/core/context.js";
-import { appError, type AppError } from "@/core/errors.js";
+import { appError, toAppError, type AppError } from "@/core/errors.js";
 import { PipelineRenderer, type PersistableVFS } from "@/core/pipeline.js";
 import { MemoryVFS } from "@/core/vfs.js";
 import { buildUpdatePlanForItem, groupBySource } from "@/domain/updatePlan.js";
@@ -46,13 +46,9 @@ function queryLoadState(): Effect.Effect<
   return Effect.gen(function* () {
     const runtime = yield* Runtime;
     const context = yield* CommandContextTag;
-    const configRes = yield* readConfig(context.cwd).pipe(
-      Effect.mapError((e) => appError("RuntimeError", String(e))),
-    );
+    const configRes = yield* readConfig(context.cwd).pipe(Effect.mapError(toAppError));
 
-    const lockfile = yield* readLockfile(context.cwd, runtime).pipe(
-      Effect.mapError((e) => appError("RuntimeError", String(e))),
-    );
+    const lockfile = yield* readLockfile(context.cwd, runtime).pipe(Effect.mapError(toAppError));
 
     if (!configRes.configPath) {
       yield* runtime.prompt.error("No regpick.json configuration found. Please run 'init' first.");
@@ -172,7 +168,7 @@ function printDiff(oldContent: string, newContent: string): Effect.Effect<void, 
   return Effect.gen(function* () {
     const changes = yield* Effect.tryPromise({
       try: () => import("diff").then(({ diffLines }) => diffLines(oldContent, newContent)),
-      catch: (e): AppError => appError("RuntimeError", String(e)),
+      catch: toAppError,
     });
 
     yield* Effect.forEach(
@@ -279,7 +275,7 @@ export function runUpdateCommand(): Effect.Effect<
       }
 
       const customPlugins = yield* loadPlugins((yield* ConfigTag).plugins || [], context.cwd).pipe(
-        Effect.mapError((e) => appError("RuntimeError", String(e))),
+        Effect.mapError(toAppError),
       );
 
       const plugins = [...customPlugins, HttpPlugin(), FilePlugin(), DirectoryPlugin()];

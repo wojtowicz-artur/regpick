@@ -1,5 +1,5 @@
 import { CommandContextTag } from "@/core/context.js";
-import { appError } from "@/core/errors.js";
+import { appError, toAppError } from "@/core/errors.js";
 import { decideInitAfterOverwritePrompt } from "@/domain/initCore.js";
 import {
   generateConfigCode,
@@ -29,14 +29,14 @@ const queryInitState = () =>
     const runtime = yield* Runtime;
     const context = yield* CommandContextTag;
     const configPath = yield* resolveTargetConfigPath(context.cwd).pipe(
-      Effect.mapError((err) => appError("RuntimeError", String(err))),
+      Effect.mapError(toAppError),
     );
 
     const statEff = yield* Effect.either(runtime.fs.stat(configPath));
     const exists = statEff._tag === "Right";
 
     const { config: existingConfig } = yield* readConfig(context.cwd).pipe(
-      Effect.mapError((err) => appError("RuntimeError", String(err))),
+      Effect.mapError(toAppError),
     );
 
     return {

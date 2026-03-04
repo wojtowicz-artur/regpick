@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 
 import { CommandContextTag } from "@/core/context.js";
-import { appError, type AppError } from "@/core/errors.js";
+import { appError, toAppError, type AppError } from "@/core/errors.js";
 import { resolveListSourceDecision } from "@/domain/listCore.js";
 import { readConfig } from "@/shell/config.js";
 import { DirectoryPlugin, FilePlugin, HttpPlugin, loadPlugins } from "@/shell/plugins/index.js";
@@ -21,9 +21,7 @@ type ListSourceState = {
 function queryListSourceState(): Effect.Effect<ListSourceState, AppError, CommandContextTag> {
   return Effect.gen(function* () {
     const context = yield* CommandContextTag;
-    const res = yield* readConfig(context.cwd).pipe(
-      Effect.mapError((e) => appError("RuntimeError", String(e))),
-    );
+    const res = yield* readConfig(context.cwd).pipe(Effect.mapError(toAppError));
 
     const sourceDecision = resolveListSourceDecision(
       context.args.positionals[1],
@@ -31,7 +29,7 @@ function queryListSourceState(): Effect.Effect<ListSourceState, AppError, Comman
     );
 
     const customPlugins = yield* loadPlugins(res.config.plugins || [], context.cwd).pipe(
-      Effect.mapError((e) => appError("RuntimeError", String(e))),
+      Effect.mapError(toAppError),
     );
 
     const plugins = [...customPlugins, HttpPlugin(), FilePlugin(), DirectoryPlugin()];

@@ -146,7 +146,24 @@ function handleAppError(error: AppError, write: (message: string) => void): void
     write(error.message);
     return;
   }
-  write(`[${error._tag}] ${error.message}`);
+
+  let msg = `[${error._tag}] ${error.message}`;
+
+  if (error.cause) {
+    if (error.cause instanceof Error) {
+      msg += `\n\nCause:\n${error.cause.stack || error.cause.message}`;
+    } else if (typeof error.cause === "object") {
+      try {
+        msg += `\n\nCause:\n${JSON.stringify(error.cause, null, 2)}`;
+      } catch {
+        msg += `\n\nCause: ${String(error.cause)}`;
+      }
+    } else {
+      msg += `\n\nCause: ${String(error.cause)}`;
+    }
+  }
+
+  write(msg);
 }
 
 Effect.runPromise(run());

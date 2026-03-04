@@ -76,5 +76,10 @@ export function toAppError(error: unknown, fallbackKind: AppErrorKind = "Runtime
     return appError(fallbackKind, error.message, error);
   }
 
-  return appError(fallbackKind, String(error));
+  const message =
+    error !== null && typeof error === "object" && "message" in error
+      ? String(error.message)
+      : String(error);
+
+  return appError(fallbackKind, message, error);
 }

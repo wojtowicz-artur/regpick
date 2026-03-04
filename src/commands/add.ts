@@ -1,5 +1,5 @@
 import { CommandContextTag, ConfigTag } from "@/core/context.js";
-import { appError, type AppError } from "@/core/errors.js";
+import { appError, toAppError, type AppError } from "@/core/errors.js";
 import { PipelineRenderer } from "@/core/pipeline.js";
 import { MemoryVFS } from "@/core/vfs.js";
 import { buildInstallPlan, resolveRegistryDependencies } from "@/domain/addPlan.js";
@@ -61,9 +61,7 @@ function queryLoadConfiguration(): Effect.Effect<
   return Effect.gen(function* () {
     const runtime = yield* Runtime;
     const context = yield* CommandContextTag;
-    const res = yield* readConfig(context.cwd).pipe(
-      Effect.mapError((e) => appError("RuntimeError", String(e))),
-    );
+    const res = yield* readConfig(context.cwd).pipe(Effect.mapError(toAppError));
 
     if (!res.configPath) {
       yield* runtime.prompt.error("No regpick.json configuration found. Please run 'init' first.");
