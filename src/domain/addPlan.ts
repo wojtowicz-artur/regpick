@@ -1,15 +1,24 @@
 import type { AppError } from "@/core/errors.js";
 import { resolveOutputPathFromPolicy } from "@/domain/pathPolicy.js";
-import type { InstallPlan, PlannedWrite, RegistryItem, RegpickConfig } from "@/types.js";
+import type {
+  InstallPlan,
+  PlannedWrite,
+  RegistryItem,
+  RegpickConfig,
+} from "@/types.js";
 import { Array, Effect } from "effect";
 
-function buildDependencyPlan(selectedItems: RegistryItem[]): InstallPlan["dependencyPlan"] {
+function buildDependencyPlan(
+  selectedItems: RegistryItem[],
+): InstallPlan["dependencyPlan"] {
   return {
     dependencies: Array.dedupe(
       selectedItems.flatMap((item) => item.dependencies || []).filter(Boolean),
     ),
     devDependencies: Array.dedupe(
-      selectedItems.flatMap((item) => item.devDependencies || []).filter(Boolean),
+      selectedItems
+        .flatMap((item) => item.devDependencies || [])
+        .filter(Boolean),
     ),
   };
 }
@@ -27,7 +36,10 @@ export function resolveRegistryDependencies(
     if (allResolvedItems.has(current.name)) continue;
     allResolvedItems.set(current.name, current);
 
-    if (current.registryDependencies && current.registryDependencies.length > 0) {
+    if (
+      current.registryDependencies &&
+      current.registryDependencies.length > 0
+    ) {
       for (const depName of current.registryDependencies) {
         if (allResolvedItems.has(depName)) continue;
         const found = allItems.find((i) => i.name === depName);
@@ -58,12 +70,8 @@ export const buildInstallPlan = (
 
     for (const item of selectedItems) {
       for (const file of item.files) {
-        const { absoluteTarget, relativeTarget } = yield* resolveOutputPathFromPolicy(
-          item,
-          file,
-          cwd,
-          config,
-        );
+        const { absoluteTarget, relativeTarget } =
+          yield* resolveOutputPathFromPolicy(item, file, cwd, config);
         const planned: PlannedWrite = {
           itemName: item.name,
           sourceFile: file,
@@ -84,3 +92,49 @@ export const buildInstallPlan = (
       conflicts,
     });
   });
+
+export type InteractiveAddState = {
+  selectedItems: RegistryItem[];
+  plannedWrites: PlannedWrite[];
+  existingTargets: Set<string>;
+  missingDependencies: string[];
+  missingDevDependencies: string[];
+};
+
+export type ApprovedAddPlan = {
+  selectedItems: RegistryItem[];
+  shouldInstallDeps: boolean;
+  finalWrites: PlannedWrite[];
+  dependencyPlan: { dependencies: string[]; devDependencies: string[] };
+};
+
+export type OverwriteResolution = "overwrite" | "skip" | "abort";
+
+export function computeFinalWrites(
+  plannedWrites: PlannedWrite[],
+  existingTargets: Set<string>,
+  resolutions: Map<string, OverwriteResolution>,
+  assumeYes: boolean,
+  overwritePolicy: "prompt" | "overwrite" | "skip" = "prompt",
+): PlannedWrite[] {
+  const finalWrites: PlannedWrite[] = [];
+
+  for (const write of plannedWrites) {
+    if (existingTargets.has(write.absoluteTarget)) {
+      if (assumeYes || overwritePolicy === "overwrite") {
+        finalWrites.push(write);
+      } else if (overwritePolicy === "skip") {
+        continue;
+      } else {
+        const res = resolutions.get(write.absoluteTarget);
+        if (res === "overwrite") {
+          finalWrites.push(write);
+        }
+      }
+    } else {
+      finalWrites.push(write);
+    }
+  }
+
+  return finalWrites;
+}
