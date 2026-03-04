@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.16.5](https://github.com/wojtowicz-artur/regpick/compare/v0.16.4...v0.16.5) (2026-03-04)
+
+### Code Refactoring
+
+* command execution to use Effect for better error handling ([c8ebb5c](https://github.com/wojtowicz-artur/regpick/commit/c8ebb5c5bc46c2c3484b8828fca6f292547a45b2))
+* migrate commands and tests to use Effect for improved error handling and async flow ([288ea8d](https://github.com/wojtowicz-artur/regpick/commit/288ea8dbfd258c07f55dfd6e676a37445e83bd0f))
+* streamline registry loading and error handling using Effect ([aedf340](https://github.com/wojtowicz-artur/regpick/commit/aedf340e847d3da38d7e37430a45f812a736e58f))
+* update error handling in add and update commands to use Effect for improved async flow ([49c5b0c](https://github.com/wojtowicz-artur/regpick/commit/49c5b0cd21a24682f5b594eb1bb9b9e89ae43e53))
+
 ## [0.16.4](https://github.com/wojtowicz-artur/regpick/compare/v0.16.3...v0.16.4) (2026-03-03)
 
 ### Code Refactoring
