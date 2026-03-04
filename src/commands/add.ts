@@ -1,7 +1,7 @@
 import { CommandContextTag, ConfigTag } from "@/core/context.js";
 import { appError, toAppError, type AppError } from "@/core/errors.js";
 import { JournalService } from "@/core/journal.js";
-import { PipelineRenderer } from "@/core/pipeline.js";
+import { runPipeline } from "@/core/pipeline.js";
 import { Runtime } from "@/core/ports.js";
 import { buildInstallPlan, resolveRegistryDependencies } from "@/domain/addPlan.js";
 import { applyAliases } from "@/domain/aliasCore.js";
@@ -450,7 +450,7 @@ export function runAddCommand(): Effect.Effect<
         ? approved.dependencyPlan
         : { dependencies: [], devDependencies: [] };
 
-      const pipeline = new PipelineRenderer([
+      const pipelinePlugins: import("@/core/pipeline.js").Plugin[] = [
         ...userPlugins,
         coreAddPlugin(
           depPlan,
@@ -459,7 +459,7 @@ export function runAddCommand(): Effect.Effect<
           installedItemsInfo,
           hydratedWrites,
         ) as import("@/core/pipeline.js").Plugin,
-      ]);
+      ];
 
       const journal = yield* JournalService;
       let lockfileBackup: any;
@@ -484,7 +484,11 @@ export function runAddCommand(): Effect.Effect<
 
       yield* journal.writeIntent(entry, context.cwd);
 
-      yield* pipeline.run({ vfs, cwd: context.cwd, runtime: runtime }, vfsFiles).pipe(
+      yield* runPipeline(
+        { vfs, cwd: context.cwd, runtime: runtime },
+        pipelinePlugins,
+        vfsFiles,
+      ).pipe(
         Effect.tapError(() => journal.clearIntent(context.cwd)),
         Effect.catchAll((error) => {
           vfs.rollback();

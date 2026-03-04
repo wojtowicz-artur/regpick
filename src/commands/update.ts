@@ -4,7 +4,7 @@ import { styleText } from "node:util";
 import { CommandContextTag, ConfigTag } from "@/core/context.js";
 import { appError, toAppError, type AppError } from "@/core/errors.js";
 import { JournalService } from "@/core/journal.js";
-import { PipelineRenderer, type PersistableVFS } from "@/core/pipeline.js";
+import { runPipeline, type PersistableVFS } from "@/core/pipeline.js";
 import { Runtime } from "@/core/ports.js";
 import { buildUpdatePlanForItem, groupBySource } from "@/domain/updatePlan.js";
 import { MemoryVFS } from "@/shell/adapters/vfs.js";
@@ -329,11 +329,11 @@ export function runUpdateCommand(): Effect.Effect<
       const userPlugins = (yield* ConfigTag).plugins?.filter((p) => typeof p === "object") || [];
       const vfs = new MemoryVFS();
 
-      const pipeline = new PipelineRenderer([
+      const pipelinePlugins: import("../core/pipeline.js").Plugin[] = [
         ...(userPlugins as import("../core/pipeline.js").Plugin[]),
         {
           name: "regpick:core-update",
-          async finish(ctx) {
+          async finish(ctx: import("../core/pipeline.js").PipelineContext) {
             if ("flushToDisk" in ctx.vfs) {
               await (ctx.vfs as PersistableVFS).flushToDisk();
             }
@@ -361,7 +361,7 @@ export function runUpdateCommand(): Effect.Effect<
             await Effect.runPromise(writeLockfile(ctx.cwd, updatedLockfile, runtime));
           },
         },
-      ]);
+      ];
 
       const journal = yield* JournalService;
       const entry = {
@@ -374,7 +374,11 @@ export function runUpdateCommand(): Effect.Effect<
 
       yield* journal.writeIntent(entry, context.cwd);
 
-      yield* pipeline.run({ vfs, cwd: context.cwd, runtime: runtime }, vfsFiles).pipe(
+      yield* runPipeline(
+        { vfs, cwd: context.cwd, runtime: runtime },
+        pipelinePlugins,
+        vfsFiles,
+      ).pipe(
         Effect.tapError(() => journal.clearIntent(context.cwd)),
         Effect.catchAll((error) => {
           vfs.rollback();

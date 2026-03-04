@@ -1,4 +1,4 @@
-import { PipelineRenderer } from "@/core/pipeline.js";
+import { runPipeline } from "@/core/pipeline.js";
 import { MemoryVFS } from "@/shell/adapters/vfs.js";
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
@@ -8,7 +8,6 @@ describe("shadcnPlugin", () => {
   it("should add 'use client' automatically to React files using states", async () => {
     const plugin = shadcnPlugin();
     const vfs = new MemoryVFS();
-    const pipeline = new PipelineRenderer([plugin]);
 
     const files = [
       {
@@ -21,7 +20,7 @@ describe("shadcnPlugin", () => {
       },
     ];
 
-    await Effect.runPromise(pipeline.run({ vfs, cwd: "/", runtime: {} as any }, files));
+    await Effect.runPromise(runPipeline({ vfs, cwd: "/", runtime: {} as any }, [plugin], files));
 
     const btnOutput = await vfs.readFile("/components/ui/button.tsx");
     expect(btnOutput).toContain('"use client";');
