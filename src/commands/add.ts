@@ -1,3 +1,4 @@
+import { CommandContextTag } from "@/core/context.js";
 import { appError, type AppError } from "@/core/errors.js";
 import { PipelineRenderer } from "@/core/pipeline.js";
 import { MemoryVFS } from "@/core/vfs.js";
@@ -10,8 +11,8 @@ import { collectMissingDependencies } from "@/shell/installer.js";
 import { resolvePackageManager } from "@/shell/packageManagers/resolver.js";
 import { DirectoryPlugin, FilePlugin, HttpPlugin, loadPlugins } from "@/shell/plugins/index.js";
 import { loadRegistry, resolveFileContent } from "@/shell/registry.js";
+import { Runtime } from "@/shell/runtime/ports.js";
 import type {
-  CommandContext,
   CommandOutcome,
   PlannedWrite,
   RegistryFile,
@@ -20,8 +21,6 @@ import type {
   RegpickPlugin,
 } from "@/types.js";
 import { Effect } from "effect";
-import { Runtime } from "@/shell/runtime/ports.js";
-import { CommandContextTag } from "@/core/context.js";
 
 type HydratedWrite = {
   itemName: string;

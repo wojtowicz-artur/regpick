@@ -2,8 +2,8 @@ import { Effect, Layer } from "effect";
 import path from "node:path";
 import { styleText } from "node:util";
 
-import { type AppError, toAppError } from "@/core/errors.js";
 import { CommandContextTag } from "@/core/context.js";
+import { type AppError, toAppError } from "@/core/errors.js";
 import { parseCliArgs } from "@/shell/cli/args.js";
 import type { CommandContext, CommandOutcome } from "@/types.js";
 
