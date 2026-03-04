@@ -75,19 +75,20 @@ export class PipelineRenderer {
       // 1. Start Phase
       yield* Effect.forEach(
         this.plugins,
-        (plugin) => Effect.gen(function* () {
-          if (plugin.start) {
-            yield* Effect.tryPromise({
-              try: () => plugin.start!(ctx),
-              catch: (e) =>
-                appError(
-                  "RuntimeError",
-                  `[${plugin.name}] Failed during start hook: ${e instanceof Error ? e.message : String(e)}`,
-                ),
-            });
-          }
-        }),
-        { concurrency: 1 }
+        (plugin) =>
+          Effect.gen(function* () {
+            if (plugin.start) {
+              yield* Effect.tryPromise({
+                try: () => plugin.start!(ctx),
+                catch: (e) =>
+                  appError(
+                    "RuntimeError",
+                    `[${plugin.name}] Failed during start hook: ${e instanceof Error ? e.message : String(e)}`,
+                  ),
+              });
+            }
+          }),
+        { concurrency: 1 },
       );
 
       // 2. Resolve Phase
@@ -186,34 +187,36 @@ export class PipelineRenderer {
       // 3. Finish Phase
       yield* Effect.forEach(
         this.plugins,
-        (plugin) => Effect.gen(function* () {
-          if (plugin.finish) {
-            yield* Effect.tryPromise({
-              try: () => plugin.finish!(ctx),
-              catch: (e) =>
-                appError(
-                  "RuntimeError",
-                  `[${plugin.name}] Failed during finish hook: ${e instanceof Error ? e.message : String(e)}`,
-                ),
-            });
-          }
-        }),
-        { concurrency: 1 }
+        (plugin) =>
+          Effect.gen(function* () {
+            if (plugin.finish) {
+              yield* Effect.tryPromise({
+                try: () => plugin.finish!(ctx),
+                catch: (e) =>
+                  appError(
+                    "RuntimeError",
+                    `[${plugin.name}] Failed during finish hook: ${e instanceof Error ? e.message : String(e)}`,
+                  ),
+              });
+            }
+          }),
+        { concurrency: 1 },
       );
     }).pipe(
       Effect.catchAll((err) =>
         Effect.gen(this, function* () {
           yield* Effect.forEach(
             this.plugins,
-            (plugin) => Effect.gen(function* () {
-              if (plugin.onError) {
-                yield* Effect.tryPromise({
-                  try: () => plugin.onError!(err as Error, ctx),
-                  catch: () => {}, // Ignore nested errors during cleanup
-                }).pipe(Effect.ignore);
-              }
-            }),
-            { concurrency: 1 }
+            (plugin) =>
+              Effect.gen(function* () {
+                if (plugin.onError) {
+                  yield* Effect.tryPromise({
+                    try: () => plugin.onError!(err as Error, ctx),
+                    catch: () => {}, // Ignore nested errors during cleanup
+                  }).pipe(Effect.ignore);
+                }
+              }),
+            { concurrency: 1 },
           );
           return yield* Effect.fail(err);
         }),
