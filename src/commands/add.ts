@@ -56,10 +56,9 @@ function queryLoadConfiguration(
   context: CommandContext,
 ): Effect.Effect<{ config: RegpickConfig; configPath: string }, AppError> {
   return Effect.gen(function* () {
-    const res = yield* Effect.tryPromise({
-      try: () => readConfig(context.cwd),
-      catch: (e): AppError => appError("RuntimeError", String(e)),
-    });
+    const res = yield* readConfig(context.cwd).pipe(
+      Effect.mapError((e) => appError("RuntimeError", String(e))),
+    );
 
     if (!res.configPath) {
       yield* context.runtime.prompt.error(
@@ -371,10 +370,7 @@ function runAddCommandEff(context: CommandContext): Effect.Effect<CommandOutcome
       return { kind: "noop", message: "No source provided" } as CommandOutcome;
     }
 
-    const customPlugins = yield* Effect.tryPromise({
-      try: () => loadPlugins(config.plugins || [], context.cwd),
-      catch: (e): AppError => appError("RuntimeError", String(e)),
-    });
+    const customPlugins = yield* loadPlugins(config.plugins || [], context.cwd);
 
     const plugins = [...customPlugins, HttpPlugin(), FilePlugin(), DirectoryPlugin()];
 

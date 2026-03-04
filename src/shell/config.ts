@@ -1,5 +1,4 @@
-import { Either } from "effect";
-import { Schema as S } from "effect";
+import { Effect, Schema as S } from "effect";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { loadConfig } from "unconfig";
@@ -144,22 +143,30 @@ const DEFAULT_CONFIG: RegpickConfig = {
 
 export type ConfigFormat = "ts" | "mjs" | "cjs" | "js" | "json";
 
-export async function detectConfigFormat(cwd: string): Promise<ConfigFormat> {
-  try {
-    // Check if typescript exists in the project
-    await fs.access(path.join(cwd, "tsconfig.json"));
-    return "ts";
-  } catch {}
+export function detectConfigFormat(cwd: string): Effect.Effect<ConfigFormat, Error> {
+  return Effect.gen(function* () {
+    const tsExists = yield* Effect.tryPromise(() =>
+      fs.access(path.join(cwd, "tsconfig.json")),
+    ).pipe(
+      Effect.map(() => true),
+      Effect.catchAll(() => Effect.succeed(false)),
+    );
 
-  try {
-    // Check if type: module is specified
-    const pkgRaw = await fs.readFile(path.join(cwd, "package.json"), "utf-8");
-    const pkg = JSON.parse(pkgRaw);
-    if (pkg.type === "module") return "mjs";
-    if (pkg.type === "commonjs") return "cjs";
-  } catch {}
+    if (tsExists) return "ts";
 
-  return "mjs"; // fallback
+    const pkgType = yield* Effect.tryPromise(() =>
+      fs.readFile(path.join(cwd, "package.json"), "utf-8"),
+    ).pipe(
+      Effect.flatMap((raw) => Effect.try(() => JSON.parse(raw))),
+      Effect.map((pkg) => pkg.type as string),
+      Effect.catchAll(() => Effect.succeed(null)),
+    );
+
+    if (pkgType === "module") return "mjs";
+    if (pkgType === "commonjs") return "cjs";
+
+    return "mjs";
+  });
 }
 
 function serializeObjectToJS(obj: unknown, indentLevel = 1): string {
@@ -208,89 +215,104 @@ export function generateConfigCode(config: RegpickConfig, format: ConfigFormat):
   return `import { defineConfig } from "regpick";\n\nexport default defineConfig(${objectCode});\n`;
 }
 
-export async function resolveTargetConfigPath(cwd: string): Promise<string> {
-  // Check if unconfig finds an existing config
-  const { sources } = await loadConfig<unknown>({
-    sources: [
-      {
-        files: ["regpick", ".regpickrc", "regpickrc"],
-        extensions: ["json", "js", "ts", "mjs", "cjs", ""],
-      },
-    ],
-    cwd,
+export function resolveTargetConfigPath(cwd: string): Effect.Effect<string, Error> {
+  return Effect.gen(function* () {
+    // Check if unconfig finds an existing config
+    const { sources } = yield* Effect.tryPromise(() =>
+      loadConfig<unknown>({
+        sources: [
+          {
+            files: ["regpick", ".regpickrc", "regpickrc"],
+            extensions: ["json", "js", "ts", "mjs", "cjs", ""],
+          },
+        ],
+        cwd,
+      }),
+    );
+
+    if (sources.length > 0) {
+      return sources[0];
+    }
+
+    const format = yield* detectConfigFormat(cwd);
+    return path.join(cwd, `regpick.config.${format}`);
   });
-
-  if (sources.length > 0) {
-    return sources[0];
-  }
-
-  const format = await detectConfigFormat(cwd);
-  return path.join(cwd, `regpick.config.${format}`);
 }
 
-export async function readConfig(cwd: string): Promise<{
-  config: RegpickConfig;
-  configPath: string | null;
-}> {
-  const { config: loadedConfig, sources } = await loadConfig<unknown>({
-    sources: [
-      {
-        files: ["regpick", ".regpickrc", "regpickrc"],
-        extensions: ["json", "js", "ts", "mjs", "cjs", ""],
-      },
-      {
-        files: "package.json",
-        extensions: [],
-        rewrite(config: unknown) {
-          if (typeof config === "object" && config !== null && "regpick" in config) {
-            return config.regpick;
-          }
-          return undefined;
-        },
-      },
-    ],
-    defaults: DEFAULT_CONFIG,
-    merge: true,
-    cwd,
+export function readConfig(
+  cwd: string,
+): Effect.Effect<{ config: RegpickConfig; configPath: string | null }, Error> {
+  return Effect.gen(function* () {
+    const { config: loadedConfig, sources } = yield* Effect.tryPromise(() =>
+      loadConfig<unknown>({
+        sources: [
+          {
+            files: ["regpick", ".regpickrc", "regpickrc"],
+            extensions: ["json", "js", "ts", "mjs", "cjs", ""],
+          },
+          {
+            files: "package.json",
+            extensions: [],
+            rewrite(config: unknown) {
+              if (typeof config === "object" && config !== null && "regpick" in config) {
+                return config.regpick;
+              }
+              return undefined;
+            },
+          },
+        ],
+        defaults: DEFAULT_CONFIG,
+        merge: true,
+        cwd,
+      }),
+    );
+
+    const validConfig = yield* Effect.try(() =>
+      S.decodeUnknownSync(RegpickConfigSchema)(loadedConfig),
+    );
+
+    return {
+      config: validConfig as RegpickConfig,
+      configPath: sources[0] || null,
+    };
   });
-
-  const validConfig = S.decodeUnknownSync(RegpickConfigSchema)(loadedConfig);
-
-  return {
-    config: validConfig as RegpickConfig,
-    configPath: sources[0] || null,
-  };
 }
 
-export async function writeDefaultConfig(
+export function writeDefaultConfig(
   cwd: string,
   { overwrite = false }: { overwrite?: boolean } = {},
-): Promise<{ filePath: string; written: boolean }> {
+): Effect.Effect<{ filePath: string; written: boolean }, Error> {
   return writeConfig(cwd, DEFAULT_CONFIG, { overwrite });
 }
 
-export async function writeConfig(
+export function writeConfig(
   cwd: string,
   config: RegpickConfig,
   { overwrite = false }: { overwrite?: boolean } = {},
-): Promise<{ filePath: string; written: boolean }> {
-  const filePath = await resolveTargetConfigPath(cwd);
+): Effect.Effect<{ filePath: string; written: boolean }, Error> {
+  return Effect.gen(function* () {
+    const filePath = yield* resolveTargetConfigPath(cwd);
 
-  let exists = false;
-  try {
-    await fs.access(filePath);
-    exists = true;
-  } catch {}
+    const exists = yield* Effect.tryPromise(() => fs.access(filePath)).pipe(
+      Effect.map(() => true),
+      Effect.catchAll(() => Effect.succeed(false)),
+    );
 
-  if (exists && !overwrite) {
-    return { filePath, written: false };
-  }
+    if (exists && !overwrite) {
+      return { filePath, written: false };
+    }
 
-  const ext = path.extname(filePath).slice(1);
-  const format = ["ts", "mjs", "cjs", "js", "json"].includes(ext) ? (ext as ConfigFormat) : "json";
+    const ext = path.extname(filePath).slice(1);
+    const format = ["ts", "mjs", "cjs", "js", "json"].includes(ext)
+      ? (ext as ConfigFormat)
+      : "json";
 
-  await fs.writeFile(filePath, generateConfigCode(config, format), "utf8");
-  return { filePath, written: true };
+    yield* Effect.tryPromise(() =>
+      fs.writeFile(filePath, generateConfigCode(config, format), "utf8"),
+    );
+
+    return { filePath, written: true };
+  });
 }
 
 export function resolveRegistrySource(

@@ -41,10 +41,9 @@ function queryLoadState(
   context: CommandContext,
 ): Effect.Effect<{ config: RegpickConfig; lockfile: RegpickLockfile }, AppError> {
   return Effect.gen(function* () {
-    const configRes = yield* Effect.tryPromise({
-      try: () => readConfig(context.cwd),
-      catch: (e): AppError => appError("RuntimeError", String(e)),
-    });
+    const configRes = yield* readConfig(context.cwd).pipe(
+      Effect.mapError((e) => appError("RuntimeError", String(e))),
+    );
 
     const lockfile = yield* Effect.tryPromise({
       try: () => readLockfile(context.cwd, context.runtime),
@@ -236,10 +235,9 @@ function runUpdateCommandEff(context: CommandContext): Effect.Effect<CommandOutc
       } as CommandOutcome;
     }
 
-    const customPlugins = yield* Effect.tryPromise({
-      try: () => loadPlugins(state.config.plugins || [], context.cwd),
-      catch: (e): AppError => appError("RuntimeError", String(e)),
-    });
+    const customPlugins = yield* loadPlugins(state.config.plugins || [], context.cwd).pipe(
+      Effect.mapError((e) => appError("RuntimeError", String(e))),
+    );
 
     const plugins = [...customPlugins, HttpPlugin(), FilePlugin(), DirectoryPlugin()];
 

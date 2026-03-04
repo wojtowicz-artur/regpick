@@ -24,12 +24,16 @@ type ApprovedInitPlan = {
 
 const queryInitState = (context: CommandContext) =>
   Effect.gen(function* () {
-    const configPath = yield* Effect.promise(() => resolveTargetConfigPath(context.cwd));
+    const configPath = yield* resolveTargetConfigPath(context.cwd).pipe(
+      Effect.mapError((err) => appError("RuntimeError", String(err))),
+    );
 
     const statEff = yield* Effect.either(context.runtime.fs.stat(configPath));
     const exists = statEff._tag === "Right";
 
-    const { config: existingConfig } = yield* Effect.promise(() => readConfig(context.cwd));
+    const { config: existingConfig } = yield* readConfig(context.cwd).pipe(
+      Effect.mapError((err) => appError("RuntimeError", String(err))),
+    );
 
     return {
       configPath,

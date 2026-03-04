@@ -21,7 +21,7 @@ function resolveAndLoadWithPlugins(
       if (!plugin.resolveId || !plugin.load) continue;
 
       const resolvedId = yield* Effect.tryPromise({
-        try: () =>
+        try: async () =>
           plugin.resolveId!(target, originalSource || cwd, {
             cwd: process.cwd(),
             runtime,
@@ -39,7 +39,7 @@ function resolveAndLoadWithPlugins(
       if (!resolvedId) continue;
 
       const content = yield* Effect.tryPromise({
-        try: () => plugin.load!(resolvedId, { cwd: process.cwd(), runtime }),
+        try: async () => plugin.load!(resolvedId, { cwd: process.cwd(), runtime }),
         catch: (e): AppError => {
           if (e && typeof e === "object" && "kind" in e) return e as AppError;
           return appError(

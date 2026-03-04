@@ -1,4 +1,3 @@
-import { Either } from "effect";
 import type { RuntimePorts } from "@/shell/runtime/ports.js";
 import { Effect, Schema as S } from "effect";
 import crypto from "node:crypto";

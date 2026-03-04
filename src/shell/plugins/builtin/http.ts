@@ -1,5 +1,5 @@
-import { Effect } from "effect";
 import type { PluginContext, RegpickPlugin } from "@/types.js";
+import { Effect } from "effect";
 
 export function HttpPlugin(): RegpickPlugin {
   return {
@@ -21,12 +21,17 @@ export function HttpPlugin(): RegpickPlugin {
       if (!id.startsWith("http://") && !id.startsWith("https://")) return null;
       if (!ctx) return null;
 
-      const res = await Effect.runPromise(ctx.runtime.http.getText(id));
-      try {
-        return JSON.parse(res);
-      } catch {
-        return res;
-      }
+      const program = ctx.runtime.http.getText(id).pipe(
+        Effect.map((res) => {
+          try {
+            return JSON.parse(res);
+          } catch {
+            return res;
+          }
+        }),
+      );
+
+      return Effect.runPromise(program);
     },
   };
 }

@@ -18,20 +18,18 @@ type ListSourceState = {
  */
 function queryListSourceState(context: CommandContext): Effect.Effect<ListSourceState, AppError> {
   return Effect.gen(function* () {
-    const res = yield* Effect.tryPromise({
-      try: () => readConfig(context.cwd),
-      catch: (e): AppError => appError("RuntimeError", String(e)),
-    });
+    const res = yield* readConfig(context.cwd).pipe(
+      Effect.mapError((e) => appError("RuntimeError", String(e))),
+    );
 
     const sourceDecision = resolveListSourceDecision(
       context.args.positionals[1],
       res.config.registry?.sources || {},
     );
 
-    const customPlugins = yield* Effect.tryPromise({
-      try: () => loadPlugins(res.config.plugins || [], context.cwd),
-      catch: (e): AppError => appError("RuntimeError", String(e)),
-    });
+    const customPlugins = yield* loadPlugins(res.config.plugins || [], context.cwd).pipe(
+      Effect.mapError((e) => appError("RuntimeError", String(e))),
+    );
 
     const plugins = [...customPlugins, HttpPlugin(), FilePlugin(), DirectoryPlugin()];
 
