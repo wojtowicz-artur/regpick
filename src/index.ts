@@ -132,11 +132,11 @@ function run(): Effect.Effect<void, never> {
 }
 
 function handleAppError(error: AppError, write: (message: string) => void): void {
-  if (error.kind === "UserCancelled") {
+  if (error._tag === "UserCancelled") {
     write(error.message);
     return;
   }
-  write(`[${error.kind}] ${error.message}`);
+  write(`[${error._tag}] ${error.message}`);
 }
 
 Effect.runPromise(run());

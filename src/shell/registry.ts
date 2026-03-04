@@ -27,7 +27,7 @@ function resolveAndLoadWithPlugins(
             runtime,
           }),
         catch: (e): AppError => {
-          if (e && typeof e === "object" && "kind" in e) return e as AppError;
+          if (e && typeof e === "object" && "_tag" in e) return e as AppError;
           return appError(
             "RegistryError",
             `Failed to resolve ${target}: ${e instanceof Error ? e.message : String(e)}`,
@@ -41,7 +41,7 @@ function resolveAndLoadWithPlugins(
       const content = yield* Effect.tryPromise({
         try: async () => plugin.load!(resolvedId, { cwd: process.cwd(), runtime }),
         catch: (e): AppError => {
-          if (e && typeof e === "object" && "kind" in e) return e as AppError;
+          if (e && typeof e === "object" && "_tag" in e) return e as AppError;
           return appError(
             "RegistryError",
             `Failed to load ${resolvedId}: ${e instanceof Error ? e.message : String(e)}`,
@@ -80,7 +80,7 @@ function resolveItemReference(
 
     if (Either.isLeft(loadOpt)) {
       const e = loadOpt.left;
-      if (e.kind === "RegistryError" && e.message.includes("No suitable plugin")) {
+      if (e._tag === "RegistryError" && e.message.includes("No suitable plugin")) {
         return yield* Effect.fail(
           appError("RegistryError", `Could not resolve reference: ${itemRef}`),
         );
@@ -154,7 +154,7 @@ export function loadRegistry(
 
     if (Either.isLeft(loadOpt)) {
       const e = loadOpt.left;
-      if (e.kind === "RegistryError" && e.message.includes("No suitable plugin found")) {
+      if (e._tag === "RegistryError" && e.message.includes("No suitable plugin found")) {
         return yield* Effect.fail(
           appError("RegistryError", `No suitable plugin found for source: ${source}`),
         );
@@ -257,7 +257,7 @@ export function resolveFileContent(
 
     if (Either.isLeft(loadOpt)) {
       const e = loadOpt.left;
-      if (e.kind === "RegistryError" && e.message.includes("No suitable plugin found")) {
+      if (e._tag === "RegistryError" && e.message.includes("No suitable plugin found")) {
         return yield* Effect.fail(
           appError(
             "RegistryError",

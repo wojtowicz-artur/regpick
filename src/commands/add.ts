@@ -202,10 +202,15 @@ function queryPlanState(
     const probeRes = yield* buildInstallPlan(selectedItems, context.cwd, config);
 
     const existingTargets = new Set<string>();
-    for (const write of probeRes.plannedWrites) {
-      const exists = yield* context.runtime.fs.pathExists(write.absoluteTarget);
-      if (exists) existingTargets.add(write.absoluteTarget);
-    }
+    yield* Effect.forEach(
+      probeRes.plannedWrites,
+      (write) =>
+        Effect.gen(function* () {
+          const exists = yield* context.runtime.fs.pathExists(write.absoluteTarget);
+          if (exists) existingTargets.add(write.absoluteTarget);
+        }),
+      { concurrency: "unbounded" },
+    );
 
     const finalRes = yield* buildInstallPlan(selectedItems, context.cwd, config, existingTargets);
 
@@ -247,34 +252,41 @@ function processInteractionApproval(
     const finalWrites: PlannedWrite[] = [];
     const overwritePolicy = config.install?.overwritePolicy || "prompt";
 
-    for (const write of state.plannedWrites) {
-      if (state.existingTargets.has(write.absoluteTarget)) {
-        if (assumeYes || overwritePolicy === "overwrite") {
-          finalWrites.push(write);
-        } else if (overwritePolicy === "skip") {
-          yield* context.runtime.prompt.warn(`Skipped existing file: ${write.absoluteTarget}`);
-        } else {
-          const ans = yield* context.runtime.prompt.select({
-            message: `File exists: ${write.absoluteTarget}`,
-            options: [
-              { value: "overwrite", label: "Overwrite this file" },
-              { value: "skip", label: "Skip this file" },
-              { value: "abort", label: "Abort installation" },
-            ],
-          });
+    yield* Effect.forEach(
+      state.plannedWrites,
+      (write) =>
+        Effect.gen(function* () {
+          if (state.existingTargets.has(write.absoluteTarget)) {
+            if (assumeYes || overwritePolicy === "overwrite") {
+              finalWrites.push(write);
+            } else if (overwritePolicy === "skip") {
+              yield* context.runtime.prompt.warn(`Skipped existing file: ${write.absoluteTarget}`);
+            } else {
+              const ans = yield* context.runtime.prompt.select({
+                message: `File exists: ${write.absoluteTarget}`,
+                options: [
+                  { value: "overwrite", label: "Overwrite this file" },
+                  { value: "skip", label: "Skip this file" },
+                  { value: "abort", label: "Abort installation" },
+                ],
+              });
 
-          const isCancel = yield* context.runtime.prompt.isCancel(ans);
+              const isCancel = yield* context.runtime.prompt.isCancel(ans);
 
-          if (isCancel || ans === "abort") {
-            return yield* Effect.fail(appError("UserCancelled", "Installation aborted by user."));
+              if (isCancel || ans === "abort") {
+                return yield* Effect.fail(
+                  appError("UserCancelled", "Installation aborted by user."),
+                );
+              }
+
+              if (ans === "overwrite") finalWrites.push(write);
+            }
+          } else {
+            finalWrites.push(write);
           }
-
-          if (ans === "overwrite") finalWrites.push(write);
-        }
-      } else {
-        finalWrites.push(write);
-      }
-    }
+        }),
+      { concurrency: 1 }, // Sequential is required because of prompt
+    );
 
     let shouldInstallDeps = false;
     const hasDeps = state.missingDependencies.length > 0 || state.missingDevDependencies.length > 0;
@@ -335,27 +347,32 @@ function resolveContents(
   return Effect.gen(function* () {
     const writes: HydratedWrite[] = [];
 
-    for (const write of finalWrites) {
-      const item = selectedItems.find((i) => i.name === write.itemName);
-      if (!item) continue;
+    yield* Effect.forEach(
+      finalWrites,
+      (write) =>
+        Effect.gen(function* () {
+          const item = selectedItems.find((i) => i.name === write.itemName);
+          if (!item) return;
 
-      const content = yield* resolveFileContent(
-        write.sourceFile,
-        item,
-        context.cwd,
-        context.runtime,
-        plugins,
-      );
+          const content = yield* resolveFileContent(
+            write.sourceFile,
+            item,
+            context.cwd,
+            context.runtime,
+            plugins,
+          );
 
-      const finalContent = applyAliases(content, config);
-      writes.push({
-        itemName: write.itemName,
-        absoluteTarget: write.absoluteTarget,
-        sourceFile: write.sourceFile,
-        originalContent: content,
-        finalContent,
-      });
-    }
+          const finalContent = applyAliases(content, config);
+          writes.push({
+            itemName: write.itemName,
+            absoluteTarget: write.absoluteTarget,
+            sourceFile: write.sourceFile,
+            originalContent: content,
+            finalContent,
+          });
+        }),
+      { concurrency: "unbounded" },
+    );
 
     return writes;
   });

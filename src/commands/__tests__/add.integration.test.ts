@@ -211,7 +211,7 @@ describe("add integration with shadcn compatibility", () => {
     expect(Either.isRight(result)).toBe(false);
     if (Either.isLeft(result)) {
       expect(result.left).toMatchObject({
-        kind: "UserCancelled",
+        _tag: "UserCancelled",
         message: expect.stringContaining("Dependency installation cancelled"),
       });
     }
@@ -237,7 +237,7 @@ describe("add integration with shadcn compatibility", () => {
     expect(Either.isRight(result)).toBe(false);
     if (Either.isLeft(result)) {
       expect(result.left).toMatchObject({
-        kind: "ValidationError",
+        _tag: "ValidationError",
         message: "No config file found",
       });
     }
@@ -272,7 +272,7 @@ describe("add integration with shadcn compatibility", () => {
 
     expect(Either.isRight(result)).toBe(false);
     if (Either.isLeft(result)) {
-      expect(result.left.kind).toBe("RegistryError");
+      expect(result.left._tag).toBe("RegistryError");
       expect(result.left.message).toContain("HTTP error! status: 500");
     }
   });
@@ -313,7 +313,7 @@ describe("add integration with shadcn compatibility", () => {
 
     expect(Either.isRight(result)).toBe(false);
     if (Either.isLeft(result)) {
-      expect(result.left.kind).toBe("RuntimeError");
+      expect(result.left._tag).toBe("RuntimeError");
     }
 
     // Restore permissions so cleanup works
@@ -347,7 +347,7 @@ describe("add integration with shadcn compatibility", () => {
 
     expect(Either.isRight(result)).toBe(false);
     if (Either.isLeft(result)) {
-      expect(result.left.kind).toBe("RegistryError");
+      expect(result.left._tag).toBe("RegistryError");
       expect(result.left.message).toContain("Unsupported manifest structure");
     }
   });

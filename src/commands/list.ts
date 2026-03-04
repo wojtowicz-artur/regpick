@@ -97,9 +97,14 @@ function formatItemLabel(item: RegistryItem): string {
 function presentItems(context: CommandContext, items: RegistryItem[]): Effect.Effect<void, never> {
   return Effect.gen(function* () {
     yield* context.runtime.prompt.info(`Found ${items.length} items.`);
-    for (const item of items) {
-      console.log(`- ${formatItemLabel(item)}`);
-    }
+    yield* Effect.forEach(
+      items,
+      (item) =>
+        Effect.sync(() => {
+          console.log(`- ${formatItemLabel(item)}`);
+        }),
+      { concurrency: 1 },
+    );
   });
 }
 

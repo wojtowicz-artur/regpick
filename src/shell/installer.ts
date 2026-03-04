@@ -85,16 +85,22 @@ export function installDependencies(
       );
     }
     const commands = strategy.buildInstallCommands(dependencies, devDependencies);
-    for (const command of commands) {
-      const result = runtime.process.run(command.command, command.args, cwd);
-      if (result.status !== 0) {
-        return yield* Effect.fail(
-          appError(
-            "InstallError",
-            `Dependency install failed: ${command.command} ${command.args.join(" ")}`,
-          ),
-        );
-      }
-    }
+
+    yield* Effect.forEach(
+      commands,
+      (command) =>
+        Effect.gen(function* () {
+          const result = runtime.process.run(command.command, command.args, cwd);
+          if (result.status !== 0) {
+            return yield* Effect.fail(
+              appError(
+                "InstallError",
+                `Dependency install failed: ${command.command} ${command.args.join(" ")}`,
+              ),
+            );
+          }
+        }),
+      { concurrency: 1 },
+    );
   });
 }

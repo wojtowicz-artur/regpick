@@ -71,79 +71,101 @@ function queryAvailableUpdates(
 ): Effect.Effect<DetectedUpdate[], AppError> {
   return Effect.gen(function* () {
     const bySource = groupBySource(lockfile);
-    const availableUpdates: DetectedUpdate[] = [];
 
-    for (const [source, itemsToUpdate] of Object.entries(bySource)) {
-      const loadOpt = yield* Effect.either(
-        loadRegistry(source, context.cwd, context.runtime, plugins),
-      );
+    const updatesNested = yield* Effect.forEach(
+      Object.entries(bySource),
+      ([source, itemsToUpdate]) =>
+        Effect.gen(function* () {
+          const loadOpt = yield* Effect.either(
+            loadRegistry(source, context.cwd, context.runtime, plugins),
+          );
 
-      if (Either.isLeft(loadOpt)) {
-        yield* context.runtime.prompt.warn(`Failed to load registry ${source}`);
-        continue;
-      }
-
-      const registryItems = loadOpt.right.items;
-
-      for (const itemName of itemsToUpdate) {
-        const registryItem = registryItems.find((i) => i.name === itemName);
-        if (!registryItem) continue;
-
-        const resolvedFiles = yield* Effect.all(
-          registryItem.files.map((file) =>
-            resolveFileContent(file, registryItem, context.cwd, context.runtime, plugins).pipe(
-              Effect.map((content) => ({ file, content })),
-              Effect.catchAll(() => Effect.succeed(null)),
-            ),
-          ),
-          { concurrency: "unbounded" },
-        ).pipe(
-          Effect.map((results) =>
-            results.filter((r): r is { file: RegistryFile; content: string } => r !== null),
-          ),
-        );
-
-        const currentHash = lockfile.components[itemName].hash;
-        const updatePlanRes = yield* Effect.catchAll(
-          buildUpdatePlanForItem(
-            itemName,
-            registryItem,
-            resolvedFiles,
-            currentHash,
-            context.cwd,
-            config,
-          ),
-          () => Effect.succeed(null),
-        );
-
-        if (!updatePlanRes) continue;
-
-        const updateAction = updatePlanRes;
-
-        if (updateAction.status === "requires-diff-prompt") {
-          const filesWithLocal: DetectedUpdateFile[] = [];
-          for (const rf of updateAction.files) {
-            const localContent = yield* Effect.catchAll(
-              context.runtime.fs.readFile(rf.target, "utf8"),
-              () => Effect.succeed(""),
-            );
-            filesWithLocal.push({
-              target: rf.target,
-              remoteContent: rf.content,
-              localContent,
-            });
+          if (Either.isLeft(loadOpt)) {
+            yield* context.runtime.prompt.warn(`Failed to load registry ${source}`);
+            return [];
           }
 
-          availableUpdates.push({
-            itemName,
-            newHash: updateAction.newHash,
-            files: filesWithLocal,
-          });
-        }
-      }
-    }
+          const registryItems = loadOpt.right.items;
 
-    return availableUpdates;
+          const sourceUpdates = yield* Effect.forEach(
+            itemsToUpdate,
+            (itemName) =>
+              Effect.gen(function* () {
+                const registryItem = registryItems.find((i) => i.name === itemName);
+                if (!registryItem) return null;
+
+                const resolvedFiles = yield* Effect.all(
+                  registryItem.files.map((file) =>
+                    resolveFileContent(
+                      file,
+                      registryItem,
+                      context.cwd,
+                      context.runtime,
+                      plugins,
+                    ).pipe(
+                      Effect.map((content) => ({ file, content })),
+                      Effect.catchAll(() => Effect.succeed(null)),
+                    ),
+                  ),
+                  { concurrency: "unbounded" },
+                ).pipe(
+                  Effect.map((results) =>
+                    results.filter((r): r is { file: RegistryFile; content: string } => r !== null),
+                  ),
+                );
+
+                const currentHash = lockfile.components[itemName].hash;
+                const updatePlanRes = yield* Effect.catchAll(
+                  buildUpdatePlanForItem(
+                    itemName,
+                    registryItem,
+                    resolvedFiles,
+                    currentHash,
+                    context.cwd,
+                    config,
+                  ),
+                  () => Effect.succeed(null),
+                );
+
+                if (!updatePlanRes) return null;
+
+                const updateAction = updatePlanRes;
+
+                if (updateAction.status === "requires-diff-prompt") {
+                  const filesWithLocal = yield* Effect.forEach(
+                    updateAction.files,
+                    (rf) =>
+                      Effect.gen(function* () {
+                        const localContent = yield* Effect.catchAll(
+                          context.runtime.fs.readFile(rf.target, "utf8"),
+                          () => Effect.succeed(""),
+                        );
+                        return {
+                          target: rf.target,
+                          remoteContent: rf.content,
+                          localContent,
+                        };
+                      }),
+                    { concurrency: "unbounded" },
+                  );
+
+                  return {
+                    itemName,
+                    newHash: updateAction.newHash,
+                    files: filesWithLocal,
+                  };
+                }
+                return null;
+              }),
+            { concurrency: "unbounded" },
+          );
+
+          return sourceUpdates.filter((u): u is DetectedUpdate => u !== null);
+        }),
+      { concurrency: 1 }, // Because of prompt.warn
+    );
+
+    return updatesNested.flat();
   });
 }
 
@@ -157,14 +179,19 @@ function printDiff(oldContent: string, newContent: string): Effect.Effect<void, 
       catch: (e): AppError => appError("RuntimeError", String(e)),
     });
 
-    for (const part of changes) {
-      const format = part.added ? "green" : part.removed ? "red" : "gray";
-      const prefix = part.added ? "+ " : part.removed ? "- " : "  ";
-      const lines = part.value.replace(/\n$/, "").split("\n");
-      for (const line of lines) {
-        console.log(styleText(format, `${prefix}${line}`));
-      }
-    }
+    yield* Effect.forEach(
+      changes,
+      (part) =>
+        Effect.sync(() => {
+          const format = part.added ? "green" : part.removed ? "red" : "gray";
+          const prefix = part.added ? "+ " : part.removed ? "- " : "  ";
+          const lines = part.value.replace(/\n$/, "").split("\n");
+          for (const line of lines) {
+            console.log(styleText(format, `${prefix}${line}`));
+          }
+        }),
+      { concurrency: 1 },
+    );
   });
 }
 
@@ -176,48 +203,58 @@ function interactApprovalPhase(
   availableUpdates: DetectedUpdate[],
 ): Effect.Effect<ApprovedUpdatePlan, AppError> {
   return Effect.gen(function* () {
-    const approvedUpdates: DetectedUpdate[] = [];
+    const approvedUpdatesOpt = yield* Effect.forEach(
+      availableUpdates,
+      (update) =>
+        Effect.gen(function* () {
+          yield* context.runtime.prompt.info(`Update available for ${update.itemName}`);
 
-    for (const update of availableUpdates) {
-      yield* context.runtime.prompt.info(`Update available for ${update.itemName}`);
+          const action = yield* context.runtime.prompt.select({
+            message: `What do you want to do with ${update.itemName}?`,
+            options: [
+              { value: "diff", label: "Show diff" },
+              { value: "update", label: "Update" },
+              { value: "skip", label: "Skip" },
+            ],
+          });
 
-      const action = yield* context.runtime.prompt.select({
-        message: `What do you want to do with ${update.itemName}?`,
-        options: [
-          { value: "diff", label: "Show diff" },
-          { value: "update", label: "Update" },
-          { value: "skip", label: "Skip" },
-        ],
-      });
+          const isActionCancel = yield* context.runtime.prompt.isCancel(action);
 
-      const isActionCancel = yield* context.runtime.prompt.isCancel(action);
+          if (isActionCancel || action === "skip") {
+            return null;
+          }
 
-      if (isActionCancel || action === "skip") {
-        continue;
-      }
+          if (action === "diff") {
+            yield* Effect.forEach(
+              update.files,
+              (rf) =>
+                Effect.gen(function* () {
+                  console.log(styleText("bold", `\nDiff for ${rf.target}:`));
+                  yield* printDiff(rf.localContent, rf.remoteContent);
+                }),
+              { concurrency: 1 },
+            );
 
-      if (action === "diff") {
-        for (const rf of update.files) {
-          console.log(styleText("bold", `\nDiff for ${rf.target}:`));
-          yield* printDiff(rf.localContent, rf.remoteContent);
-        }
+            const confirm = yield* context.runtime.prompt.confirm({
+              message: `Update ${update.itemName} now?`,
+              initialValue: true,
+            });
 
-        const confirm = yield* context.runtime.prompt.confirm({
-          message: `Update ${update.itemName} now?`,
-          initialValue: true,
-        });
+            const isConfirmCancel = yield* context.runtime.prompt.isCancel(confirm);
 
-        const isConfirmCancel = yield* context.runtime.prompt.isCancel(confirm);
+            if (isConfirmCancel || !confirm) {
+              return null;
+            }
+          }
 
-        if (isConfirmCancel || !confirm) {
-          continue;
-        }
-      }
+          return update;
+        }),
+      { concurrency: 1 },
+    );
 
-      approvedUpdates.push(update);
-    }
-
-    return { approvedUpdates };
+    return {
+      approvedUpdates: approvedUpdatesOpt.filter((u): u is DetectedUpdate => u !== null),
+    };
   });
 }
 
@@ -271,15 +308,20 @@ export function runUpdateCommand(context: CommandContext): Effect.Effect<Command
     const updatedLockfile = JSON.parse(JSON.stringify(state.lockfile));
     const vfsFiles: { id: string; code: string }[] = [];
 
-    for (const update of approvedPlan.approvedUpdates) {
-      for (const file of update.files) {
-        vfsFiles.push({
-          id: file.target,
-          code: file.remoteContent,
-        });
-      }
-      updatedLockfile.components[update.itemName].hash = update.newHash;
-    }
+    yield* Effect.forEach(
+      approvedPlan.approvedUpdates,
+      (update) =>
+        Effect.sync(() => {
+          update.files.forEach((file) => {
+            vfsFiles.push({
+              id: file.target,
+              code: file.remoteContent,
+            });
+          });
+          updatedLockfile.components[update.itemName].hash = update.newHash;
+        }),
+      { concurrency: "unbounded" },
+    );
 
     const userPlugins = state.config.plugins?.filter((p) => typeof p === "object") || [];
     const vfs = new MemoryVFS();

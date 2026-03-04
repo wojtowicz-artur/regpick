@@ -107,7 +107,7 @@ describe("init integration", () => {
 
     expect(Either.isRight(result)).toBe(false);
     if (Either.isLeft(result)) {
-      expect(result.left).toMatchObject({ kind: "UserCancelled" });
+      expect(result.left).toMatchObject({ _tag: "UserCancelled" });
     }
 
     // Check that config file was NOT created
@@ -164,7 +164,7 @@ describe("init integration", () => {
 
     expect(Either.isRight(result)).toBe(false);
     if (Either.isLeft(result)) {
-      expect(result.left).toMatchObject({ kind: "RuntimeError" });
+      expect(result.left).toMatchObject({ _tag: "RuntimeError" });
       expect(result.left.message).toContain("Failed to write file");
     }
 
