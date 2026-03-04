@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.16.8](https://github.com/wojtowicz-artur/regpick/compare/v0.16.7...v0.16.8) (2026-03-04)
+
+### Code Refactoring
+
+* **core:** reorder add plugin steps to prevent partial failures ([4d4c291](https://github.com/wojtowicz-artur/regpick/commit/4d4c2914782e38955d828ded6367da277fef0b26))
+
 ## [0.16.7](https://github.com/wojtowicz-artur/regpick/compare/v0.16.6...v0.16.7) (2026-03-04)
 
 ## [0.16.5](https://github.com/wojtowicz-artur/regpick/compare/v0.16.4...v0.16.5) (2026-03-04)
