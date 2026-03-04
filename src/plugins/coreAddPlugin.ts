@@ -1,10 +1,10 @@
-import { Either } from "effect";
 import { type PersistableVFS, type PipelineContext, type Plugin } from "@/core/pipeline.js";
 import { installDependencies } from "@/shell/installer.js";
 import { readLockfile, writeLockfile } from "@/shell/lockfile.js";
 import { resolvePackageManager } from "@/shell/packageManagers/resolver.js";
 import { type RuntimePorts } from "@/shell/runtime/ports.js";
 import { type RegistryItem, type RegpickConfig } from "@/types.js";
+import { Effect } from "effect";
 
 /**
  * Core Plugin that bridges the gap between the `InstallPlan` resulting from
@@ -27,24 +27,23 @@ export function coreAddPlugin(
       const depsToInstall = [...dependencyPlan.dependencies, ...dependencyPlan.devDependencies];
 
       if (depsToInstall.length > 0) {
-        const pmName = await resolvePackageManager(
-          ctx.cwd,
-          config.install?.packageManager || "auto",
-          runtime,
-          config,
+        const pmName = await Effect.runPromise(
+          resolvePackageManager(ctx.cwd, config.install?.packageManager || "auto", runtime, config),
         );
 
-        const result = installDependencies(
-          ctx.cwd,
-          pmName,
-          dependencyPlan.dependencies,
-          dependencyPlan.devDependencies,
-          runtime,
-          config,
-        );
-
-        if (Either.isLeft(result)) {
-          throw new Error(`Failed to install dependencies: ${result.left.message}`);
+        try {
+          await Effect.runPromise(
+            installDependencies(
+              ctx.cwd,
+              pmName,
+              dependencyPlan.dependencies,
+              dependencyPlan.devDependencies,
+              runtime,
+              config,
+            ),
+          );
+        } catch (error) {
+          throw new Error(`Failed to install dependencies: ${(error as any).message}`);
         }
       }
 
@@ -55,7 +54,7 @@ export function coreAddPlugin(
 
       // 3. Save Lockfile
       if (installedItemsInfo.length > 0) {
-        const lockfile = await readLockfile(ctx.cwd, runtime);
+        const lockfile = await Effect.runPromise(readLockfile(ctx.cwd, runtime));
         for (const item of installedItemsInfo) {
           if (!lockfile.components) lockfile.components = {};
           lockfile.components[item.name] = {
@@ -63,7 +62,7 @@ export function coreAddPlugin(
             hash: "pending", // Hash integration handled post-transform or left pending
           };
         }
-        await writeLockfile(ctx.cwd, lockfile, runtime);
+        await Effect.runPromise(writeLockfile(ctx.cwd, lockfile, runtime));
       }
     },
   };

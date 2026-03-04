@@ -16,7 +16,7 @@ export type LockfileItem = S.Schema.Type<typeof LockfileItemSchema>;
 
 export const RegpickLockfileSchema = S.mutable(
   S.Struct({
-    components: S.Record({ key: S.String, value: LockfileItemSchema }),
+    components: S.mutable(S.Record({ key: S.String, value: LockfileItemSchema })),
   }),
 );
 export type RegpickLockfile = {
@@ -27,35 +27,33 @@ export function getLockfilePath(cwd: string): string {
   return path.join(cwd, LOCKFILE_NAME);
 }
 
-export async function readLockfile(cwd: string, runtime: RuntimePorts): Promise<RegpickLockfile> {
+export function readLockfile(cwd: string, runtime: RuntimePorts) {
   const lockfilePath = getLockfilePath(cwd);
-  const exists = await Effect.runPromise(runtime.fs.pathExists(lockfilePath));
 
-  if (!exists) {
-    return { components: {} };
-  }
+  return Effect.gen(function* () {
+    const exists = yield* runtime.fs.pathExists(lockfilePath);
+    if (!exists) {
+      return { components: {} };
+    }
 
-  const readRes = Effect.runSyncExit(runtime.fs.readJsonSync<unknown>(lockfilePath));
-  if (readRes._tag !== "Success") {
-    return { components: {} };
-  }
+    const readRes = yield* Effect.exit(runtime.fs.readJsonSync<unknown>(lockfilePath));
+    if (readRes._tag !== "Success") {
+      return { components: {} };
+    }
 
-  const decodeEither = S.decodeUnknownEither(RegpickLockfileSchema);
-  const parsed = decodeEither(readRes.value);
-  if (parsed._tag === "Right") {
-    return parsed.right;
-  } else {
-    return { components: {} };
-  }
+    const decodeEither = S.decodeUnknownEither(RegpickLockfileSchema);
+    const parsed = decodeEither(readRes.value);
+    if (parsed._tag === "Right") {
+      return parsed.right;
+    } else {
+      return { components: {} };
+    }
+  });
 }
 
-export async function writeLockfile(
-  cwd: string,
-  lockfile: RegpickLockfile,
-  runtime: RuntimePorts,
-): Promise<void> {
+export function writeLockfile(cwd: string, lockfile: RegpickLockfile, runtime: RuntimePorts) {
   const lockfilePath = getLockfilePath(cwd);
-  await Effect.runPromise(runtime.fs.writeJson(lockfilePath, lockfile, { spaces: 2 }));
+  return runtime.fs.writeJson(lockfilePath, lockfile, { spaces: 2 });
 }
 
 export function computeHash(content: string): string {

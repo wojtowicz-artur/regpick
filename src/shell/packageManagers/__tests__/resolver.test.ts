@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
@@ -11,7 +12,9 @@ describe("resolvePackageManager", () => {
   };
 
   it("returns configured pm if not auto", async () => {
-    const result = await resolvePackageManager("/test", "yarn", dummyRuntime as any);
+    const result = await Effect.runPromise(
+      resolvePackageManager("/test", "yarn", dummyRuntime as any),
+    );
     expect(result).toBe("yarn");
   });
 
@@ -19,7 +22,9 @@ describe("resolvePackageManager", () => {
     vi.mocked(dummyRuntime.fs.existsSync).mockImplementation((p: string) => {
       return path.basename(p) === "pnpm-lock.yaml";
     });
-    const result = await resolvePackageManager("/test", "auto", dummyRuntime as any);
+    const result = await Effect.runPromise(
+      resolvePackageManager("/test", "auto", dummyRuntime as any),
+    );
     expect(result).toBe("pnpm");
   });
 
@@ -27,7 +32,9 @@ describe("resolvePackageManager", () => {
     vi.mocked(dummyRuntime.fs.existsSync).mockImplementation((p: string) => {
       return path.basename(p) === "yarn.lock";
     });
-    const result = await resolvePackageManager("/test", "auto", dummyRuntime as any);
+    const result = await Effect.runPromise(
+      resolvePackageManager("/test", "auto", dummyRuntime as any),
+    );
     expect(result).toBe("yarn");
   });
 
@@ -35,13 +42,17 @@ describe("resolvePackageManager", () => {
     vi.mocked(dummyRuntime.fs.existsSync).mockImplementation((p: string) => {
       return path.basename(p) === "bun.lockb";
     });
-    const result = await resolvePackageManager("/test", "auto", dummyRuntime as any);
+    const result = await Effect.runPromise(
+      resolvePackageManager("/test", "auto", dummyRuntime as any),
+    );
     expect(result).toBe("bun");
   });
 
   it("falls back to npm if no plugin detects", async () => {
     vi.mocked(dummyRuntime.fs.existsSync).mockReturnValue(false);
-    const result = await resolvePackageManager("/test", "auto", dummyRuntime as any);
+    const result = await Effect.runPromise(
+      resolvePackageManager("/test", "auto", dummyRuntime as any),
+    );
     expect(result).toBe("npm");
   });
 });

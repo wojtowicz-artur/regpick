@@ -1,4 +1,3 @@
-import { Either } from "effect";
 import { Effect, Schema as S } from "effect";
 import path from "node:path";
 
@@ -30,34 +29,42 @@ export function collectMissingDependencies(
   items: RegistryItem[],
   cwd: string,
   runtime: RuntimePorts,
-): { missingDependencies: string[]; missingDevDependencies: string[] } {
-  const packageJsonPath = path.join(cwd, "package.json");
-  if (!runtime.fs.existsSync(packageJsonPath)) {
-    return { missingDependencies: [], missingDevDependencies: [] };
-  }
+): Effect.Effect<
+  { missingDependencies: string[]; missingDevDependencies: string[] },
+  never,
+  never
+> {
+  return Effect.gen(function* () {
+    const packageJsonPath = path.join(cwd, "package.json");
+    if (!runtime.fs.existsSync(packageJsonPath)) {
+      return { missingDependencies: [], missingDevDependencies: [] };
+    }
 
-  const packageJsonResult = Effect.runSyncExit(runtime.fs.readJsonSync<unknown>(packageJsonPath));
-  const parsed = packageJsonResult._tag === "Success" ? packageJsonResult.value : {};
+    const packageJsonResult = yield* Effect.exit(runtime.fs.readJsonSync<unknown>(packageJsonPath));
+    const parsed = packageJsonResult._tag === "Success" ? packageJsonResult.value : {};
 
-  const safeParseResult = S.decodeUnknownEither(PackageJsonSchema)(parsed);
-  const packageJson =
-    safeParseResult._tag === "Right"
-      ? safeParseResult.right
-      : { dependencies: {}, devDependencies: {}, peerDependencies: {} };
+    const safeParseResult = S.decodeUnknownEither(PackageJsonSchema)(parsed);
+    const packageJson =
+      safeParseResult._tag === "Right"
+        ? safeParseResult.right
+        : { dependencies: {}, devDependencies: {}, peerDependencies: {} };
 
-  const declared = {
-    ...packageJson.dependencies,
-    ...packageJson.devDependencies,
-    ...packageJson.peerDependencies,
-  };
+    const declared = {
+      ...packageJson.dependencies,
+      ...packageJson.devDependencies,
+      ...packageJson.peerDependencies,
+    };
 
-  const allDeps = unique(items.flatMap((item) => item.dependencies || []));
-  const allDevDeps = unique(items.flatMap((item) => item.devDependencies || []));
+    const allDeps = unique(items.flatMap((item) => item.dependencies || []));
+    const allDevDeps = unique(items.flatMap((item) => item.devDependencies || []));
 
-  const missingDependencies = allDeps.filter((dep) => !declared[dep]);
-  const missingDevDependencies = allDevDeps.filter((dep) => !declared[dep]);
+    const missingDependencies = allDeps.filter((dep) => !(declared as Record<string, string>)[dep]);
+    const missingDevDependencies = allDevDeps.filter(
+      (dep) => !(declared as Record<string, string>)[dep],
+    );
 
-  return { missingDependencies, missingDevDependencies };
+    return { missingDependencies, missingDevDependencies };
+  });
 }
 
 export function installDependencies(
@@ -67,26 +74,29 @@ export function installDependencies(
   devDependencies: string[],
   runtime: RuntimePorts,
   config: RegpickConfig,
-): Either.Either<void, AppError> {
-  if (!dependencies.length && !devDependencies.length) {
-    return Either.right(undefined);
-  }
+): Effect.Effect<void, AppError, never> {
+  return Effect.gen(function* () {
+    if (!dependencies.length && !devDependencies.length) {
+      return;
+    }
 
-  const strategy = getPackageManagerPlugin(packageManager, config);
-  if (!strategy) {
-    return Either.left(appError("InstallError", `Unknown package manager: ${packageManager}`));
-  }
-  const commands = strategy.buildInstallCommands(dependencies, devDependencies);
-  for (const command of commands) {
-    const result = runtime.process.run(command.command, command.args, cwd);
-    if (result.status !== 0) {
-      return Either.left(
-        appError(
-          "InstallError",
-          `Dependency install failed: ${command.command} ${command.args.join(" ")}`,
-        ),
+    const strategy = getPackageManagerPlugin(packageManager, config);
+    if (!strategy) {
+      return yield* Effect.fail(
+        appError("InstallError", `Unknown package manager: ${packageManager}`),
       );
     }
-  }
-  return Either.right(undefined);
+    const commands = strategy.buildInstallCommands(dependencies, devDependencies);
+    for (const command of commands) {
+      const result = runtime.process.run(command.command, command.args, cwd);
+      if (result.status !== 0) {
+        return yield* Effect.fail(
+          appError(
+            "InstallError",
+            `Dependency install failed: ${command.command} ${command.args.join(" ")}`,
+          ),
+        );
+      }
+    }
+  });
 }

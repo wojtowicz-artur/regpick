@@ -209,7 +209,7 @@ function queryPlanState(
 
     const finalRes = yield* buildInstallPlan(selectedItems, context.cwd, config, existingTargets);
 
-    const deps = collectMissingDependencies(selectedItems, context.cwd, context.runtime);
+    const deps = yield* collectMissingDependencies(selectedItems, context.cwd, context.runtime);
 
     return {
       selectedItems,

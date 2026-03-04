@@ -90,33 +90,22 @@ export function getPackageManagerPlugin(
   name: string,
   config?: RegpickConfig,
 ): PackageManagerPlugin | undefined {
-  if (config?.plugins) {
-    const userPlugin = config.plugins.find(
-      (p: unknown) =>
-        typeof p === "object" && p !== null && "name" in p && (p as any).name === name,
-    );
-    if (userPlugin) return userPlugin as unknown as PackageManagerPlugin;
-  }
-  return defaultPluginRegistry[name];
+  const userPlugin = config?.plugins?.find(
+    (p): p is PackageManagerPlugin =>
+      typeof p === "object" && p !== null && "name" in p && (p as any).name === name,
+  );
+  return userPlugin ?? defaultPluginRegistry[name];
 }
 
-export function getAllPackageManagerPlugins(
-  config?: RegpickConfig | unknown,
-): PackageManagerPlugin[] {
-  const userPlugins = (
-    config &&
-    typeof config === "object" &&
-    "plugins" in config &&
-    Array.isArray((config as any).plugins)
-      ? (config as any).plugins
-      : []
-  ).filter((p: unknown) => typeof p === "object" && p !== null && "buildInstallCommands" in p);
-  const builtIns = Object.values(defaultPluginRegistry).filter(
-    (bp) =>
-      !userPlugins.find(
-        (up: unknown) =>
-          typeof up === "object" && up !== null && "name" in up && (up as any).name === bp.name,
-      ),
+export function getAllPackageManagerPlugins(config?: RegpickConfig): PackageManagerPlugin[] {
+  const userPlugins = (config?.plugins || []).filter(
+    (p): p is PackageManagerPlugin =>
+      typeof p === "object" && p !== null && "buildInstallCommands" in p,
   );
+
+  const builtIns = Object.values(defaultPluginRegistry).filter(
+    (bp) => !userPlugins.some((up) => up.name === bp.name),
+  );
+
   return [...userPlugins, ...builtIns];
 }

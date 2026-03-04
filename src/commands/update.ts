@@ -45,10 +45,9 @@ function queryLoadState(
       Effect.mapError((e) => appError("RuntimeError", String(e))),
     );
 
-    const lockfile = yield* Effect.tryPromise({
-      try: () => readLockfile(context.cwd, context.runtime),
-      catch: (e): AppError => appError("RuntimeError", String(e)),
-    });
+    const lockfile = yield* readLockfile(context.cwd, context.runtime).pipe(
+      Effect.mapError((e) => appError("RuntimeError", String(e))),
+    );
 
     if (!configRes.configPath) {
       yield* context.runtime.prompt.error(
@@ -293,7 +292,7 @@ export function runUpdateCommand(context: CommandContext): Effect.Effect<Command
           if ("flushToDisk" in ctx.vfs) {
             await (ctx.vfs as PersistableVFS).flushToDisk();
           }
-          await writeLockfile(ctx.cwd, updatedLockfile, context.runtime);
+          await Effect.runPromise(writeLockfile(ctx.cwd, updatedLockfile, context.runtime));
         },
       },
     ]);
