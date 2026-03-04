@@ -1,5 +1,7 @@
 # Changelog
 
+## [0.16.7](https://github.com/wojtowicz-artur/regpick/compare/v0.16.6...v0.16.7) (2026-03-04)
+
 ## [0.16.5](https://github.com/wojtowicz-artur/regpick/compare/v0.16.4...v0.16.5) (2026-03-04)
 
 ### Code Refactoring
