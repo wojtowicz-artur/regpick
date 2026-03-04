@@ -93,10 +93,7 @@ export const RegpickConfigSchema = BaseRegpickConfigSchema.pipe(
       if (!input.install?.allowOutsideProject) {
         const targets = input.resolve?.targets || {};
         for (const target of Object.values(targets)) {
-          if (
-            typeof target === "string" &&
-            (target.startsWith("..") || path.isAbsolute(target))
-          ) {
+          if (typeof target === "string" && (target.startsWith("..") || path.isAbsolute(target))) {
             return false;
           }
         }

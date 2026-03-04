@@ -21,9 +21,7 @@ describe("shadcnPlugin", () => {
       },
     ];
 
-    await Effect.runPromise(
-      pipeline.run({ vfs, cwd: "/", runtime: {} as any }, files),
-    );
+    await Effect.runPromise(pipeline.run({ vfs, cwd: "/", runtime: {} as any }, files));
 
     const btnOutput = await vfs.readFile("/components/ui/button.tsx");
     expect(btnOutput).toContain('"use client";');

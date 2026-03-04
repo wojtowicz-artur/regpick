@@ -20,7 +20,9 @@ export class FileSystemPort extends Context.Tag("FileSystemPort")<
       value: unknown,
       options?: { spaces?: number },
     ): Effect.Effect<void, AppError, never>;
-    stat(path: string): Effect.Effect<{ isDirectory(): boolean; isFile(): boolean }, AppError, never>;
+    stat(
+      path: string,
+    ): Effect.Effect<{ isDirectory(): boolean; isFile(): boolean }, AppError, never>;
     readdir(path: string): Effect.Effect<string[], AppError, never>;
   }
 >() {}

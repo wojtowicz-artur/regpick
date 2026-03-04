@@ -1,8 +1,4 @@
-import {
-  DEFAULT_CONFIG,
-  RegpickConfigSchema,
-  type RegpickConfig,
-} from "@/domain/configModel.js";
+import { DEFAULT_CONFIG, RegpickConfigSchema, type RegpickConfig } from "@/domain/configModel.js";
 import { generateConfigCode } from "@/shell/config/generator.js";
 import { Effect, Schema as S } from "effect";
 import fs from "node:fs/promises";
@@ -11,9 +7,7 @@ import { loadConfig } from "unconfig";
 
 export type ConfigFormat = "ts" | "mjs" | "cjs" | "js" | "json";
 
-export function detectConfigFormat(
-  cwd: string,
-): Effect.Effect<ConfigFormat, Error> {
+export function detectConfigFormat(cwd: string): Effect.Effect<ConfigFormat, Error> {
   return Effect.gen(function* () {
     const tsExists = yield* Effect.tryPromise(() =>
       fs.access(path.join(cwd, "tsconfig.json")),
@@ -39,9 +33,7 @@ export function detectConfigFormat(
   });
 }
 
-export function resolveTargetConfigPath(
-  cwd: string,
-): Effect.Effect<string, Error> {
+export function resolveTargetConfigPath(cwd: string): Effect.Effect<string, Error> {
   return Effect.gen(function* () {
     const { sources } = yield* Effect.tryPromise(() =>
       loadConfig<unknown>({
@@ -79,11 +71,7 @@ export function readConfig(
             files: "package.json",
             extensions: [],
             rewrite(config: unknown) {
-              if (
-                typeof config === "object" &&
-                config !== null &&
-                "regpick" in config
-              ) {
+              if (typeof config === "object" && config !== null && "regpick" in config) {
                 return (config as any).regpick;
               }
               return undefined;

@@ -47,9 +47,7 @@ function run(): Effect.Effect<void, never> {
     process.on("SIGTERM", () => handleTerminate());
     process.on("uncaughtException", handleTerminate);
     process.on("unhandledRejection", (reason) =>
-      handleTerminate(
-        reason instanceof Error ? reason : new Error(String(reason)),
-      ),
+      handleTerminate(reason instanceof Error ? reason : new Error(String(reason))),
     );
 
     const parsed = parseCliArgs(process.argv.slice(2));
@@ -64,9 +62,7 @@ function run(): Effect.Effect<void, never> {
     const runtime = createRuntimePorts({ signal: abortController.signal });
 
     const context: CommandContext = {
-      cwd: parsed.flags.cwd
-        ? path.resolve(process.cwd(), String(parsed.flags.cwd))
-        : process.cwd(),
+      cwd: parsed.flags.cwd ? path.resolve(process.cwd(), String(parsed.flags.cwd)) : process.cwd(),
       args: parsed,
     };
 
@@ -77,10 +73,7 @@ function run(): Effect.Effect<void, never> {
       const rolledBack = yield* journal.rollbackIntent(context.cwd);
       if (rolledBack) {
         yield* runtime.prompt.error(
-          styleText(
-            "yellow",
-            "Previous incomplete operation detected and rolled back.",
-          ),
+          styleText("yellow", "Previous incomplete operation detected and rolled back."),
         );
       }
 
@@ -108,9 +101,7 @@ function run(): Effect.Effect<void, never> {
           break;
         case "update":
           commandEffect = yield* Effect.promise(() =>
-            import("@/commands/update.js").then((mod) =>
-              mod.runUpdateCommand(),
-            ),
+            import("@/commands/update.js").then((mod) => mod.runUpdateCommand()),
           );
           break;
         case "pack":
@@ -160,10 +151,7 @@ function run(): Effect.Effect<void, never> {
   });
 }
 
-function handleAppError(
-  error: AppError,
-  write: (message: string) => void,
-): void {
+function handleAppError(error: AppError, write: (message: string) => void): void {
   if (error._tag === "UserCancelled") {
     write(error.message);
     return;

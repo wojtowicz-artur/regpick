@@ -63,9 +63,7 @@ const interactInitPhase = (state: InitQueryState) =>
         shouldOverwriteOrCancel === true,
       );
       if (secondDecision === "cancelled") {
-        return yield* Effect.fail(
-          appError("UserCancelled", "Operation cancelled."),
-        );
+        return yield* Effect.fail(appError("UserCancelled", "Operation cancelled."));
       }
 
       if (secondDecision === "keep") {
@@ -88,12 +86,9 @@ const interactInitPhase = (state: InitQueryState) =>
           ],
         });
 
-    const isPackageManagerCancel =
-      yield* runtime.prompt.isCancel(packageManager);
+    const isPackageManagerCancel = yield* runtime.prompt.isCancel(packageManager);
     if (!assumeYes && isPackageManagerCancel) {
-      return yield* Effect.fail(
-        appError("UserCancelled", "Operation cancelled."),
-      );
+      return yield* Effect.fail(appError("UserCancelled", "Operation cancelled."));
     }
 
     const componentsFolder = assumeYes
@@ -103,19 +98,15 @@ const interactInitPhase = (state: InitQueryState) =>
           placeholder: "src/components/ui",
         });
 
-    const isComponentsFolderCancel =
-      yield* runtime.prompt.isCancel(componentsFolder);
+    const isComponentsFolderCancel = yield* runtime.prompt.isCancel(componentsFolder);
     if (!assumeYes && isComponentsFolderCancel) {
-      return yield* Effect.fail(
-        appError("UserCancelled", "Operation cancelled."),
-      );
+      return yield* Effect.fail(appError("UserCancelled", "Operation cancelled."));
     }
 
     const overwritePolicy = assumeYes
       ? "prompt"
       : yield* runtime.prompt.select({
-          message:
-            "Czy chcesz nadpisywać pliki automatycznie, czy wolisz być pytany?",
+          message: "Czy chcesz nadpisywać pliki automatycznie, czy wolisz być pytany?",
           options: [
             { value: "prompt", label: "Pytaj (prompt)" },
             { value: "overwrite", label: "Zawsze nadpisuj (overwrite)" },
@@ -123,12 +114,9 @@ const interactInitPhase = (state: InitQueryState) =>
           ],
         });
 
-    const isOverwritePolicyCancel =
-      yield* runtime.prompt.isCancel(overwritePolicy);
+    const isOverwritePolicyCancel = yield* runtime.prompt.isCancel(overwritePolicy);
     if (!assumeYes && isOverwritePolicyCancel) {
-      return yield* Effect.fail(
-        appError("UserCancelled", "Operation cancelled."),
-      );
+      return yield* Effect.fail(appError("UserCancelled", "Operation cancelled."));
     }
 
     const newConfigRaw = {
@@ -175,15 +163,11 @@ export const runInitCommand = () =>
 
     const content = generateConfigCode(plan.newConfig, format);
 
-    yield* Effect.catchAll(
-      runtime.fs.writeFile(plan.configPath, content, "utf8"),
-      (e) =>
-        Effect.gen(function* () {
-          yield* runtime.prompt.error(
-            `Failed to write config file: ${plan.configPath}`,
-          );
-          return yield* Effect.fail(e);
-        }),
+    yield* Effect.catchAll(runtime.fs.writeFile(plan.configPath, content, "utf8"), (e) =>
+      Effect.gen(function* () {
+        yield* runtime.prompt.error(`Failed to write config file: ${plan.configPath}`);
+        return yield* Effect.fail(e);
+      }),
     );
 
     yield* runtime.prompt.success(

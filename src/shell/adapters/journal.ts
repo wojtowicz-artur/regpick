@@ -51,9 +51,7 @@ export const JournalServiceImpl = JournalService.of({
 
       // Rollback lockfile
       if (entry.lockfileBackup) {
-        yield* writeLockfile(cwd, entry.lockfileBackup!, runtime).pipe(
-          Effect.ignore,
-        );
+        yield* writeLockfile(cwd, entry.lockfileBackup!, runtime).pipe(Effect.ignore);
       }
 
       // Clean up the journal

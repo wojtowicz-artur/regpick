@@ -9,17 +9,8 @@ import { Runtime } from "@/core/ports.js";
 import { buildUpdatePlanForItem, groupBySource } from "@/domain/updatePlan.js";
 import { MemoryVFS } from "@/shell/adapters/vfs.js";
 import { readConfig } from "@/shell/config/index.js";
-import {
-  DirectoryPlugin,
-  FilePlugin,
-  HttpPlugin,
-  loadPlugins,
-} from "@/shell/plugins/index.js";
-import {
-  computeTreeHash,
-  readLockfile,
-  writeLockfile,
-} from "@/shell/services/lockfile.js";
+import { DirectoryPlugin, FilePlugin, HttpPlugin, loadPlugins } from "@/shell/plugins/index.js";
+import { computeTreeHash, readLockfile, writeLockfile } from "@/shell/services/lockfile.js";
 import { loadRegistry, resolveFileContent } from "@/shell/services/registry.js";
 import type {
   CommandOutcome,
@@ -58,21 +49,13 @@ function queryLoadState(): Effect.Effect<
   return Effect.gen(function* () {
     const runtime = yield* Runtime;
     const context = yield* CommandContextTag;
-    const configRes = yield* readConfig(context.cwd).pipe(
-      Effect.mapError(toAppError),
-    );
+    const configRes = yield* readConfig(context.cwd).pipe(Effect.mapError(toAppError));
 
-    const lockfile = yield* readLockfile(context.cwd, runtime).pipe(
-      Effect.mapError(toAppError),
-    );
+    const lockfile = yield* readLockfile(context.cwd, runtime).pipe(Effect.mapError(toAppError));
 
     if (!configRes.configPath) {
-      yield* runtime.prompt.error(
-        "No regpick.json configuration found. Please run 'init' first.",
-      );
-      return yield* Effect.fail(
-        appError("ValidationError", "No config file found"),
-      );
+      yield* runtime.prompt.error("No regpick.json configuration found. Please run 'init' first.");
+      return yield* Effect.fail(appError("ValidationError", "No config file found"));
     }
 
     return { config: configRes.config as RegpickConfig, lockfile };
@@ -85,11 +68,7 @@ function queryLoadState(): Effect.Effect<
 function queryAvailableUpdates(
   lockfile: RegpickLockfile,
   plugins: RegpickPlugin[],
-): Effect.Effect<
-  DetectedUpdate[],
-  AppError,
-  Runtime | CommandContextTag | ConfigTag
-> {
+): Effect.Effect<DetectedUpdate[], AppError, Runtime | CommandContextTag | ConfigTag> {
   return Effect.gen(function* () {
     const config = yield* ConfigTag;
     const runtime = yield* Runtime;
@@ -100,9 +79,7 @@ function queryAvailableUpdates(
       Object.entries(bySource),
       ([source, itemsToUpdate]) =>
         Effect.gen(function* () {
-          const loadOpt = yield* Effect.either(
-            loadRegistry(source, context.cwd, runtime, plugins),
-          );
+          const loadOpt = yield* Effect.either(loadRegistry(source, context.cwd, runtime, plugins));
 
           if (Either.isLeft(loadOpt)) {
             yield* runtime.prompt.warn(`Failed to load registry ${source}`);
@@ -115,20 +92,12 @@ function queryAvailableUpdates(
             itemsToUpdate,
             (itemName) =>
               Effect.gen(function* () {
-                const registryItem = registryItems.find(
-                  (i) => i.name === itemName,
-                );
+                const registryItem = registryItems.find((i) => i.name === itemName);
                 if (!registryItem) return null;
 
                 const resolvedFiles = yield* Effect.all(
                   registryItem.files.map((file) =>
-                    resolveFileContent(
-                      file,
-                      registryItem,
-                      context.cwd,
-                      runtime,
-                      plugins,
-                    ).pipe(
+                    resolveFileContent(file, registryItem, context.cwd, runtime, plugins).pipe(
                       Effect.map((content) => ({ file, content })),
                       Effect.catchAll(() => Effect.succeed(null)),
                     ),
@@ -136,10 +105,7 @@ function queryAvailableUpdates(
                   { concurrency: "unbounded" },
                 ).pipe(
                   Effect.map((results) =>
-                    results.filter(
-                      (r): r is { file: RegistryFile; content: string } =>
-                        r !== null,
-                    ),
+                    results.filter((r): r is { file: RegistryFile; content: string } => r !== null),
                   ),
                 );
 
@@ -201,16 +167,10 @@ function queryAvailableUpdates(
 /**
  * Outputs standard diffing structures inside terminal consoles inline.
  */
-function printDiff(
-  oldContent: string,
-  newContent: string,
-): Effect.Effect<void, AppError> {
+function printDiff(oldContent: string, newContent: string): Effect.Effect<void, AppError> {
   return Effect.gen(function* () {
     const changes = yield* Effect.tryPromise({
-      try: () =>
-        import("diff").then(({ diffLines }) =>
-          diffLines(oldContent, newContent),
-        ),
+      try: () => import("diff").then(({ diffLines }) => diffLines(oldContent, newContent)),
       catch: toAppError,
     });
 
@@ -235,11 +195,7 @@ function printDiff(
  */
 function interactApprovalPhase(
   availableUpdates: DetectedUpdate[],
-): Effect.Effect<
-  ApprovedUpdatePlan,
-  AppError,
-  Runtime | CommandContextTag | ConfigTag
-> {
+): Effect.Effect<ApprovedUpdatePlan, AppError, Runtime | CommandContextTag | ConfigTag> {
   return Effect.gen(function* () {
     const runtime = yield* Runtime;
     const approvedUpdatesOpt = yield* Effect.forEach(
@@ -292,9 +248,7 @@ function interactApprovalPhase(
     );
 
     return {
-      approvedUpdates: approvedUpdatesOpt.filter(
-        (u): u is DetectedUpdate => u !== null,
-      ),
+      approvedUpdates: approvedUpdatesOpt.filter((u): u is DetectedUpdate => u !== null),
     };
   });
 }
@@ -316,26 +270,18 @@ export function runUpdateCommand(): Effect.Effect<
 
       const componentNames = Object.keys(state.lockfile.components);
       if (componentNames.length === 0) {
-        yield* runtime.prompt.info(
-          "No components installed. Nothing to update.",
-        );
+        yield* runtime.prompt.info("No components installed. Nothing to update.");
         return {
           kind: "noop",
           message: "No components to update.",
         } as CommandOutcome;
       }
 
-      const customPlugins = yield* loadPlugins(
-        (yield* ConfigTag).plugins || [],
-        context.cwd,
-      ).pipe(Effect.mapError(toAppError));
+      const customPlugins = yield* loadPlugins((yield* ConfigTag).plugins || [], context.cwd).pipe(
+        Effect.mapError(toAppError),
+      );
 
-      const plugins = [
-        ...customPlugins,
-        HttpPlugin(),
-        FilePlugin(),
-        DirectoryPlugin(),
-      ];
+      const plugins = [...customPlugins, HttpPlugin(), FilePlugin(), DirectoryPlugin()];
 
       const updates = yield* queryAvailableUpdates(state.lockfile, plugins);
 
@@ -375,14 +321,12 @@ export function runUpdateCommand(): Effect.Effect<
                 code: file.remoteContent,
               });
             });
-            updatedLockfile.components[update.itemName].remoteHash =
-              update.newHash;
+            updatedLockfile.components[update.itemName].remoteHash = update.newHash;
           }),
         { concurrency: "unbounded" },
       );
 
-      const userPlugins =
-        (yield* ConfigTag).plugins?.filter((p) => typeof p === "object") || [];
+      const userPlugins = (yield* ConfigTag).plugins?.filter((p) => typeof p === "object") || [];
       const vfs = new MemoryVFS();
 
       const pipeline = new PipelineRenderer([
@@ -399,10 +343,7 @@ export function runUpdateCommand(): Effect.Effect<
               for (const file of update.files) {
                 const relativeTarget = path.relative(ctx.cwd, file.target);
                 try {
-                  const localContent = await ctx.vfs.readFile(
-                    file.target,
-                    "utf-8",
-                  );
+                  const localContent = await ctx.vfs.readFile(file.target, "utf-8");
                   localFiles.push({
                     path: relativeTarget,
                     content: localContent.toString(),
@@ -414,13 +355,10 @@ export function runUpdateCommand(): Effect.Effect<
                   });
                 }
               }
-              updatedLockfile.components[update.itemName].localHash =
-                computeTreeHash(localFiles);
+              updatedLockfile.components[update.itemName].localHash = computeTreeHash(localFiles);
             }
 
-            await Effect.runPromise(
-              writeLockfile(ctx.cwd, updatedLockfile, runtime),
-            );
+            await Effect.runPromise(writeLockfile(ctx.cwd, updatedLockfile, runtime));
           },
         },
       ]);
@@ -436,21 +374,17 @@ export function runUpdateCommand(): Effect.Effect<
 
       yield* journal.writeIntent(entry, context.cwd);
 
-      yield* pipeline
-        .run({ vfs, cwd: context.cwd, runtime: runtime }, vfsFiles)
-        .pipe(
-          Effect.tapError(() => journal.clearIntent(context.cwd)),
-          Effect.catchAll((error) => {
-            vfs.rollback();
-            return Effect.gen(function* () {
-              yield* runtime.prompt.error(
-                `[Failed] Update aborted: ${error.message}`,
-              );
-              return yield* Effect.fail(error);
-            });
-          }),
-          Effect.tap(() => journal.clearIntent(context.cwd)),
-        );
+      yield* pipeline.run({ vfs, cwd: context.cwd, runtime: runtime }, vfsFiles).pipe(
+        Effect.tapError(() => journal.clearIntent(context.cwd)),
+        Effect.catchAll((error) => {
+          vfs.rollback();
+          return Effect.gen(function* () {
+            yield* runtime.prompt.error(`[Failed] Update aborted: ${error.message}`);
+            return yield* Effect.fail(error);
+          });
+        }),
+        Effect.tap(() => journal.clearIntent(context.cwd)),
+      );
 
       return {
         kind: "success",

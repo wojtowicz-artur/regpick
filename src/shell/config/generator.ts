@@ -9,9 +9,7 @@ export function serializeObjectToJS(obj: unknown, indentLevel = 1): string {
   if (Array.isArray(obj)) {
     if (obj.length === 0) return "[]";
     const indent = "  ".repeat(indentLevel);
-    const inner = obj
-      .map((val) => serializeObjectToJS(val, indentLevel + 1))
-      .join(`,\n${indent}`);
+    const inner = obj.map((val) => serializeObjectToJS(val, indentLevel + 1)).join(`,\n${indent}`);
     return `[\n${indent}${inner}\n${"  ".repeat(indentLevel - 1)}]`;
   }
 
@@ -35,10 +33,7 @@ export function serializeObjectToJS(obj: unknown, indentLevel = 1): string {
   return "undefined";
 }
 
-export function generateConfigCode(
-  config: RegpickConfig,
-  format: ConfigFormat,
-): string {
+export function generateConfigCode(config: RegpickConfig, format: ConfigFormat): string {
   if (format === "json") {
     return JSON.stringify(config, null, 2);
   }
