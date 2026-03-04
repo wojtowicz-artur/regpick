@@ -1,8 +1,8 @@
 import { type PersistableVFS, type PipelineContext, type Plugin } from "@/core/pipeline.js";
-import { installDependencies } from "@/shell/installer.js";
-import { computeTreeHash, readLockfile, writeLockfile } from "@/shell/lockfile.js";
+import { installDependencies } from "@/shell/services/installer.js";
+import { computeTreeHash, readLockfile, writeLockfile } from "@/shell/services/lockfile.js";
 import { resolvePackageManager } from "@/shell/packageManagers/resolver.js";
-import { type RuntimePorts } from "@/shell/runtime/ports.js";
+import { type RuntimePorts } from "@/core/ports.js";
 import { type RegistryFile, type RegistryItem, type RegpickConfig } from "@/types.js";
 import { Effect } from "effect";
 

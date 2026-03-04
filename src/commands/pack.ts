@@ -1,7 +1,7 @@
 import { CommandContextTag } from "@/core/context.js";
 import { appError, type AppError } from "@/core/errors.js";
 import { buildRegistryItemFromFile } from "@/domain/packCore.js";
-import { Runtime } from "@/shell/runtime/ports.js";
+import { Runtime } from "@/core/ports.js";
 import type { CommandOutcome, RegistryItem } from "@/types.js";
 import { Effect } from "effect";
 import path from "node:path";

@@ -2,17 +2,25 @@ import { CommandContextTag, ConfigTag } from "@/core/context.js";
 import { appError, toAppError, type AppError } from "@/core/errors.js";
 import { JournalService } from "@/core/journal.js";
 import { PipelineRenderer } from "@/core/pipeline.js";
-import { MemoryVFS } from "@/core/vfs.js";
-import { buildInstallPlan, resolveRegistryDependencies } from "@/domain/addPlan.js";
+import { Runtime } from "@/core/ports.js";
+import {
+  buildInstallPlan,
+  resolveRegistryDependencies,
+} from "@/domain/addPlan.js";
 import { applyAliases } from "@/domain/aliasCore.js";
 import { selectItemsFromFlags } from "@/domain/selection.js";
 import { coreAddPlugin } from "@/plugins/coreAddPlugin.js";
-import { readConfig, resolveRegistrySource } from "@/shell/config.js";
-import { collectMissingDependencies } from "@/shell/installer.js";
+import { MemoryVFS } from "@/shell/adapters/vfs.js";
+import { readConfig, resolveRegistrySource } from "@/shell/config/index.js";
 import { resolvePackageManager } from "@/shell/packageManagers/resolver.js";
-import { DirectoryPlugin, FilePlugin, HttpPlugin, loadPlugins } from "@/shell/plugins/index.js";
-import { loadRegistry, resolveFileContent } from "@/shell/registry.js";
-import { Runtime } from "@/shell/runtime/ports.js";
+import {
+  DirectoryPlugin,
+  FilePlugin,
+  HttpPlugin,
+  loadPlugins,
+} from "@/shell/plugins/index.js";
+import { collectMissingDependencies } from "@/shell/services/installer.js";
+import { loadRegistry, resolveFileContent } from "@/shell/services/registry.js";
 import type {
   CommandOutcome,
   PlannedWrite,
@@ -64,11 +72,17 @@ function queryLoadConfiguration(): Effect.Effect<
   return Effect.gen(function* () {
     const runtime = yield* Runtime;
     const context = yield* CommandContextTag;
-    const res = yield* readConfig(context.cwd).pipe(Effect.mapError(toAppError));
+    const res = yield* readConfig(context.cwd).pipe(
+      Effect.mapError(toAppError),
+    );
 
     if (!res.configPath) {
-      yield* runtime.prompt.error("No regpick.json configuration found. Please run 'init' first.");
-      return yield* Effect.fail(appError("ValidationError", "No config file found"));
+      yield* runtime.prompt.error(
+        "No regpick.json configuration found. Please run 'init' first.",
+      );
+      return yield* Effect.fail(
+        appError("ValidationError", "No config file found"),
+      );
     }
 
     return { config: res.config, configPath: res.configPath };
@@ -94,14 +108,17 @@ function queryResolveRegistrySource(): Effect.Effect<
       return resolveRegistrySource(argValue, config);
     }
 
-    const aliases = Object.entries(config.registry?.sources || {}).map(([alias, value]) => ({
-      label: `${alias} -> ${value}`,
-      value: alias,
-    }));
+    const aliases = Object.entries(config.registry?.sources || {}).map(
+      ([alias, value]) => ({
+        label: `${alias} -> ${value}`,
+        value: alias,
+      }),
+    );
 
     if (aliases.length > 0) {
       const picked = yield* runtime.prompt.multiselect({
-        message: "Pick registry alias (or cancel and provide URL/path manually)",
+        message:
+          "Pick registry alias (or cancel and provide URL/path manually)",
         options: aliases,
         maxItems: 1,
         required: false,
@@ -111,7 +128,10 @@ function queryResolveRegistrySource(): Effect.Effect<
 
       if (isCancel)
         return yield* Effect.fail(
-          appError("UserCancelled", "Dependency installation cancelled by user."),
+          appError(
+            "UserCancelled",
+            "Dependency installation cancelled by user.",
+          ),
         );
 
       if (Array.isArray(picked) && picked.length > 0) {
@@ -141,18 +161,29 @@ function queryResolveRegistrySource(): Effect.Effect<
 function queryRegistryItemsToProcess(
   source: string,
   plugins: RegpickPlugin[],
-): Effect.Effect<CustomQueryItemsResult, AppError, Runtime | CommandContextTag | ConfigTag> {
+): Effect.Effect<
+  CustomQueryItemsResult,
+  AppError,
+  Runtime | CommandContextTag | ConfigTag
+> {
   return Effect.gen(function* () {
     const runtime = yield* Runtime;
     const context = yield* CommandContextTag;
     const sourcePosIdx = context.args.positionals[0] === "add" ? 1 : 0;
     const itemPosIdx = sourcePosIdx + 1;
 
-    const { items } = yield* loadRegistry(source, context.cwd, runtime, plugins);
+    const { items } = yield* loadRegistry(
+      source,
+      context.cwd,
+      runtime,
+      plugins,
+    );
 
     if (!items.length) {
       yield* runtime.prompt.warn("No installable items in registry.");
-      return yield* Effect.fail(appError("ValidationError", "No installable items in registry."));
+      return yield* Effect.fail(
+        appError("ValidationError", "No installable items in registry."),
+      );
     }
 
     const itemName = context.args.positionals[itemPosIdx];
@@ -181,22 +212,27 @@ function queryRegistryItemsToProcess(
 
       if (isCancel)
         return yield* Effect.fail(
-          appError("UserCancelled", "Dependency installation cancelled by user."),
+          appError(
+            "UserCancelled",
+            "Dependency installation cancelled by user.",
+          ),
         );
 
-      const setNames = new Set((Array.isArray(selectedNames) ? selectedNames : []).map(String));
+      const setNames = new Set(
+        (Array.isArray(selectedNames) ? selectedNames : []).map(String),
+      );
       selectedItems = items.filter((item) => setNames.has(item.name));
     }
 
     if (!selectedItems.length) {
       yield* runtime.prompt.warn("No items selected.");
-      return yield* Effect.fail(appError("ValidationError", "No items selected."));
+      return yield* Effect.fail(
+        appError("ValidationError", "No items selected."),
+      );
     }
 
-    const { resolvedItems, missingDependencies: regDeps } = resolveRegistryDependencies(
-      selectedItems,
-      items,
-    );
+    const { resolvedItems, missingDependencies: regDeps } =
+      resolveRegistryDependencies(selectedItems, items);
 
     return { selectedItems: resolvedItems, missingRegistryDeps: regDeps };
   });
@@ -204,12 +240,20 @@ function queryRegistryItemsToProcess(
 
 function queryPlanState(
   selectedItems: RegistryItem[],
-): Effect.Effect<InteractiveAddState, AppError, Runtime | CommandContextTag | ConfigTag> {
+): Effect.Effect<
+  InteractiveAddState,
+  AppError,
+  Runtime | CommandContextTag | ConfigTag
+> {
   return Effect.gen(function* () {
     const config = yield* ConfigTag;
     const runtime = yield* Runtime;
     const context = yield* CommandContextTag;
-    const probeRes = yield* buildInstallPlan(selectedItems, context.cwd, config);
+    const probeRes = yield* buildInstallPlan(
+      selectedItems,
+      context.cwd,
+      config,
+    );
 
     const existingTargets = new Set<string>();
     yield* Effect.forEach(
@@ -222,9 +266,18 @@ function queryPlanState(
       { concurrency: "unbounded" },
     );
 
-    const finalRes = yield* buildInstallPlan(selectedItems, context.cwd, config, existingTargets);
+    const finalRes = yield* buildInstallPlan(
+      selectedItems,
+      context.cwd,
+      config,
+      existingTargets,
+    );
 
-    const deps = yield* collectMissingDependencies(selectedItems, context.cwd, runtime);
+    const deps = yield* collectMissingDependencies(
+      selectedItems,
+      context.cwd,
+      runtime,
+    );
 
     return {
       selectedItems,
@@ -238,7 +291,11 @@ function queryPlanState(
 
 function processInteractionApproval(
   state: InteractiveAddState,
-): Effect.Effect<ApprovedAddPlan, AppError, Runtime | CommandContextTag | ConfigTag> {
+): Effect.Effect<
+  ApprovedAddPlan,
+  AppError,
+  Runtime | CommandContextTag | ConfigTag
+> {
   return Effect.gen(function* () {
     const config = yield* ConfigTag;
     const runtime = yield* Runtime;
@@ -255,7 +312,10 @@ function processInteractionApproval(
 
       if (isCancel || !proceed) {
         return yield* Effect.fail(
-          appError("UserCancelled", "Dependency installation cancelled by user."),
+          appError(
+            "UserCancelled",
+            "Dependency installation cancelled by user.",
+          ),
         );
       }
     }
@@ -271,7 +331,9 @@ function processInteractionApproval(
             if (assumeYes || overwritePolicy === "overwrite") {
               finalWrites.push(write);
             } else if (overwritePolicy === "skip") {
-              yield* runtime.prompt.warn(`Skipped existing file: ${write.absoluteTarget}`);
+              yield* runtime.prompt.warn(
+                `Skipped existing file: ${write.absoluteTarget}`,
+              );
             } else {
               const ans = yield* runtime.prompt.select({
                 message: `File exists: ${write.absoluteTarget}`,
@@ -300,7 +362,9 @@ function processInteractionApproval(
     );
 
     let shouldInstallDeps = false;
-    const hasDeps = state.missingDependencies.length > 0 || state.missingDevDependencies.length > 0;
+    const hasDeps =
+      state.missingDependencies.length > 0 ||
+      state.missingDevDependencies.length > 0;
 
     if (hasDeps) {
       if (assumeYes) {
@@ -313,9 +377,13 @@ function processInteractionApproval(
         );
         const msgParts: string[] = [];
         if (state.missingDependencies.length)
-          msgParts.push(`dependencies: ${state.missingDependencies.join(", ")}`);
+          msgParts.push(
+            `dependencies: ${state.missingDependencies.join(", ")}`,
+          );
         if (state.missingDevDependencies.length)
-          msgParts.push(`devDependencies: ${state.missingDevDependencies.join(", ")}`);
+          msgParts.push(
+            `devDependencies: ${state.missingDevDependencies.join(", ")}`,
+          );
 
         const ans = yield* runtime.prompt.confirm({
           message: `Install missing packages with ${pm}? (${msgParts.join(" | ")})`,
@@ -326,7 +394,10 @@ function processInteractionApproval(
 
         if (isCancel)
           return yield* Effect.fail(
-            appError("UserCancelled", "Dependency installation cancelled by user."),
+            appError(
+              "UserCancelled",
+              "Dependency installation cancelled by user.",
+            ),
           );
 
         shouldInstallDeps = Boolean(ans);
@@ -352,7 +423,11 @@ function resolveContents(
   finalWrites: PlannedWrite[],
   selectedItems: RegistryItem[],
   plugins: RegpickPlugin[],
-): Effect.Effect<HydratedWrite[], AppError, Runtime | CommandContextTag | ConfigTag> {
+): Effect.Effect<
+  HydratedWrite[],
+  AppError,
+  Runtime | CommandContextTag | ConfigTag
+> {
   return Effect.gen(function* () {
     const config = yield* ConfigTag;
     const runtime = yield* Runtime;
@@ -411,14 +486,24 @@ export function runAddCommand(): Effect.Effect<
         } as CommandOutcome;
       }
 
-      const customPlugins = yield* loadPlugins((yield* ConfigTag).plugins || [], context.cwd);
+      const customPlugins = yield* loadPlugins(
+        (yield* ConfigTag).plugins || [],
+        context.cwd,
+      );
 
-      const plugins = [...customPlugins, HttpPlugin(), FilePlugin(), DirectoryPlugin()];
+      const plugins = [
+        ...customPlugins,
+        HttpPlugin(),
+        FilePlugin(),
+        DirectoryPlugin(),
+      ];
 
       const itemsToProc = yield* queryRegistryItemsToProcess(source, plugins);
 
       for (const d of itemsToProc.missingRegistryDeps || []) {
-        yield* runtime.prompt.warn(`Registry dependency "${d}" not found in current registry.`);
+        yield* runtime.prompt.warn(
+          `Registry dependency "${d}" not found in current registry.`,
+        );
       }
 
       const state = yield* queryPlanState(itemsToProc.selectedItems);
@@ -437,14 +522,20 @@ export function runAddCommand(): Effect.Effect<
 
       const installedItemsInfo: RegistryItem[] = [];
       for (const write of hydratedWrites) {
-        const originalItem = approved.selectedItems.find((i) => i.name === write.itemName);
-        if (originalItem && !installedItemsInfo.some((i) => i.name === originalItem.name)) {
+        const originalItem = approved.selectedItems.find(
+          (i) => i.name === write.itemName,
+        );
+        if (
+          originalItem &&
+          !installedItemsInfo.some((i) => i.name === originalItem.name)
+        ) {
           installedItemsInfo.push(originalItem);
         }
       }
 
-      const userPlugins = (config.plugins?.filter((p) => typeof p === "object") ||
-        []) as import("../core/pipeline.js").Plugin[];
+      const userPlugins = (config.plugins?.filter(
+        (p) => typeof p === "object",
+      ) || []) as import("../core/pipeline.js").Plugin[];
 
       const depPlan = approved.shouldInstallDeps
         ? approved.dependencyPlan
@@ -458,13 +549,15 @@ export function runAddCommand(): Effect.Effect<
           runtime,
           installedItemsInfo,
           hydratedWrites,
-        ) as import("../core/pipeline.js").Plugin,
+        ) as import("@/core/pipeline.js").Plugin,
       ]);
 
       const journal = yield* JournalService;
       let lockfileBackup: any;
       try {
-        const { readLockfile } = yield* Effect.promise(() => import("@/shell/lockfile.js"));
+        const { readLockfile } = yield* Effect.promise(
+          () => import("@/shell/services/lockfile.js"),
+        );
         lockfileBackup = yield* readLockfile(context.cwd, runtime).pipe(
           Effect.catchAll(() => Effect.succeed(undefined)),
         );
@@ -482,17 +575,21 @@ export function runAddCommand(): Effect.Effect<
 
       yield* journal.writeIntent(entry, context.cwd);
 
-      yield* pipeline.run({ vfs, cwd: context.cwd, runtime: runtime }, vfsFiles).pipe(
-        Effect.tapError(() => journal.clearIntent(context.cwd)),
-        Effect.catchAll((error) => {
-          vfs.rollback();
-          return Effect.gen(function* () {
-            yield* runtime.prompt.error(`[Failed] Installation aborted: ${error.message}`);
-            return yield* Effect.fail(error);
-          });
-        }),
-        Effect.tap(() => journal.clearIntent(context.cwd)),
-      );
+      yield* pipeline
+        .run({ vfs, cwd: context.cwd, runtime: runtime }, vfsFiles)
+        .pipe(
+          Effect.tapError(() => journal.clearIntent(context.cwd)),
+          Effect.catchAll((error) => {
+            vfs.rollback();
+            return Effect.gen(function* () {
+              yield* runtime.prompt.error(
+                `[Failed] Installation aborted: ${error.message}`,
+              );
+              return yield* Effect.fail(error);
+            });
+          }),
+          Effect.tap(() => journal.clearIntent(context.cwd)),
+        );
 
       yield* runtime.prompt.info(
         `Installed ${approved.selectedItems.length} item(s), wrote ${hydratedWrites.length} file(s).`,

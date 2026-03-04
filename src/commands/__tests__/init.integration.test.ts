@@ -1,10 +1,11 @@
-import { Runtime } from "@/shell/runtime/ports.js";
+import { Runtime } from "@/core/ports.js";
 import { CommandContextTag } from "@/core/context.js";
 import { Layer } from "effect";
 
 import { createMockPrompt } from "@/__tests__/helpers/integration.js";
 import { runInitCommand } from "@/commands/init.js";
-import { createRuntimePorts, type RuntimePorts } from "@/shell/runtime/ports.js";
+import { type RuntimePorts } from "@/core/ports.js";
+import { createRuntimePorts } from "@/shell/adapters/runtime.js";
 import { Effect, Either } from "effect";
 import * as fs from "node:fs/promises";
 import { tmpdir } from "node:os";

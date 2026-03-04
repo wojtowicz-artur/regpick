@@ -1,12 +1,14 @@
 import { CommandContextTag } from "@/core/context.js";
-import { JournalService, JournalServiceImpl } from "@/core/journal.js";
-import { Runtime } from "@/shell/runtime/ports.js";
+import { JournalService } from "@/core/journal.js";
+import { JournalServiceImpl } from "@/shell/adapters/journal.js";
+import { Runtime } from "@/core/ports.js";
 import { Layer } from "effect";
 
 import mockRegistry from "@/__tests__/fixtures/shadcn-registry.json" with { type: "json" };
 import { createMockHttp, createMockPrompt } from "@/__tests__/helpers/integration.js";
 import { runAddCommand } from "@/commands/add.js";
-import { createRuntimePorts, type RuntimePorts } from "@/shell/runtime/ports.js";
+import { type RuntimePorts } from "@/core/ports.js";
+import { createRuntimePorts } from "@/shell/adapters/runtime.js";
 import { Effect, Either } from "effect";
 import * as fs from "node:fs/promises";
 import { tmpdir } from "node:os";

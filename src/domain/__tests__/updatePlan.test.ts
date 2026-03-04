@@ -2,7 +2,7 @@ import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { buildUpdatePlanForItem } from "@/domain/updatePlan.js";
-import { computeTreeHash } from "@/shell/lockfile.js";
+import { computeTreeHash } from "@/shell/services/lockfile.js";
 import type { LockfileItem, RegistryItem, RegpickConfig } from "@/types.js";
 
 const config: RegpickConfig = {

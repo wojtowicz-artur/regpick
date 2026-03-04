@@ -4,7 +4,7 @@ import {
   normalizeItem,
   normalizeManifestInline,
 } from "@/domain/registryModel.js";
-import type { RuntimePorts } from "@/shell/runtime/ports.js";
+import type { RuntimePorts } from "@/core/ports.js";
 import type { RegistryFile, RegistryItem, RegistrySourceMeta, RegpickPlugin } from "@/types.js";
 import { Effect, Either } from "effect";
 

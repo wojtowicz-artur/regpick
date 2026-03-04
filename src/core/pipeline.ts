@@ -1,5 +1,5 @@
 import { Effect } from "effect";
-import type { RuntimePorts } from "../shell/runtime/ports.js";
+import type { RuntimePorts } from "../core/ports.js";
 import { appError, type AppError } from "./errors.js";
 
 export interface VFS {

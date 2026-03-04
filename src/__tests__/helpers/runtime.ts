@@ -1,4 +1,4 @@
-import { type RuntimePorts, HttpPort } from "@/shell/runtime/ports.js";
+import { type RuntimePorts, HttpPort } from "@/core/ports.js";
 import { Context, Effect } from "effect";
 import * as path from "path";
 import { type Mock, vi } from "vitest";

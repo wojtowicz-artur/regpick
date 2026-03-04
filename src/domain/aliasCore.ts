@@ -1,6 +1,6 @@
 import type { RegpickConfig } from "@/types.js";
 
-export function applyAliases(content: string, config: RegpickConfig): string {
+export function applyAliases(content: string, config: Pick<RegpickConfig, "resolve">): string {
   let result = content;
   for (const [oldAlias, newAlias] of Object.entries(config.resolve?.aliases || {} || {})) {
     const regex = new RegExp(`from ["']${oldAlias}(.*?)["']`, "g");

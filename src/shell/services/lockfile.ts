@@ -1,4 +1,4 @@
-import type { RuntimePorts } from "@/shell/runtime/ports.js";
+import type { RuntimePorts } from "@/core/ports.js";
 import { Effect, Schema as S } from "effect";
 import crypto from "node:crypto";
 import path from "node:path";

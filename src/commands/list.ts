@@ -3,10 +3,10 @@ import { Effect } from "effect";
 import { CommandContextTag } from "@/core/context.js";
 import { appError, toAppError, type AppError } from "@/core/errors.js";
 import { resolveListSourceDecision } from "@/domain/listCore.js";
-import { readConfig } from "@/shell/config.js";
+import { readConfig } from "@/shell/config/index.js";
 import { DirectoryPlugin, FilePlugin, HttpPlugin, loadPlugins } from "@/shell/plugins/index.js";
-import { loadRegistry } from "@/shell/registry.js";
-import { Runtime } from "@/shell/runtime/ports.js";
+import { loadRegistry } from "@/shell/services/registry.js";
+import { Runtime } from "@/core/ports.js";
 import type { CommandOutcome, RegistryItem, RegpickPlugin } from "@/types.js";
 
 type ListSourceState = {

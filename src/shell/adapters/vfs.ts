@@ -1,8 +1,8 @@
+import { type PersistableVFS } from "@/core/pipeline.js";
 import { Effect } from "effect";
 import { Volume } from "memfs";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { type PersistableVFS } from "./pipeline.js";
 
 /**
  * Normalizes windows paths to posix format for compatible memory caching.
@@ -35,7 +35,10 @@ export class MemoryVFS implements PersistableVFS {
     return content;
   }
 
-  async writeFile(filePath: string, content: string | Uint8Array): Promise<void> {
+  async writeFile(
+    filePath: string,
+    content: string | Uint8Array,
+  ): Promise<void> {
     const normPath = normalizePath(filePath);
     const dir = path.dirname(normPath);
     await this.mkdir(dir);
@@ -65,7 +68,9 @@ export class MemoryVFS implements PersistableVFS {
    */
   async flushToDisk(): Promise<void> {
     const files = this.memory.toJSON();
-    const entries = Object.entries(files).filter(([_, content]) => content !== null);
+    const entries = Object.entries(files).filter(
+      ([_, content]) => content !== null,
+    );
 
     if (entries.length === 0) return;
 
@@ -83,7 +88,9 @@ export class MemoryVFS implements PersistableVFS {
         await fs.mkdir(dir, { recursive: true });
       }
     } catch (err) {
-      throw new Error(`Failed to create physical filesystem directories during flush: ${err}`);
+      throw new Error(
+        `Failed to create physical filesystem directories during flush: ${err}`,
+      );
     }
 
     // 3. Dump files safely handling all outcomes via Promise.allSettled
@@ -107,7 +114,9 @@ export class MemoryVFS implements PersistableVFS {
       const errorMessages = failures
         .map((f) => (f as any).left?.message || String((f as any).left))
         .join("\n");
-      throw new Error(`flushToDisk failed with ${failures.length} errors:\n${errorMessages}`);
+      throw new Error(
+        `flushToDisk failed with ${failures.length} errors:\n${errorMessages}`,
+      );
     }
   }
 

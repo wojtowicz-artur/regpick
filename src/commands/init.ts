@@ -6,8 +6,8 @@ import {
   readConfig,
   RegpickConfigSchema,
   resolveTargetConfigPath,
-} from "@/shell/config.js";
-import { Runtime } from "@/shell/runtime/ports.js";
+} from "@/shell/config/index.js";
+import { Runtime } from "@/core/ports.js";
 import type { CommandOutcome, RegpickConfig } from "@/types.js";
 import { Effect, Schema as S } from "effect";
 import path from "node:path";
@@ -63,7 +63,9 @@ const interactInitPhase = (state: InitQueryState) =>
         shouldOverwriteOrCancel === true,
       );
       if (secondDecision === "cancelled") {
-        return yield* Effect.fail(appError("UserCancelled", "Operation cancelled."));
+        return yield* Effect.fail(
+          appError("UserCancelled", "Operation cancelled."),
+        );
       }
 
       if (secondDecision === "keep") {
@@ -86,9 +88,12 @@ const interactInitPhase = (state: InitQueryState) =>
           ],
         });
 
-    const isPackageManagerCancel = yield* runtime.prompt.isCancel(packageManager);
+    const isPackageManagerCancel =
+      yield* runtime.prompt.isCancel(packageManager);
     if (!assumeYes && isPackageManagerCancel) {
-      return yield* Effect.fail(appError("UserCancelled", "Operation cancelled."));
+      return yield* Effect.fail(
+        appError("UserCancelled", "Operation cancelled."),
+      );
     }
 
     const componentsFolder = assumeYes
@@ -98,15 +103,19 @@ const interactInitPhase = (state: InitQueryState) =>
           placeholder: "src/components/ui",
         });
 
-    const isComponentsFolderCancel = yield* runtime.prompt.isCancel(componentsFolder);
+    const isComponentsFolderCancel =
+      yield* runtime.prompt.isCancel(componentsFolder);
     if (!assumeYes && isComponentsFolderCancel) {
-      return yield* Effect.fail(appError("UserCancelled", "Operation cancelled."));
+      return yield* Effect.fail(
+        appError("UserCancelled", "Operation cancelled."),
+      );
     }
 
     const overwritePolicy = assumeYes
       ? "prompt"
       : yield* runtime.prompt.select({
-          message: "Czy chcesz nadpisywać pliki automatycznie, czy wolisz być pytany?",
+          message:
+            "Czy chcesz nadpisywać pliki automatycznie, czy wolisz być pytany?",
           options: [
             { value: "prompt", label: "Pytaj (prompt)" },
             { value: "overwrite", label: "Zawsze nadpisuj (overwrite)" },
@@ -114,9 +123,12 @@ const interactInitPhase = (state: InitQueryState) =>
           ],
         });
 
-    const isOverwritePolicyCancel = yield* runtime.prompt.isCancel(overwritePolicy);
+    const isOverwritePolicyCancel =
+      yield* runtime.prompt.isCancel(overwritePolicy);
     if (!assumeYes && isOverwritePolicyCancel) {
-      return yield* Effect.fail(appError("UserCancelled", "Operation cancelled."));
+      return yield* Effect.fail(
+        appError("UserCancelled", "Operation cancelled."),
+      );
     }
 
     const newConfigRaw = {
@@ -138,7 +150,7 @@ const interactInitPhase = (state: InitQueryState) =>
     const newConfig = S.decodeUnknownSync(RegpickConfigSchema)(newConfigRaw);
 
     return {
-      newConfig: newConfig as import("../types.js").RegpickConfig,
+      newConfig: newConfig as import("@/types.js").RegpickConfig,
       configPath: state.configPath,
       isOverwrite: state.exists,
     } satisfies ApprovedInitPlan;
@@ -158,16 +170,20 @@ export const runInitCommand = () =>
 
     const ext = path.extname(plan.configPath).slice(1);
     const format = ["ts", "mjs", "cjs", "js", "json"].includes(ext)
-      ? (ext as import("../shell/config.js").ConfigFormat)
+      ? (ext as import("@/shell/config/index.js").ConfigFormat)
       : "json";
 
     const content = generateConfigCode(plan.newConfig, format);
 
-    yield* Effect.catchAll(runtime.fs.writeFile(plan.configPath, content, "utf8"), (e) =>
-      Effect.gen(function* () {
-        yield* runtime.prompt.error(`Failed to write config file: ${plan.configPath}`);
-        return yield* Effect.fail(e);
-      }),
+    yield* Effect.catchAll(
+      runtime.fs.writeFile(plan.configPath, content, "utf8"),
+      (e) =>
+        Effect.gen(function* () {
+          yield* runtime.prompt.error(
+            `Failed to write config file: ${plan.configPath}`,
+          );
+          return yield* Effect.fail(e);
+        }),
     );
 
     yield* runtime.prompt.success(

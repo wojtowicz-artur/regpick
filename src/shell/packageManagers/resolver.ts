@@ -1,4 +1,4 @@
-import type { RuntimePorts } from "@/shell/runtime/ports.js";
+import type { RuntimePorts } from "@/core/ports.js";
 import type { PackageManager, RegpickConfig } from "@/types.js";
 import { Effect } from "effect";
 import { getAllPackageManagerPlugins } from "./strategy.js";

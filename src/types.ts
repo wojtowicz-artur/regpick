@@ -3,12 +3,12 @@ import type {
   RegistryItem as ValibotRegistryItem,
   RegistrySourceMeta as ValibotRegistrySourceMeta,
 } from "@/domain/registryModel.js";
-import type { RegpickConfig as ValibotRegpickConfig } from "@/shell/config.js";
+import type { RegpickConfig as ValibotRegpickConfig } from "@/domain/configModel.js";
 import type {
   LockfileItem as ValibotLockfileItem,
   RegpickLockfile as ValibotRegpickLockfile,
-} from "@/shell/lockfile.js";
-import type { RuntimePorts } from "@/shell/runtime/ports.js";
+} from "@/shell/services/lockfile.js";
+import type { RuntimePorts } from "@/core/ports.js";
 
 export interface PluginContext {
   cwd: string;

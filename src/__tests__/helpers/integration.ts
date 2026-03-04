@@ -1,4 +1,4 @@
-import type { HttpPort, PromptPort } from "@/shell/runtime/ports.js";
+import type { HttpPort, PromptPort } from "@/core/ports.js";
 import { Context, Effect } from "effect";
 import { type Mock, vi } from "vitest";
 

@@ -4,7 +4,9 @@ import { styleText } from "node:util";
 
 import { CommandContextTag } from "@/core/context.js";
 import { type AppError, toAppError } from "@/core/errors.js";
-import { JournalService, JournalServiceImpl } from "@/core/journal.js";
+import { JournalService } from "@/core/journal.js";
+import { JournalServiceImpl } from "@/shell/adapters/journal.js";
+import { createRuntimePorts } from "@/shell/adapters/runtime.js";
 import { parseCliArgs } from "@/shell/cli/args.js";
 import type { CommandContext, CommandOutcome } from "@/types.js";
 
@@ -45,7 +47,9 @@ function run(): Effect.Effect<void, never> {
     process.on("SIGTERM", () => handleTerminate());
     process.on("uncaughtException", handleTerminate);
     process.on("unhandledRejection", (reason) =>
-      handleTerminate(reason instanceof Error ? reason : new Error(String(reason))),
+      handleTerminate(
+        reason instanceof Error ? reason : new Error(String(reason)),
+      ),
     );
 
     const parsed = parseCliArgs(process.argv.slice(2));
@@ -56,13 +60,13 @@ function run(): Effect.Effect<void, never> {
       return;
     }
 
-    const { createRuntimePorts, Runtime } = yield* Effect.promise(
-      () => import("@/shell/runtime/ports.js"),
-    );
+    const { Runtime } = yield* Effect.promise(() => import("@/core/ports.js"));
     const runtime = createRuntimePorts({ signal: abortController.signal });
 
     const context: CommandContext = {
-      cwd: parsed.flags.cwd ? path.resolve(process.cwd(), String(parsed.flags.cwd)) : process.cwd(),
+      cwd: parsed.flags.cwd
+        ? path.resolve(process.cwd(), String(parsed.flags.cwd))
+        : process.cwd(),
       args: parsed,
     };
 
@@ -73,14 +77,17 @@ function run(): Effect.Effect<void, never> {
       const rolledBack = yield* journal.rollbackIntent(context.cwd);
       if (rolledBack) {
         yield* runtime.prompt.error(
-          styleText("yellow", "Previous incomplete operation detected and rolled back."),
+          styleText(
+            "yellow",
+            "Previous incomplete operation detected and rolled back.",
+          ),
         );
       }
 
       let commandEffect: Effect.Effect<
         CommandOutcome,
         AppError,
-        import("@/shell/runtime/ports.js").Runtime | CommandContextTag | JournalService
+        import("@/core/ports.js").Runtime | CommandContextTag | JournalService
       >;
 
       switch (command) {
@@ -101,7 +108,9 @@ function run(): Effect.Effect<void, never> {
           break;
         case "update":
           commandEffect = yield* Effect.promise(() =>
-            import("@/commands/update.js").then((mod) => mod.runUpdateCommand()),
+            import("@/commands/update.js").then((mod) =>
+              mod.runUpdateCommand(),
+            ),
           );
           break;
         case "pack":
@@ -151,7 +160,10 @@ function run(): Effect.Effect<void, never> {
   });
 }
 
-function handleAppError(error: AppError, write: (message: string) => void): void {
+function handleAppError(
+  error: AppError,
+  write: (message: string) => void,
+): void {
   if (error._tag === "UserCancelled") {
     write(error.message);
     return;

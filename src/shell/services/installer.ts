@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { appError, type AppError } from "@/core/errors.js";
 import { getPackageManagerPlugin } from "@/shell/packageManagers/strategy.js";
-import type { RuntimePorts } from "@/shell/runtime/ports.js";
+import type { RuntimePorts } from "@/core/ports.js";
 import type { RegistryItem, RegpickConfig } from "@/types.js";
 
 const PackageJsonSchema = S.Struct({

@@ -1,7 +1,7 @@
 import type { RegpickPlugin } from "@/types.js";
 import { Effect, Option, Schema as S } from "effect";
 import path from "node:path";
-import { PluginSchema } from "../config.js";
+import { PluginSchema } from "../config/index.js";
 
 export function loadPlugins(
   configuredPlugins: (string | unknown)[],

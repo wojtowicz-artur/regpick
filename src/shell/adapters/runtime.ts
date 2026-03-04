@@ -1,95 +1,9 @@
-import { AppError, appError } from "@/core/errors.js";
-import { Context, Effect } from "effect";
+import { appError } from "@/core/errors.js";
+import { Effect } from "effect";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import fsPromises from "node:fs/promises";
-
-export class FileSystemPort extends Context.Tag("FileSystemPort")<
-  FileSystemPort,
-  {
-    existsSync(path: string): boolean;
-    pathExists(path: string): Effect.Effect<boolean, never, never>;
-    ensureDir(path: string): Effect.Effect<void, AppError, never>;
-    remove(path: string): Effect.Effect<void, AppError, never>;
-    writeFile(
-      path: string,
-      content: string,
-      encoding: BufferEncoding,
-    ): Effect.Effect<void, AppError, never>;
-    readFile(path: string, encoding: BufferEncoding): Effect.Effect<string, AppError, never>;
-    readJsonSync<T = unknown>(path: string): Effect.Effect<T, AppError, never>;
-    writeJson(
-      path: string,
-      value: unknown,
-      options?: { spaces?: number },
-    ): Effect.Effect<void, AppError, never>;
-    stat(path: string): Effect.Effect<import("fs").Stats, AppError, never>;
-    readdir(path: string): Effect.Effect<string[], AppError, never>;
-  }
->() {}
-
-export class HttpPort extends Context.Tag("HttpPort")<
-  HttpPort,
-  {
-    getJson<T = unknown>(url: string, timeoutMs?: number): Effect.Effect<T, AppError, never>;
-    getText(url: string, timeoutMs?: number): Effect.Effect<string, AppError, never>;
-  }
->() {}
-
-export class PromptPort extends Context.Tag("PromptPort")<
-  PromptPort,
-  {
-    intro(message: string): Effect.Effect<void, never, never>;
-    outro(message: string): Effect.Effect<void, never, never>;
-    cancel(message: string): Effect.Effect<void, never, never>;
-    isCancel(value: unknown): Effect.Effect<boolean, never, never>;
-    info(message: string): Effect.Effect<void, never, never>;
-    warn(message: string): Effect.Effect<void, never, never>;
-    error(message: string): Effect.Effect<void, never, never>;
-    success(message: string): Effect.Effect<void, never, never>;
-    text(options: {
-      message: string;
-      placeholder?: string;
-      defaultValue?: string;
-    }): Effect.Effect<string | symbol, never, never>;
-    confirm(options: {
-      message: string;
-      initialValue?: boolean;
-    }): Effect.Effect<boolean | symbol, never, never>;
-    select(options: {
-      message: string;
-      options: Array<{ value: string; label: string; hint?: string }>;
-    }): Effect.Effect<string | symbol, never, never>;
-    multiselect(options: {
-      message: string;
-      options: Array<{ value: string; label: string; hint?: string }>;
-      maxItems?: number;
-      required?: boolean;
-    }): Effect.Effect<Array<string> | symbol, never, never>;
-    autocompleteMultiselect(options: {
-      message: string;
-      options: Array<{ value: string; label: string; hint?: string }>;
-      maxItems?: number;
-      required?: boolean;
-    }): Effect.Effect<Array<string> | symbol, never, never>;
-  }
->() {}
-
-export class ProcessPort extends Context.Tag("ProcessPort")<
-  ProcessPort,
-  {
-    run(command: string, args: string[], cwd: string): { status: number | null };
-  }
->() {}
-
-export type RuntimePorts = {
-  fs: Context.Tag.Service<FileSystemPort>;
-  http: Context.Tag.Service<HttpPort>;
-  prompt: Context.Tag.Service<PromptPort>;
-  process: Context.Tag.Service<ProcessPort>;
-};
-
-export class Runtime extends Context.Tag("RuntimePorts")<Runtime, RuntimePorts>() {}
+import { RuntimePorts } from "@/core/ports.js";
 
 export const createRuntimePorts = (options?: { signal?: AbortSignal }): RuntimePorts => ({
   fs: {
@@ -155,7 +69,7 @@ export const createRuntimePorts = (options?: { signal?: AbortSignal }): RuntimeP
       Effect.tryPromise({
         try: async () => {
           const response = await fetch(url, {
-            signal: AbortSignal.timeout(timeoutMs),
+            signal: options?.signal || AbortSignal.timeout(timeoutMs),
           });
           if (!response.ok) {
             throw new Error(
@@ -170,7 +84,7 @@ export const createRuntimePorts = (options?: { signal?: AbortSignal }): RuntimeP
       Effect.tryPromise({
         try: async () => {
           const response = await fetch(url, {
-            signal: AbortSignal.timeout(timeoutMs),
+            signal: options?.signal || AbortSignal.timeout(timeoutMs),
           });
           if (!response.ok) {
             throw new Error(
@@ -199,9 +113,9 @@ export const createRuntimePorts = (options?: { signal?: AbortSignal }): RuntimeP
         cancel(message);
       }),
     isCancel: (value) =>
-      Effect.promise(async () => {
-        const { isCancel } = await import("@clack/prompts");
-        return isCancel(value);
+      Effect.sync(() => {
+        const isCancelSymbol = typeof value === "symbol" && value.description === "clack:cancel";
+        return isCancelSymbol;
       }),
     info: (message) =>
       Effect.promise(async () => {
@@ -223,43 +137,40 @@ export const createRuntimePorts = (options?: { signal?: AbortSignal }): RuntimeP
         const { log } = await import("@clack/prompts");
         log.success(message);
       }),
-    text: (opts) =>
+    text: (options) =>
       Effect.promise(async () => {
         const { text } = await import("@clack/prompts");
-        return text({ signal: options?.signal, ...opts });
+        return text(options);
       }),
-    confirm: (opts) =>
+    confirm: (options) =>
       Effect.promise(async () => {
         const { confirm } = await import("@clack/prompts");
-        return confirm({ signal: options?.signal, ...opts });
+        return confirm(options);
       }),
-    select: (opts) =>
+    select: (options) =>
       Effect.promise(async () => {
         const { select } = await import("@clack/prompts");
-        return select({ signal: options?.signal, ...opts } as any);
+        return select(options);
       }),
-    multiselect: (opts) =>
+    multiselect: (options) =>
       Effect.promise(async () => {
         const { multiselect } = await import("@clack/prompts");
-        return multiselect({ signal: options?.signal, ...opts } as any);
+        return multiselect(options) as any;
       }),
-    autocompleteMultiselect: (opts) =>
+    autocompleteMultiselect: (options) =>
       Effect.promise(async () => {
-        const { autocompleteMultiselect } = await import("@clack/prompts");
-        return autocompleteMultiselect({
-          signal: options?.signal,
-          ...opts,
-        } as any);
+        // Fallback to autocomplete-multiselect when available, else regular multiselect
+        const prompts = await import("@clack/prompts");
+        if ((prompts as any).autocompleteMultiselect) {
+          return (prompts as any).autocompleteMultiselect(options);
+        }
+        return prompts.multiselect(options) as any;
       }),
   },
   process: {
-    run: (command, args, cwd) =>
-      spawnSync(command, args, {
-        cwd,
-        stdio: "inherit",
-        shell: process.platform === "win32",
-      }),
+    run: (command, args, cwd) => {
+      const result = spawnSync(command, args, { stdio: "inherit", cwd, shell: true });
+      return { status: result.status };
+    },
   },
 });
-
-export const defaultRuntimePorts: RuntimePorts = createRuntimePorts();

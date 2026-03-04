@@ -1,13 +1,14 @@
 import { Effect, Either } from "effect";
 import { pathToFileURL } from "node:url";
 
-import { loadRegistry, resolveFileContent } from "@/shell/registry.js";
-import { createRuntimePorts } from "@/shell/runtime/ports.js";
+import { loadRegistry, resolveFileContent } from "@/shell/services/registry.js";
+
 import * as path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DirectoryPlugin } from "@/shell/plugins/builtin/directory.js";
 import { FilePlugin } from "@/shell/plugins/builtin/file.js";
+import { createRuntimePorts } from "@/shell/adapters/runtime.js";
 import { HttpPlugin } from "@/shell/plugins/builtin/http.js";
 
 describe("registry loader", () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeHash, computeTreeHash } from "../lockfile.js";
+import { computeHash, computeTreeHash } from "../services/lockfile.js";
 
 describe("lockfile hasashing mechanisms (CAS)", () => {
   describe("computeHash", () => {

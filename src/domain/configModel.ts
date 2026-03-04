@@ -1,0 +1,161 @@
+import { Schema as S } from "effect";
+import path from "node:path";
+
+export const OverwritePolicySchema = S.Union(
+  S.Literal("prompt"),
+  S.Literal("overwrite"),
+  S.Literal("skip"),
+);
+
+export const PackageManagerSchema = S.String;
+
+export const isFunction = (val: unknown) => typeof val === "function";
+const FunctionType = S.declare(isFunction, {
+  identifier: "Function",
+}) as S.Schema<Function>;
+export const FunctionSchema = FunctionType;
+
+export const PluginSchema = S.Struct({
+  name: S.String,
+  start: S.optionalWith(FunctionSchema, { exact: true }),
+  resolveId: S.optionalWith(FunctionSchema, { exact: true }),
+  load: S.optionalWith(FunctionSchema, { exact: true }),
+  transform: S.optionalWith(FunctionSchema, { exact: true }),
+  finish: S.optionalWith(FunctionSchema, { exact: true }),
+  onError: S.optionalWith(FunctionSchema, { exact: true }),
+}).pipe(S.typeSchema);
+
+export const PackageManagerPluginSchema = S.Struct({
+  name: S.String,
+  lockfiles: S.Array(S.String),
+  detect: FunctionSchema,
+  buildInstallCommands: FunctionSchema,
+}).pipe(S.typeSchema);
+
+export const PathResolverPluginSchema = S.Struct({
+  name: S.String,
+  resolvePath: FunctionSchema,
+}).pipe(S.typeSchema);
+
+const BaseRegpickConfigSchema = S.Struct({
+  resolve: S.optionalWith(
+    S.Struct({
+      targets: S.optionalWith(S.Record({ key: S.String, value: S.String }), {
+        exact: true,
+        default: () => ({}) as any,
+      }),
+      aliases: S.optionalWith(S.Record({ key: S.String, value: S.String }), {
+        exact: true,
+        default: () => ({}) as any,
+      }),
+    }),
+    { exact: true, default: () => ({}) as any },
+  ),
+  registry: S.optionalWith(
+    S.Struct({
+      sources: S.optionalWith(S.Record({ key: S.String, value: S.String }), {
+        exact: true,
+        default: () => ({}) as any,
+      }),
+      preferManifestTarget: S.optionalWith(S.Boolean, {
+        exact: true,
+        default: () => true,
+      }),
+    }),
+    { exact: true, default: () => ({}) as any },
+  ),
+  install: S.optionalWith(
+    S.Struct({
+      packageManager: S.optionalWith(PackageManagerSchema, {
+        exact: true,
+        default: () => "auto",
+      }),
+      overwritePolicy: S.optionalWith(OverwritePolicySchema, {
+        exact: true,
+        default: () => "prompt",
+      }),
+      allowOutsideProject: S.optionalWith(S.Boolean, {
+        exact: true,
+        default: () => false,
+      }),
+    }),
+    { exact: true, default: () => ({}) as any },
+  ),
+  plugins: S.optionalWith(S.Array(S.Union(S.Any, S.String)), {
+    exact: true,
+    default: () => [],
+  }),
+});
+
+export const RegpickConfigSchema = BaseRegpickConfigSchema.pipe(
+  S.filter(
+    (input) => {
+      if (!input.install?.allowOutsideProject) {
+        const targets = input.resolve?.targets || {};
+        for (const target of Object.values(targets)) {
+          if (
+            typeof target === "string" &&
+            (target.startsWith("..") || path.isAbsolute(target))
+          ) {
+            return false;
+          }
+        }
+      }
+      return true;
+    },
+    {
+      message: () =>
+        "Target paths outside project are disallowed when install.allowOutsideProject is false",
+    },
+  ),
+);
+
+type BaseRegpickConfig = S.Schema.Type<typeof RegpickConfigSchema>;
+export type RegpickConfig = Omit<BaseRegpickConfig, "plugins"> & {
+  plugins?: (string | import("../types.js").RegpickPlugin)[];
+};
+
+export type ResolutionConfig = Pick<RegpickConfig, "resolve" | "registry">;
+export type InstallPolicyConfig = Pick<RegpickConfig, "install">;
+
+export function defineConfig(config: RegpickConfig): RegpickConfig {
+  return config;
+}
+
+export const DEFAULT_CONFIG: RegpickConfig = {
+  resolve: {
+    targets: {
+      "registry:icon": "src/components/ui/icons",
+      "registry:component": "src/components/ui",
+      "registry:file": "src/components/ui",
+    },
+    aliases: {},
+  },
+  registry: {
+    sources: {
+      tebra: "./tebra-icon-registry/registry",
+    },
+    preferManifestTarget: true,
+  },
+  install: {
+    overwritePolicy: "prompt",
+    packageManager: "auto",
+    allowOutsideProject: false,
+  },
+  plugins: [],
+};
+
+export function resolveRegistrySource(
+  input: string | undefined,
+  config: RegpickConfig,
+): string | null {
+  if (!input) {
+    return null;
+  }
+
+  if (config.registry?.sources?.[input]) {
+    return String(config.registry.sources[input]);
+  }
+
+  return input;
+}
