@@ -423,14 +423,15 @@ function runAddCommandEff(context: CommandContext): Effect.Effect<CommandOutcome
       ) as import("../core/pipeline.js").Plugin,
     ]);
 
-    yield* Effect.tryPromise({
-      try: () => pipeline.run({ vfs, cwd: context.cwd, runtime: context.runtime }, vfsFiles),
-      catch: (error): AppError => {
+    yield* pipeline.run({ vfs, cwd: context.cwd, runtime: context.runtime }, vfsFiles).pipe(
+      Effect.catchAll((error) => {
         vfs.rollback();
-        Effect.runPromise(context.runtime.prompt.error(`[Failed] Installation aborted: ${error}`));
-        return appError("RuntimeError", String(error));
-      },
-    });
+        return Effect.gen(function* () {
+          yield* context.runtime.prompt.error(`[Failed] Installation aborted: ${error.message}`);
+          return yield* Effect.fail(error);
+        });
+      }),
+    );
 
     yield* context.runtime.prompt.info(
       `Installed ${approved.selectedItems.length} item(s), wrote ${hydratedWrites.length} file(s).`,

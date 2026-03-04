@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import type { RuntimePorts } from "../shell/runtime/ports.js";
-import { appError } from "./errors.js";
+import { appError, type AppError } from "./errors.js";
 
 export interface VFS {
   readFile(path: string, encoding?: "utf-8"): Promise<string | Uint8Array>;
@@ -67,10 +67,10 @@ export class PipelineRenderer {
     this.plugins = plugins;
   }
 
-  async run(
+  run(
     ctx: PipelineContext,
     files: { id: string; code: string | Uint8Array }[],
-  ): Promise<void> {
+  ): Effect.Effect<void, AppError> {
     const effect = Effect.gen(this, function* () {
       // 1. Start Phase
       for (const plugin of this.plugins) {
@@ -208,9 +208,6 @@ export class PipelineRenderer {
       ),
     );
 
-    const exit = await Effect.runPromiseExit(effect);
-    if (exit._tag === "Failure") {
-      throw (exit.cause as any).errors?.[0] || (exit.cause as any).failure || exit.cause;
-    }
+    return effect as unknown as Effect.Effect<void, AppError>;
   }
 }

@@ -1,6 +1,7 @@
 import { PipelineRenderer } from "@/core/pipeline.js";
 import { MemoryVFS } from "@/core/vfs.js";
 import { describe, expect, it } from "vitest";
+import { Effect } from "effect";
 import { shadcnPlugin } from "../shadcnPlugin.js";
 
 describe("shadcnPlugin", () => {
@@ -20,7 +21,7 @@ describe("shadcnPlugin", () => {
       },
     ];
 
-    await pipeline.run({ vfs, cwd: "/", runtime: {} as any }, files);
+    await Effect.runPromise(pipeline.run({ vfs, cwd: "/", runtime: {} as any }, files));
 
     const btnOutput = await vfs.readFile("/components/ui/button.tsx");
     expect(btnOutput).toContain('"use client";');
