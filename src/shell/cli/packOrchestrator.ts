@@ -42,10 +42,7 @@ export const getFilesRecursive = (
               const stat = yield* runtime.fs.stat(fullPath);
               if (stat.isDirectory()) {
                 yield* scan(fullPath);
-              } else if (
-                fullPath.endsWith(".ts") ||
-                fullPath.endsWith(".tsx")
-              ) {
+              } else if (fullPath.endsWith(".ts") || fullPath.endsWith(".tsx")) {
                 result.push(fullPath);
               }
             }),
@@ -75,9 +72,7 @@ export const queryPackState = (): Effect.Effect<
 
     const stat = yield* runtime.fs.stat(targetDir);
     if (!stat.isDirectory()) {
-      yield* Effect.fail(
-        appError("ValidationError", `Target is not a directory: ${targetDir}`),
-      );
+      yield* Effect.fail(appError("ValidationError", `Target is not a directory: ${targetDir}`));
     }
 
     yield* runtime.prompt.info(`Scanning ${targetDir} for components...`);
@@ -98,11 +93,7 @@ export const queryPackState = (): Effect.Effect<
  */
 export const generateRegistryItems = (
   state: PackQueryState,
-): Effect.Effect<
-  PackGeneratedRegistry,
-  AppError,
-  Runtime | CommandContextTag
-> =>
+): Effect.Effect<PackGeneratedRegistry, AppError, Runtime | CommandContextTag> =>
   Effect.gen(function* () {
     const runtime = yield* Runtime;
     const context = yield* CommandContextTag;

@@ -3,16 +3,10 @@ import { execa } from "execa";
 import fs from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 
 describe("regpick e2e (journal rollback)", () => {
-  const projectRoot = path.resolve(".");
   const entryPath = path.resolve("dist/index.mjs");
-
-  beforeAll(async () => {
-    // Ensure we have a fresh build
-    await execa("npm", ["run", "build"], { cwd: projectRoot });
-  });
 
   it("should detect incomplete operations on boot and rollback planned files", async () => {
     const testDir = path.join(tmpdir(), `regpick-journal-e2e-${Date.now()}`);

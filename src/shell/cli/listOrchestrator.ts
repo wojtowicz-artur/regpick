@@ -3,12 +3,7 @@ import { appError, toAppError, type AppError } from "@/core/errors.js";
 import { Runtime } from "@/core/ports.js";
 import { resolveListSourceDecision } from "@/domain/listCore.js";
 import { readConfig } from "@/shell/config/index.js";
-import {
-  DirectoryPlugin,
-  FilePlugin,
-  HttpPlugin,
-  loadPlugins,
-} from "@/shell/plugins/index.js";
+import { DirectoryPlugin, FilePlugin, HttpPlugin, loadPlugins } from "@/shell/plugins/index.js";
 import { loadRegistry } from "@/shell/services/registry.js";
 import type { RegistryItem, RegpickPlugin } from "@/types.js";
 import { Effect } from "effect";
@@ -29,26 +24,18 @@ export function queryListSourceState(): Effect.Effect<
 > {
   return Effect.gen(function* () {
     const context = yield* CommandContextTag;
-    const res = yield* readConfig(context.cwd).pipe(
-      Effect.mapError(toAppError),
-    );
+    const res = yield* readConfig(context.cwd).pipe(Effect.mapError(toAppError));
 
     const sourceDecision = resolveListSourceDecision(
       context.args.positionals[1],
       res.config.registry?.sources || {},
     );
 
-    const customPlugins = yield* loadPlugins(
-      res.config.plugins || [],
-      context.cwd,
-    ).pipe(Effect.mapError(toAppError));
+    const customPlugins = yield* loadPlugins(res.config.plugins || [], context.cwd).pipe(
+      Effect.mapError(toAppError),
+    );
 
-    const plugins = [
-      ...customPlugins,
-      HttpPlugin(),
-      FilePlugin(),
-      DirectoryPlugin(),
-    ];
+    const plugins = [...customPlugins, HttpPlugin(), FilePlugin(), DirectoryPlugin()];
 
     return {
       source: sourceDecision.source,
@@ -78,9 +65,7 @@ export function interactSourcePhase(
     const isCancel = yield* runtime.prompt.isCancel(response);
 
     if (isCancel) {
-      return yield* Effect.fail(
-        appError("UserCancelled", "Operation cancelled."),
-      );
+      return yield* Effect.fail(appError("UserCancelled", "Operation cancelled."));
     }
 
     return String(response);
@@ -97,12 +82,7 @@ export function queryRegistryItems(
   return Effect.gen(function* () {
     const runtime = yield* Runtime;
     const context = yield* CommandContextTag;
-    const { items } = yield* loadRegistry(
-      source,
-      context.cwd,
-      runtime,
-      plugins,
-    );
+    const { items } = yield* loadRegistry(source, context.cwd, runtime, plugins);
     return items;
   });
 }

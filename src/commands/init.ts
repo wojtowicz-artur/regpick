@@ -1,8 +1,5 @@
 import { Runtime } from "@/core/ports.js";
-import {
-  interactInitPhase,
-  queryInitState,
-} from "@/shell/cli/initOrchestrator.js";
+import { interactInitPhase, queryInitState } from "@/shell/cli/initOrchestrator.js";
 import { generateConfigCode } from "@/shell/config/index.js";
 import type { CommandOutcome } from "@/types.js";
 import { Effect } from "effect";
@@ -28,15 +25,11 @@ export const runInitCommand = () =>
 
     const content = generateConfigCode(plan.newConfig, format);
 
-    yield* Effect.catchAll(
-      runtime.fs.writeFile(plan.configPath, content, "utf8"),
-      (e) =>
-        Effect.gen(function* () {
-          yield* runtime.prompt.error(
-            `Failed to write config file: ${plan.configPath}`,
-          );
-          return yield* Effect.fail(e);
-        }),
+    yield* Effect.catchAll(runtime.fs.writeFile(plan.configPath, content, "utf8"), (e) =>
+      Effect.gen(function* () {
+        yield* runtime.prompt.error(`Failed to write config file: ${plan.configPath}`);
+        return yield* Effect.fail(e);
+      }),
     );
 
     yield* runtime.prompt.success(

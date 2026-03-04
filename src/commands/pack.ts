@@ -1,10 +1,7 @@
 import { CommandContextTag } from "@/core/context.js";
 import { type AppError } from "@/core/errors.js";
 import { Runtime } from "@/core/ports.js";
-import {
-  generateRegistryItems,
-  queryPackState,
-} from "@/shell/cli/packOrchestrator.js";
+import { generateRegistryItems, queryPackState } from "@/shell/cli/packOrchestrator.js";
 import type { CommandOutcome } from "@/types.js";
 import { Effect } from "effect";
 
@@ -39,20 +36,14 @@ export function runPackCommand(): Effect.Effect<
       2,
     );
 
-    yield* Effect.catchAll(
-      runtime.fs.writeFile(registry.outPath, content, "utf8"),
-      (e) =>
-        Effect.gen(function* () {
-          yield* runtime.prompt.error(
-            `Failed to write registry file: ${registry.outPath}`,
-          );
-          return yield* Effect.fail(e);
-        }),
+    yield* Effect.catchAll(runtime.fs.writeFile(registry.outPath, content, "utf8"), (e) =>
+      Effect.gen(function* () {
+        yield* runtime.prompt.error(`Failed to write registry file: ${registry.outPath}`);
+        return yield* Effect.fail(e);
+      }),
     );
 
-    yield* runtime.prompt.success(
-      `Packed ${registry.items.length} components into registry.json`,
-    );
+    yield* runtime.prompt.success(`Packed ${registry.items.length} components into registry.json`);
 
     return {
       kind: "success",

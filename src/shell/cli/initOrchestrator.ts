@@ -2,11 +2,7 @@ import { CommandContextTag } from "@/core/context.js";
 import { appError, toAppError } from "@/core/errors.js";
 import { Runtime } from "@/core/ports.js";
 import { decideInitAfterOverwritePrompt } from "@/domain/initCore.js";
-import {
-  readConfig,
-  RegpickConfigSchema,
-  resolveTargetConfigPath,
-} from "@/shell/config/index.js";
+import { readConfig, RegpickConfigSchema, resolveTargetConfigPath } from "@/shell/config/index.js";
 import type { RegpickConfig } from "@/types.js";
 import { Effect, Schema as S } from "effect";
 
@@ -63,9 +59,7 @@ export const interactInitPhase = (state: InitQueryState) =>
       );
 
       if (secondDecision === "cancelled") {
-        return yield* Effect.fail(
-          appError("UserCancelled", "Operation cancelled."),
-        );
+        return yield* Effect.fail(appError("UserCancelled", "Operation cancelled."));
       }
 
       if (secondDecision === "keep") {
@@ -88,12 +82,9 @@ export const interactInitPhase = (state: InitQueryState) =>
           ],
         });
 
-    const isPackageManagerCancel =
-      yield* runtime.prompt.isCancel(packageManager);
+    const isPackageManagerCancel = yield* runtime.prompt.isCancel(packageManager);
     if (!assumeYes && isPackageManagerCancel) {
-      return yield* Effect.fail(
-        appError("UserCancelled", "Operation cancelled."),
-      );
+      return yield* Effect.fail(appError("UserCancelled", "Operation cancelled."));
     }
 
     const componentsFolder = assumeYes
@@ -103,19 +94,15 @@ export const interactInitPhase = (state: InitQueryState) =>
           placeholder: "src/components/ui",
         });
 
-    const isComponentsFolderCancel =
-      yield* runtime.prompt.isCancel(componentsFolder);
+    const isComponentsFolderCancel = yield* runtime.prompt.isCancel(componentsFolder);
     if (!assumeYes && isComponentsFolderCancel) {
-      return yield* Effect.fail(
-        appError("UserCancelled", "Operation cancelled."),
-      );
+      return yield* Effect.fail(appError("UserCancelled", "Operation cancelled."));
     }
 
     const overwritePolicy = assumeYes
       ? "prompt"
       : yield* runtime.prompt.select({
-          message:
-            "Czy chcesz nadpisywać pliki automatycznie, czy wolisz być pytany?",
+          message: "Czy chcesz nadpisywać pliki automatycznie, czy wolisz być pytany?",
           options: [
             { value: "prompt", label: "Pytaj (prompt)" },
             { value: "overwrite", label: "Zawsze nadpisuj (overwrite)" },
@@ -123,12 +110,9 @@ export const interactInitPhase = (state: InitQueryState) =>
           ],
         });
 
-    const isOverwritePolicyCancel =
-      yield* runtime.prompt.isCancel(overwritePolicy);
+    const isOverwritePolicyCancel = yield* runtime.prompt.isCancel(overwritePolicy);
     if (!assumeYes && isOverwritePolicyCancel) {
-      return yield* Effect.fail(
-        appError("UserCancelled", "Operation cancelled."),
-      );
+      return yield* Effect.fail(appError("UserCancelled", "Operation cancelled."));
     }
 
     const newConfigRaw = {
