@@ -9,6 +9,7 @@ import {
 import type { CommandContext, CommandOutcome, RegpickConfig } from "@/types.js";
 import { Effect, Schema as S } from "effect";
 import path from "node:path";
+import { Runtime } from "@/shell/runtime/ports.js";
 
 type InitQueryState = {
   configPath: string;
@@ -24,11 +25,12 @@ type ApprovedInitPlan = {
 
 const queryInitState = (context: CommandContext) =>
   Effect.gen(function* () {
+    const runtime = yield* Runtime;
     const configPath = yield* resolveTargetConfigPath(context.cwd).pipe(
       Effect.mapError((err) => appError("RuntimeError", String(err))),
     );
 
-    const statEff = yield* Effect.either(context.runtime.fs.stat(configPath));
+    const statEff = yield* Effect.either(runtime.fs.stat(configPath));
     const exists = statEff._tag === "Right";
 
     const { config: existingConfig } = yield* readConfig(context.cwd).pipe(
@@ -44,13 +46,14 @@ const queryInitState = (context: CommandContext) =>
 
 const interactInitPhase = (context: CommandContext, state: InitQueryState) =>
   Effect.gen(function* () {
+    const runtime = yield* Runtime;
     if (state.exists) {
-      const shouldOverwriteOrCancel = yield* context.runtime.prompt.confirm({
+      const shouldOverwriteOrCancel = yield* runtime.prompt.confirm({
         message: `${state.configPath} already exists. Overwrite?`,
         initialValue: false,
       });
 
-      const isCancel = yield* context.runtime.prompt.isCancel(shouldOverwriteOrCancel);
+      const isCancel = yield* runtime.prompt.isCancel(shouldOverwriteOrCancel);
 
       const secondDecision = decideInitAfterOverwritePrompt(
         isCancel,
@@ -61,7 +64,7 @@ const interactInitPhase = (context: CommandContext, state: InitQueryState) =>
       }
 
       if (secondDecision === "keep") {
-        yield* context.runtime.prompt.info("Keeping existing configuration.");
+        yield* runtime.prompt.info("Keeping existing configuration.");
         return null;
       }
     }
@@ -70,7 +73,7 @@ const interactInitPhase = (context: CommandContext, state: InitQueryState) =>
 
     const packageManager = assumeYes
       ? "auto"
-      : yield* context.runtime.prompt.select({
+      : yield* runtime.prompt.select({
           message: "Jakiego menedżera pakietów używasz?",
           options: [
             { value: "auto", label: "Auto (wykrywanie)" },
@@ -80,26 +83,26 @@ const interactInitPhase = (context: CommandContext, state: InitQueryState) =>
           ],
         });
 
-    const isPackageManagerCancel = yield* context.runtime.prompt.isCancel(packageManager);
+    const isPackageManagerCancel = yield* runtime.prompt.isCancel(packageManager);
     if (!assumeYes && isPackageManagerCancel) {
       return yield* Effect.fail(appError("UserCancelled", "Operation cancelled."));
     }
 
     const componentsFolder = assumeYes
       ? "src/components/ui"
-      : yield* context.runtime.prompt.text({
+      : yield* runtime.prompt.text({
           message: "W jakim folderze trzymasz komponenty UI?",
           placeholder: "src/components/ui",
         });
 
-    const isComponentsFolderCancel = yield* context.runtime.prompt.isCancel(componentsFolder);
+    const isComponentsFolderCancel = yield* runtime.prompt.isCancel(componentsFolder);
     if (!assumeYes && isComponentsFolderCancel) {
       return yield* Effect.fail(appError("UserCancelled", "Operation cancelled."));
     }
 
     const overwritePolicy = assumeYes
       ? "prompt"
-      : yield* context.runtime.prompt.select({
+      : yield* runtime.prompt.select({
           message: "Czy chcesz nadpisywać pliki automatycznie, czy wolisz być pytany?",
           options: [
             { value: "prompt", label: "Pytaj (prompt)" },
@@ -108,7 +111,7 @@ const interactInitPhase = (context: CommandContext, state: InitQueryState) =>
           ],
         });
 
-    const isOverwritePolicyCancel = yield* context.runtime.prompt.isCancel(overwritePolicy);
+    const isOverwritePolicyCancel = yield* runtime.prompt.isCancel(overwritePolicy);
     if (!assumeYes && isOverwritePolicyCancel) {
       return yield* Effect.fail(appError("UserCancelled", "Operation cancelled."));
     }
@@ -140,6 +143,7 @@ const interactInitPhase = (context: CommandContext, state: InitQueryState) =>
 
 export const runInitCommand = (context: CommandContext) =>
   Effect.gen(function* () {
+    const runtime = yield* Runtime;
     const state = yield* queryInitState(context);
     const plan = yield* interactInitPhase(context, state);
 
@@ -156,14 +160,14 @@ export const runInitCommand = (context: CommandContext) =>
 
     const content = generateConfigCode(plan.newConfig, format);
 
-    yield* Effect.catchAll(context.runtime.fs.writeFile(plan.configPath, content, "utf8"), (e) =>
+    yield* Effect.catchAll(runtime.fs.writeFile(plan.configPath, content, "utf8"), (e) =>
       Effect.gen(function* () {
-        yield* context.runtime.prompt.error(`Failed to write config file: ${plan.configPath}`);
+        yield* runtime.prompt.error(`Failed to write config file: ${plan.configPath}`);
         return yield* Effect.fail(e);
       }),
     );
 
-    yield* context.runtime.prompt.success(
+    yield* runtime.prompt.success(
       `${plan.isOverwrite ? "Overwrote" : "Created"} ${plan.configPath}`,
     );
 

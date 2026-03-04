@@ -48,7 +48,6 @@ export type CliArgs = {
 export type CommandContext = {
   cwd: string;
   args: CliArgs;
-  runtime: RuntimePorts;
 };
 
 export type OverwritePolicy = "prompt" | "overwrite" | "skip";

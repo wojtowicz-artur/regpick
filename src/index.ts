@@ -1,4 +1,4 @@
-import { Effect } from "effect";
+import { Effect, Layer } from "effect";
 import path from "node:path";
 import { styleText } from "node:util";
 
@@ -54,19 +54,24 @@ function run(): Effect.Effect<void, never> {
       return;
     }
 
-    const { createRuntimePorts } = yield* Effect.promise(() => import("@/shell/runtime/ports.js"));
+    const { createRuntimePorts, Runtime } = yield* Effect.promise(
+      () => import("@/shell/runtime/ports.js"),
+    );
     const runtime = createRuntimePorts({ signal: abortController.signal });
 
     const context: CommandContext = {
       cwd: parsed.flags.cwd ? path.resolve(process.cwd(), String(parsed.flags.cwd)) : process.cwd(),
       args: parsed,
-      runtime,
     };
 
     runtime.prompt.intro(styleText("cyan", "regpick"));
 
     const executeCommand = Effect.gen(function* () {
-      let commandEffect: Effect.Effect<CommandOutcome, AppError>;
+      let commandEffect: Effect.Effect<
+        CommandOutcome,
+        AppError,
+        import("@/shell/runtime/ports.js").Runtime
+      >;
 
       switch (command) {
         case "init":
@@ -127,7 +132,8 @@ function run(): Effect.Effect<void, never> {
       ),
     );
 
-    yield* executeCommand;
+    const layer = Layer.succeed(Runtime, runtime);
+    yield* executeCommand.pipe(Effect.provide(layer));
   });
 }
 

@@ -89,6 +89,8 @@ export type RuntimePorts = {
   process: Context.Tag.Service<ProcessPort>;
 };
 
+export class Runtime extends Context.Tag("RuntimePorts")<Runtime, RuntimePorts>() {}
+
 export const createRuntimePorts = (options?: { signal?: AbortSignal }): RuntimePorts => ({
   fs: {
     existsSync: (path) => fs.existsSync(path),

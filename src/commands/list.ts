@@ -5,6 +5,7 @@ import { resolveListSourceDecision } from "@/domain/listCore.js";
 import { readConfig } from "@/shell/config.js";
 import { DirectoryPlugin, FilePlugin, HttpPlugin, loadPlugins } from "@/shell/plugins/index.js";
 import { loadRegistry } from "@/shell/registry.js";
+import { Runtime } from "@/shell/runtime/ports.js";
 import type { CommandContext, CommandOutcome, RegistryItem, RegpickPlugin } from "@/types.js";
 
 type ListSourceState = {
@@ -47,18 +48,19 @@ function queryListSourceState(context: CommandContext): Effect.Effect<ListSource
 function interactSourcePhase(
   context: CommandContext,
   state: ListSourceState,
-): Effect.Effect<string | null, AppError> {
+): Effect.Effect<string | null, AppError, Runtime> {
   return Effect.gen(function* () {
+    const runtime = yield* Runtime;
     if (!state.requiresPrompt) {
       return state.source;
     }
 
-    const response = yield* context.runtime.prompt.text({
+    const response = yield* runtime.prompt.text({
       message: "Registry URL/path:",
       placeholder: "https://example.com/registry.json",
     });
 
-    const isCancel = yield* context.runtime.prompt.isCancel(response);
+    const isCancel = yield* runtime.prompt.isCancel(response);
 
     if (isCancel) {
       return yield* Effect.fail(appError("UserCancelled", "Operation cancelled."));
@@ -75,9 +77,10 @@ function queryRegistryItems(
   context: CommandContext,
   source: string,
   plugins: RegpickPlugin[],
-): Effect.Effect<RegistryItem[], AppError> {
+): Effect.Effect<RegistryItem[], AppError, Runtime> {
   return Effect.gen(function* () {
-    const { items } = yield* loadRegistry(source, context.cwd, context.runtime, plugins);
+    const runtime = yield* Runtime;
+    const { items } = yield* loadRegistry(source, context.cwd, runtime, plugins);
     return items;
   });
 }
@@ -94,9 +97,13 @@ function formatItemLabel(item: RegistryItem): string {
 /**
  * Renders elements into the STD provider view.
  */
-function presentItems(context: CommandContext, items: RegistryItem[]): Effect.Effect<void, never> {
+function presentItems(
+  context: CommandContext,
+  items: RegistryItem[],
+): Effect.Effect<void, never, Runtime> {
   return Effect.gen(function* () {
-    yield* context.runtime.prompt.info(`Found ${items.length} items.`);
+    const runtime = yield* Runtime;
+    yield* runtime.prompt.info(`Found ${items.length} items.`);
     yield* Effect.forEach(
       items,
       (item) =>
@@ -111,8 +118,11 @@ function presentItems(context: CommandContext, items: RegistryItem[]): Effect.Ef
 /**
  * Main controller for the `list` command.
  */
-export function runListCommand(context: CommandContext): Effect.Effect<CommandOutcome, AppError> {
+export function runListCommand(
+  context: CommandContext,
+): Effect.Effect<CommandOutcome, AppError, Runtime> {
   return Effect.gen(function* () {
+    const runtime = yield* Runtime;
     const state = yield* queryListSourceState(context);
     const source = yield* interactSourcePhase(context, state);
 
@@ -126,7 +136,7 @@ export function runListCommand(context: CommandContext): Effect.Effect<CommandOu
     const items = yield* queryRegistryItems(context, source, state.plugins);
 
     if (!items.length) {
-      yield* context.runtime.prompt.warn("No items found in registry.");
+      yield* runtime.prompt.warn("No items found in registry.");
       return {
         kind: "noop",
         message: "No items found in registry.",

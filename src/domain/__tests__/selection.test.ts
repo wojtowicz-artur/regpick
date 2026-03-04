@@ -6,7 +6,6 @@ import {
   parseSelectedNames,
   selectItemsFromFlags,
 } from "@/domain/selection.js";
-import type { RuntimePorts } from "@/shell/runtime/ports.js";
 import type { CommandContext, RegistryItem } from "@/types.js";
 
 const items: RegistryItem[] = [
@@ -38,7 +37,6 @@ function context(flags: CommandContext["args"]["flags"]): CommandContext {
   return {
     cwd: "/tmp/project",
     args: { flags, positionals: ["add"] },
-    runtime: {} as RuntimePorts,
   };
 }
 

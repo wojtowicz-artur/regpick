@@ -1,5 +1,6 @@
 import { appError, type AppError } from "@/core/errors.js";
 import { buildRegistryItemFromFile } from "@/domain/packCore.js";
+import { Runtime } from "@/shell/runtime/ports.js";
 import type { CommandContext, CommandOutcome, RegistryItem } from "@/types.js";
 import { Effect } from "effect";
 import path from "node:path";
@@ -22,23 +23,21 @@ type PackGeneratedRegistry = {
  * @param context - Command context.
  * @returns Matched typescript files within the target space.
  */
-const getFilesRecursive = (
-  dir: string,
-  context: CommandContext,
-): Effect.Effect<string[], AppError> =>
+const getFilesRecursive = (dir: string): Effect.Effect<string[], AppError, Runtime> =>
   Effect.gen(function* () {
+    const runtime = yield* Runtime;
     const result: string[] = [];
 
     const scan = (currentDir: string): Effect.Effect<void, AppError> =>
       Effect.gen(function* () {
-        const files = yield* context.runtime.fs.readdir(currentDir);
+        const files = yield* runtime.fs.readdir(currentDir);
 
         yield* Effect.forEach(
           files,
           (file) =>
             Effect.gen(function* () {
               const fullPath = path.join(currentDir, file);
-              const stat = yield* context.runtime.fs.stat(fullPath);
+              const stat = yield* runtime.fs.stat(fullPath);
               if (stat.isDirectory()) {
                 yield* scan(fullPath);
               } else if (fullPath.endsWith(".ts") || fullPath.endsWith(".tsx")) {
@@ -59,19 +58,22 @@ const getFilesRecursive = (
  * @param context - Command context.
  * @returns Verified target scan list paths.
  */
-const queryPackState = (context: CommandContext): Effect.Effect<PackQueryState, AppError> =>
+const queryPackState = (
+  context: CommandContext,
+): Effect.Effect<PackQueryState, AppError, Runtime> =>
   Effect.gen(function* () {
+    const runtime = yield* Runtime;
     const targetDirArg = context.args.positionals[1] || ".";
     const targetDir = path.resolve(context.cwd, targetDirArg);
 
-    const stat = yield* context.runtime.fs.stat(targetDir);
+    const stat = yield* runtime.fs.stat(targetDir);
     if (!stat.isDirectory()) {
       yield* Effect.fail(appError("ValidationError", `Target is not a directory: ${targetDir}`));
     }
 
-    yield* context.runtime.prompt.info(`Scanning ${targetDir} for components...`);
+    yield* runtime.prompt.info(`Scanning ${targetDir} for components...`);
 
-    const files = yield* getFilesRecursive(targetDir, context);
+    const files = yield* getFilesRecursive(targetDir);
 
     return {
       targetDir,
@@ -89,13 +91,14 @@ const queryPackState = (context: CommandContext): Effect.Effect<PackQueryState, 
 const generateRegistryItems = (
   context: CommandContext,
   state: PackQueryState,
-): Effect.Effect<PackGeneratedRegistry, AppError> =>
+): Effect.Effect<PackGeneratedRegistry, AppError, Runtime> =>
   Effect.gen(function* () {
+    const runtime = yield* Runtime;
     const items = yield* Effect.forEach(
       state.files,
       (file) =>
         Effect.gen(function* () {
-          const content = yield* context.runtime.fs.readFile(file, "utf8");
+          const content = yield* runtime.fs.readFile(file, "utf8");
           return buildRegistryItemFromFile({
             path: file,
             content,
@@ -121,12 +124,15 @@ const generateRegistryItems = (
  * @param context - Command context.
  * @returns Completion confirmation schema wrapper.
  */
-export function runPackCommand(context: CommandContext): Effect.Effect<CommandOutcome, AppError> {
+export function runPackCommand(
+  context: CommandContext,
+): Effect.Effect<CommandOutcome, AppError, Runtime> {
   return Effect.gen(function* () {
+    const runtime = yield* Runtime;
     const state = yield* queryPackState(context);
 
     if (state.files.length === 0) {
-      yield* context.runtime.prompt.warn("No .ts or .tsx files found.");
+      yield* runtime.prompt.warn("No .ts or .tsx files found.");
       return { kind: "noop", message: "No files found." } as CommandOutcome;
     }
 
@@ -141,16 +147,14 @@ export function runPackCommand(context: CommandContext): Effect.Effect<CommandOu
       2,
     );
 
-    yield* Effect.catchAll(context.runtime.fs.writeFile(registry.outPath, content, "utf8"), (e) =>
+    yield* Effect.catchAll(runtime.fs.writeFile(registry.outPath, content, "utf8"), (e) =>
       Effect.gen(function* () {
-        yield* context.runtime.prompt.error(`Failed to write registry file: ${registry.outPath}`);
+        yield* runtime.prompt.error(`Failed to write registry file: ${registry.outPath}`);
         return yield* Effect.fail(e);
       }),
     );
 
-    yield* context.runtime.prompt.success(
-      `Packed ${registry.items.length} components into registry.json`,
-    );
+    yield* runtime.prompt.success(`Packed ${registry.items.length} components into registry.json`);
 
     return {
       kind: "success",

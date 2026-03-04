@@ -20,6 +20,7 @@ import type {
   RegpickPlugin,
 } from "@/types.js";
 import { Effect } from "effect";
+import { Runtime } from "@/shell/runtime/ports.js";
 
 type HydratedWrite = {
   itemName: string;
@@ -54,16 +55,15 @@ interface CustomQueryItemsResult {
  */
 function queryLoadConfiguration(
   context: CommandContext,
-): Effect.Effect<{ config: RegpickConfig; configPath: string }, AppError> {
+): Effect.Effect<{ config: RegpickConfig; configPath: string }, AppError, Runtime> {
   return Effect.gen(function* () {
+    const runtime = yield* Runtime;
     const res = yield* readConfig(context.cwd).pipe(
       Effect.mapError((e) => appError("RuntimeError", String(e))),
     );
 
     if (!res.configPath) {
-      yield* context.runtime.prompt.error(
-        "No regpick.json configuration found. Please run 'init' first.",
-      );
+      yield* runtime.prompt.error("No regpick.json configuration found. Please run 'init' first.");
       return yield* Effect.fail(appError("ValidationError", "No config file found"));
     }
 
@@ -77,8 +77,9 @@ function queryLoadConfiguration(
 function queryResolveRegistrySource(
   context: CommandContext,
   config: RegpickConfig,
-): Effect.Effect<string | null, AppError> {
+): Effect.Effect<string | null, AppError, Runtime> {
   return Effect.gen(function* () {
+    const runtime = yield* Runtime;
     const sourcePosIdx = context.args.positionals[0] === "add" ? 1 : 0;
     const argValue = context.args.positionals[sourcePosIdx];
 
@@ -92,14 +93,14 @@ function queryResolveRegistrySource(
     }));
 
     if (aliases.length > 0) {
-      const picked = yield* context.runtime.prompt.multiselect({
+      const picked = yield* runtime.prompt.multiselect({
         message: "Pick registry alias (or cancel and provide URL/path manually)",
         options: aliases,
         maxItems: 1,
         required: false,
       });
 
-      const isCancel = yield* context.runtime.prompt.isCancel(picked);
+      const isCancel = yield* runtime.prompt.isCancel(picked);
 
       if (isCancel)
         return yield* Effect.fail(
@@ -111,12 +112,12 @@ function queryResolveRegistrySource(
       }
     }
 
-    const manual = yield* context.runtime.prompt.text({
+    const manual = yield* runtime.prompt.text({
       message: "Registry URL/path:",
       placeholder: "https://example.com/registry.json",
     });
 
-    const isManualCancel = yield* context.runtime.prompt.isCancel(manual);
+    const isManualCancel = yield* runtime.prompt.isCancel(manual);
 
     if (isManualCancel)
       return yield* Effect.fail(
@@ -134,15 +135,16 @@ function queryRegistryItemsToProcess(
   context: CommandContext,
   source: string,
   plugins: RegpickPlugin[],
-): Effect.Effect<CustomQueryItemsResult, AppError> {
+): Effect.Effect<CustomQueryItemsResult, AppError, Runtime> {
   return Effect.gen(function* () {
+    const runtime = yield* Runtime;
     const sourcePosIdx = context.args.positionals[0] === "add" ? 1 : 0;
     const itemPosIdx = sourcePosIdx + 1;
 
-    const { items } = yield* loadRegistry(source, context.cwd, context.runtime, plugins);
+    const { items } = yield* loadRegistry(source, context.cwd, runtime, plugins);
 
     if (!items.length) {
-      yield* context.runtime.prompt.warn("No installable items in registry.");
+      yield* runtime.prompt.warn("No installable items in registry.");
       return yield* Effect.fail(appError("ValidationError", "No installable items in registry."));
     }
 
@@ -157,7 +159,7 @@ function queryRegistryItemsToProcess(
     if (preselected) {
       selectedItems = preselected;
     } else {
-      const selectedNames = yield* context.runtime.prompt.autocompleteMultiselect({
+      const selectedNames = yield* runtime.prompt.autocompleteMultiselect({
         message: "Select items to install",
         options: items.map((item) => ({
           value: item.name,
@@ -168,7 +170,7 @@ function queryRegistryItemsToProcess(
         required: true,
       });
 
-      const isCancel = yield* context.runtime.prompt.isCancel(selectedNames);
+      const isCancel = yield* runtime.prompt.isCancel(selectedNames);
 
       if (isCancel)
         return yield* Effect.fail(
@@ -180,7 +182,7 @@ function queryRegistryItemsToProcess(
     }
 
     if (!selectedItems.length) {
-      yield* context.runtime.prompt.warn("No items selected.");
+      yield* runtime.prompt.warn("No items selected.");
       return yield* Effect.fail(appError("ValidationError", "No items selected."));
     }
 
@@ -197,8 +199,9 @@ function queryPlanState(
   context: CommandContext,
   config: RegpickConfig,
   selectedItems: RegistryItem[],
-): Effect.Effect<InteractiveAddState, AppError> {
+): Effect.Effect<InteractiveAddState, AppError, Runtime> {
   return Effect.gen(function* () {
+    const runtime = yield* Runtime;
     const probeRes = yield* buildInstallPlan(selectedItems, context.cwd, config);
 
     const existingTargets = new Set<string>();
@@ -206,7 +209,7 @@ function queryPlanState(
       probeRes.plannedWrites,
       (write) =>
         Effect.gen(function* () {
-          const exists = yield* context.runtime.fs.pathExists(write.absoluteTarget);
+          const exists = yield* runtime.fs.pathExists(write.absoluteTarget);
           if (exists) existingTargets.add(write.absoluteTarget);
         }),
       { concurrency: "unbounded" },
@@ -214,7 +217,7 @@ function queryPlanState(
 
     const finalRes = yield* buildInstallPlan(selectedItems, context.cwd, config, existingTargets);
 
-    const deps = yield* collectMissingDependencies(selectedItems, context.cwd, context.runtime);
+    const deps = yield* collectMissingDependencies(selectedItems, context.cwd, runtime);
 
     return {
       selectedItems,
@@ -230,17 +233,18 @@ function processInteractionApproval(
   context: CommandContext,
   config: RegpickConfig,
   state: InteractiveAddState,
-): Effect.Effect<ApprovedAddPlan, AppError> {
+): Effect.Effect<ApprovedAddPlan, AppError, Runtime> {
   return Effect.gen(function* () {
+    const runtime = yield* Runtime;
     const assumeYes = Boolean(context.args.flags.yes);
 
     if (!assumeYes) {
-      const proceed = yield* context.runtime.prompt.confirm({
+      const proceed = yield* runtime.prompt.confirm({
         message: `Install ${state.selectedItems.length} item(s)?`,
         initialValue: true,
       });
 
-      const isCancel = yield* context.runtime.prompt.isCancel(proceed);
+      const isCancel = yield* runtime.prompt.isCancel(proceed);
 
       if (isCancel || !proceed) {
         return yield* Effect.fail(
@@ -260,9 +264,9 @@ function processInteractionApproval(
             if (assumeYes || overwritePolicy === "overwrite") {
               finalWrites.push(write);
             } else if (overwritePolicy === "skip") {
-              yield* context.runtime.prompt.warn(`Skipped existing file: ${write.absoluteTarget}`);
+              yield* runtime.prompt.warn(`Skipped existing file: ${write.absoluteTarget}`);
             } else {
-              const ans = yield* context.runtime.prompt.select({
+              const ans = yield* runtime.prompt.select({
                 message: `File exists: ${write.absoluteTarget}`,
                 options: [
                   { value: "overwrite", label: "Overwrite this file" },
@@ -271,7 +275,7 @@ function processInteractionApproval(
                 ],
               });
 
-              const isCancel = yield* context.runtime.prompt.isCancel(ans);
+              const isCancel = yield* runtime.prompt.isCancel(ans);
 
               if (isCancel || ans === "abort") {
                 return yield* Effect.fail(
@@ -298,7 +302,7 @@ function processInteractionApproval(
         const pm = resolvePackageManager(
           context.cwd,
           config.install?.packageManager || "auto",
-          context.runtime,
+          runtime,
         );
         const msgParts: string[] = [];
         if (state.missingDependencies.length)
@@ -306,12 +310,12 @@ function processInteractionApproval(
         if (state.missingDevDependencies.length)
           msgParts.push(`devDependencies: ${state.missingDevDependencies.join(", ")}`);
 
-        const ans = yield* context.runtime.prompt.confirm({
+        const ans = yield* runtime.prompt.confirm({
           message: `Install missing packages with ${pm}? (${msgParts.join(" | ")})`,
           initialValue: true,
         });
 
-        const isCancel = yield* context.runtime.prompt.isCancel(ans);
+        const isCancel = yield* runtime.prompt.isCancel(ans);
 
         if (isCancel)
           return yield* Effect.fail(
@@ -320,7 +324,7 @@ function processInteractionApproval(
 
         shouldInstallDeps = Boolean(ans);
         if (!shouldInstallDeps) {
-          yield* context.runtime.prompt.warn("Skipped dependency installation.");
+          yield* runtime.prompt.warn("Skipped dependency installation.");
         }
       }
     }
@@ -343,8 +347,9 @@ function resolveContents(
   finalWrites: PlannedWrite[],
   selectedItems: RegistryItem[],
   plugins: RegpickPlugin[],
-): Effect.Effect<HydratedWrite[], AppError> {
+): Effect.Effect<HydratedWrite[], AppError, Runtime> {
   return Effect.gen(function* () {
+    const runtime = yield* Runtime;
     const writes: HydratedWrite[] = [];
 
     yield* Effect.forEach(
@@ -358,7 +363,7 @@ function resolveContents(
             write.sourceFile,
             item,
             context.cwd,
-            context.runtime,
+            runtime,
             plugins,
           );
 
@@ -378,8 +383,11 @@ function resolveContents(
   });
 }
 
-export function runAddCommand(context: CommandContext): Effect.Effect<CommandOutcome, AppError> {
+export function runAddCommand(
+  context: CommandContext,
+): Effect.Effect<CommandOutcome, AppError, Runtime> {
   return Effect.gen(function* () {
+    const runtime = yield* Runtime;
     const { config } = yield* queryLoadConfiguration(context);
     const source = yield* queryResolveRegistrySource(context, config);
 
@@ -394,9 +402,7 @@ export function runAddCommand(context: CommandContext): Effect.Effect<CommandOut
     const itemsToProc = yield* queryRegistryItemsToProcess(context, source, plugins);
 
     for (const d of itemsToProc.missingRegistryDeps || []) {
-      yield* context.runtime.prompt.warn(
-        `Registry dependency "${d}" not found in current registry.`,
-      );
+      yield* runtime.prompt.warn(`Registry dependency "${d}" not found in current registry.`);
     }
 
     const state = yield* queryPlanState(context, config, itemsToProc.selectedItems);
@@ -435,22 +441,22 @@ export function runAddCommand(context: CommandContext): Effect.Effect<CommandOut
       coreAddPlugin(
         depPlan,
         config,
-        context.runtime,
+        runtime,
         installedItemsInfo,
       ) as import("../core/pipeline.js").Plugin,
     ]);
 
-    yield* pipeline.run({ vfs, cwd: context.cwd, runtime: context.runtime }, vfsFiles).pipe(
+    yield* pipeline.run({ vfs, cwd: context.cwd, runtime: runtime }, vfsFiles).pipe(
       Effect.catchAll((error) => {
         vfs.rollback();
         return Effect.gen(function* () {
-          yield* context.runtime.prompt.error(`[Failed] Installation aborted: ${error.message}`);
+          yield* runtime.prompt.error(`[Failed] Installation aborted: ${error.message}`);
           return yield* Effect.fail(error);
         });
       }),
     );
 
-    yield* context.runtime.prompt.info(
+    yield* runtime.prompt.info(
       `Installed ${approved.selectedItems.length} item(s), wrote ${hydratedWrites.length} file(s).`,
     );
 

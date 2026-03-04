@@ -1,3 +1,6 @@
+import { Runtime } from "@/shell/runtime/ports.js";
+import { Layer } from "effect";
+
 import { createMockPrompt } from "@/__tests__/helpers/integration.js";
 import { runInitCommand } from "@/commands/init.js";
 import { createRuntimePorts, type RuntimePorts } from "@/shell/runtime/ports.js";
@@ -41,11 +44,13 @@ describe("init integration", () => {
     // 2. Run the command
     const result = await Effect.runPromise(
       Effect.either(
-        runInitCommand({
-          cwd: testDir,
-          runtime,
-          args: { flags: { yes: true }, positionals: [] },
-        }),
+        Effect.provide(
+          runInitCommand({
+            cwd: testDir,
+            args: { flags: { yes: true }, positionals: [] },
+          }),
+          Layer.succeed(Runtime, runtime),
+        ),
       ),
     );
 
@@ -71,11 +76,13 @@ describe("init integration", () => {
   it("should work even if package.json is missing", async () => {
     const result = await Effect.runPromise(
       Effect.either(
-        runInitCommand({
-          cwd: testDir,
-          runtime,
-          args: { flags: { yes: true }, positionals: [] },
-        }),
+        Effect.provide(
+          runInitCommand({
+            cwd: testDir,
+            args: { flags: { yes: true }, positionals: [] },
+          }),
+          Layer.succeed(Runtime, runtime),
+        ),
       ),
     );
 
@@ -97,11 +104,13 @@ describe("init integration", () => {
 
     const result = await Effect.runPromise(
       Effect.either(
-        runInitCommand({
-          cwd: testDir,
-          runtime,
-          args: { flags: { yes: false }, positionals: [] },
-        }),
+        Effect.provide(
+          runInitCommand({
+            cwd: testDir,
+            args: { flags: { yes: false }, positionals: [] },
+          }),
+          Layer.succeed(Runtime, runtime),
+        ),
       ),
     );
 
@@ -129,11 +138,13 @@ describe("init integration", () => {
 
     const result = await Effect.runPromise(
       Effect.either(
-        runInitCommand({
-          cwd: testDir,
-          runtime,
-          args: { flags: { yes: false }, positionals: [] },
-        }),
+        Effect.provide(
+          runInitCommand({
+            cwd: testDir,
+            args: { flags: { yes: false }, positionals: [] },
+          }),
+          Layer.succeed(Runtime, runtime),
+        ),
       ),
     );
 
@@ -154,11 +165,13 @@ describe("init integration", () => {
 
     const result = await Effect.runPromise(
       Effect.either(
-        runInitCommand({
-          cwd: testDir,
-          runtime,
-          args: { flags: { yes: true }, positionals: [] },
-        }),
+        Effect.provide(
+          runInitCommand({
+            cwd: testDir,
+            args: { flags: { yes: true }, positionals: [] },
+          }),
+          Layer.succeed(Runtime, runtime),
+        ),
       ),
     );
 

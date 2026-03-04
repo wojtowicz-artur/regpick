@@ -9,6 +9,7 @@ import { readConfig } from "@/shell/config.js";
 import { readLockfile, writeLockfile } from "@/shell/lockfile.js";
 import { DirectoryPlugin, FilePlugin, HttpPlugin, loadPlugins } from "@/shell/plugins/index.js";
 import { loadRegistry, resolveFileContent } from "@/shell/registry.js";
+import { Runtime } from "@/shell/runtime/ports.js";
 import type {
   CommandContext,
   CommandOutcome,
@@ -39,20 +40,19 @@ type ApprovedUpdatePlan = {
  */
 function queryLoadState(
   context: CommandContext,
-): Effect.Effect<{ config: RegpickConfig; lockfile: RegpickLockfile }, AppError> {
+): Effect.Effect<{ config: RegpickConfig; lockfile: RegpickLockfile }, AppError, Runtime> {
   return Effect.gen(function* () {
+    const runtime = yield* Runtime;
     const configRes = yield* readConfig(context.cwd).pipe(
       Effect.mapError((e) => appError("RuntimeError", String(e))),
     );
 
-    const lockfile = yield* readLockfile(context.cwd, context.runtime).pipe(
+    const lockfile = yield* readLockfile(context.cwd, runtime).pipe(
       Effect.mapError((e) => appError("RuntimeError", String(e))),
     );
 
     if (!configRes.configPath) {
-      yield* context.runtime.prompt.error(
-        "No regpick.json configuration found. Please run 'init' first.",
-      );
+      yield* runtime.prompt.error("No regpick.json configuration found. Please run 'init' first.");
       return yield* Effect.fail(appError("ValidationError", "No config file found"));
     }
 
@@ -68,20 +68,19 @@ function queryAvailableUpdates(
   config: RegpickConfig,
   lockfile: RegpickLockfile,
   plugins: RegpickPlugin[],
-): Effect.Effect<DetectedUpdate[], AppError> {
+): Effect.Effect<DetectedUpdate[], AppError, Runtime> {
   return Effect.gen(function* () {
+    const runtime = yield* Runtime;
     const bySource = groupBySource(lockfile);
 
     const updatesNested = yield* Effect.forEach(
       Object.entries(bySource),
       ([source, itemsToUpdate]) =>
         Effect.gen(function* () {
-          const loadOpt = yield* Effect.either(
-            loadRegistry(source, context.cwd, context.runtime, plugins),
-          );
+          const loadOpt = yield* Effect.either(loadRegistry(source, context.cwd, runtime, plugins));
 
           if (Either.isLeft(loadOpt)) {
-            yield* context.runtime.prompt.warn(`Failed to load registry ${source}`);
+            yield* runtime.prompt.warn(`Failed to load registry ${source}`);
             return [];
           }
 
@@ -96,13 +95,7 @@ function queryAvailableUpdates(
 
                 const resolvedFiles = yield* Effect.all(
                   registryItem.files.map((file) =>
-                    resolveFileContent(
-                      file,
-                      registryItem,
-                      context.cwd,
-                      context.runtime,
-                      plugins,
-                    ).pipe(
+                    resolveFileContent(file, registryItem, context.cwd, runtime, plugins).pipe(
                       Effect.map((content) => ({ file, content })),
                       Effect.catchAll(() => Effect.succeed(null)),
                     ),
@@ -137,7 +130,7 @@ function queryAvailableUpdates(
                     (rf) =>
                       Effect.gen(function* () {
                         const localContent = yield* Effect.catchAll(
-                          context.runtime.fs.readFile(rf.target, "utf8"),
+                          runtime.fs.readFile(rf.target, "utf8"),
                           () => Effect.succeed(""),
                         );
                         return {
@@ -201,15 +194,16 @@ function printDiff(oldContent: string, newContent: string): Effect.Effect<void, 
 function interactApprovalPhase(
   context: CommandContext,
   availableUpdates: DetectedUpdate[],
-): Effect.Effect<ApprovedUpdatePlan, AppError> {
+): Effect.Effect<ApprovedUpdatePlan, AppError, Runtime> {
   return Effect.gen(function* () {
+    const runtime = yield* Runtime;
     const approvedUpdatesOpt = yield* Effect.forEach(
       availableUpdates,
       (update) =>
         Effect.gen(function* () {
-          yield* context.runtime.prompt.info(`Update available for ${update.itemName}`);
+          yield* runtime.prompt.info(`Update available for ${update.itemName}`);
 
-          const action = yield* context.runtime.prompt.select({
+          const action = yield* runtime.prompt.select({
             message: `What do you want to do with ${update.itemName}?`,
             options: [
               { value: "diff", label: "Show diff" },
@@ -218,7 +212,7 @@ function interactApprovalPhase(
             ],
           });
 
-          const isActionCancel = yield* context.runtime.prompt.isCancel(action);
+          const isActionCancel = yield* runtime.prompt.isCancel(action);
 
           if (isActionCancel || action === "skip") {
             return null;
@@ -235,12 +229,12 @@ function interactApprovalPhase(
               { concurrency: 1 },
             );
 
-            const confirm = yield* context.runtime.prompt.confirm({
+            const confirm = yield* runtime.prompt.confirm({
               message: `Update ${update.itemName} now?`,
               initialValue: true,
             });
 
-            const isConfirmCancel = yield* context.runtime.prompt.isCancel(confirm);
+            const isConfirmCancel = yield* runtime.prompt.isCancel(confirm);
 
             if (isConfirmCancel || !confirm) {
               return null;
@@ -261,13 +255,16 @@ function interactApprovalPhase(
 /**
  * Main controller for the `update` command effect loop.
  */
-export function runUpdateCommand(context: CommandContext): Effect.Effect<CommandOutcome, AppError> {
+export function runUpdateCommand(
+  context: CommandContext,
+): Effect.Effect<CommandOutcome, AppError, Runtime> {
   return Effect.gen(function* () {
+    const runtime = yield* Runtime;
     const state = yield* queryLoadState(context);
 
     const componentNames = Object.keys(state.lockfile.components);
     if (componentNames.length === 0) {
-      yield* context.runtime.prompt.info("No components installed. Nothing to update.");
+      yield* runtime.prompt.info("No components installed. Nothing to update.");
       return {
         kind: "noop",
         message: "No components to update.",
@@ -334,16 +331,16 @@ export function runUpdateCommand(context: CommandContext): Effect.Effect<Command
           if ("flushToDisk" in ctx.vfs) {
             await (ctx.vfs as PersistableVFS).flushToDisk();
           }
-          await Effect.runPromise(writeLockfile(ctx.cwd, updatedLockfile, context.runtime));
+          await Effect.runPromise(writeLockfile(ctx.cwd, updatedLockfile, runtime));
         },
       },
     ]);
 
-    yield* pipeline.run({ vfs, cwd: context.cwd, runtime: context.runtime }, vfsFiles).pipe(
+    yield* pipeline.run({ vfs, cwd: context.cwd, runtime: runtime }, vfsFiles).pipe(
       Effect.catchAll((error) => {
         vfs.rollback();
         return Effect.gen(function* () {
-          yield* context.runtime.prompt.error(`[Failed] Update aborted: ${error.message}`);
+          yield* runtime.prompt.error(`[Failed] Update aborted: ${error.message}`);
           return yield* Effect.fail(error);
         });
       }),

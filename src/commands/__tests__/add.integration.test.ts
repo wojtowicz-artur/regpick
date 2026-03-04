@@ -1,3 +1,6 @@
+import { Runtime } from "@/shell/runtime/ports.js";
+import { Layer } from "effect";
+
 import mockRegistry from "@/__tests__/fixtures/shadcn-registry.json" with { type: "json" };
 import { createMockHttp, createMockPrompt } from "@/__tests__/helpers/integration.js";
 import { runAddCommand } from "@/commands/add.js";
@@ -60,14 +63,16 @@ describe("add integration with shadcn compatibility", () => {
     // 3. Run add command
     const result = await Effect.runPromise(
       Effect.either(
-        runAddCommand({
-          cwd: testDir,
-          runtime,
-          args: {
-            flags: { yes: true },
-            positionals: ["add", "https://example.com/registry.json", "button"],
-          },
-        }),
+        Effect.provide(
+          runAddCommand({
+            cwd: testDir,
+            args: {
+              flags: { yes: true },
+              positionals: ["add", "https://example.com/registry.json", "button"],
+            },
+          }),
+          Layer.succeed(Runtime, runtime),
+        ),
       ),
     );
 
@@ -126,14 +131,16 @@ describe("add integration with shadcn compatibility", () => {
     // 2. Run add card
     const result = await Effect.runPromise(
       Effect.either(
-        runAddCommand({
-          cwd: testDir,
-          runtime,
-          args: {
-            flags: { yes: true },
-            positionals: ["add", "https://example.com/registry.json", "card"],
-          },
-        }),
+        Effect.provide(
+          runAddCommand({
+            cwd: testDir,
+            args: {
+              flags: { yes: true },
+              positionals: ["add", "https://example.com/registry.json", "card"],
+            },
+          }),
+          Layer.succeed(Runtime, runtime),
+        ),
       ),
     );
 
@@ -197,14 +204,16 @@ describe("add integration with shadcn compatibility", () => {
 
     const result = await Effect.runPromise(
       Effect.either(
-        runAddCommand({
-          cwd: testDir,
-          runtime,
-          args: {
-            flags: { yes: false },
-            positionals: ["add", "https://example.com/registry.json", "button"],
-          },
-        }),
+        Effect.provide(
+          runAddCommand({
+            cwd: testDir,
+            args: {
+              flags: { yes: false },
+              positionals: ["add", "https://example.com/registry.json", "button"],
+            },
+          }),
+          Layer.succeed(Runtime, runtime),
+        ),
       ),
     );
 
@@ -223,14 +232,16 @@ describe("add integration with shadcn compatibility", () => {
 
     const result = await Effect.runPromise(
       Effect.either(
-        runAddCommand({
-          cwd: testDir,
-          runtime,
-          args: {
-            flags: { yes: true },
-            positionals: ["add", "https://example.com/registry.json", "button"],
-          },
-        }),
+        Effect.provide(
+          runAddCommand({
+            cwd: testDir,
+            args: {
+              flags: { yes: true },
+              positionals: ["add", "https://example.com/registry.json", "button"],
+            },
+          }),
+          Layer.succeed(Runtime, runtime),
+        ),
       ),
     );
 
@@ -259,14 +270,16 @@ describe("add integration with shadcn compatibility", () => {
 
     const result = await Effect.runPromise(
       Effect.either(
-        runAddCommand({
-          cwd: testDir,
-          runtime,
-          args: {
-            flags: { yes: true },
-            positionals: ["add", "https://example.com/registry.json", "button"],
-          },
-        }),
+        Effect.provide(
+          runAddCommand({
+            cwd: testDir,
+            args: {
+              flags: { yes: true },
+              positionals: ["add", "https://example.com/registry.json", "button"],
+            },
+          }),
+          Layer.succeed(Runtime, runtime),
+        ),
       ),
     );
 
@@ -300,14 +313,16 @@ describe("add integration with shadcn compatibility", () => {
 
     const result = await Effect.runPromise(
       Effect.either(
-        runAddCommand({
-          cwd: testDir,
-          runtime,
-          args: {
-            flags: { yes: true },
-            positionals: ["add", "https://example.com/registry.json", "card"],
-          },
-        }),
+        Effect.provide(
+          runAddCommand({
+            cwd: testDir,
+            args: {
+              flags: { yes: true },
+              positionals: ["add", "https://example.com/registry.json", "card"],
+            },
+          }),
+          Layer.succeed(Runtime, runtime),
+        ),
       ),
     );
 
@@ -334,14 +349,16 @@ describe("add integration with shadcn compatibility", () => {
 
     const result = await Effect.runPromise(
       Effect.either(
-        runAddCommand({
-          cwd: testDir,
-          runtime,
-          args: {
-            flags: { yes: true },
-            positionals: ["add", "https://example.com/registry.json", "button"],
-          },
-        }),
+        Effect.provide(
+          runAddCommand({
+            cwd: testDir,
+            args: {
+              flags: { yes: true },
+              positionals: ["add", "https://example.com/registry.json", "button"],
+            },
+          }),
+          Layer.succeed(Runtime, runtime),
+        ),
       ),
     );
 
