@@ -23,6 +23,22 @@ export type UpdateAction = {
   files: UpdateFile[];
 };
 
+export type DetectedUpdateFile = {
+  target: string;
+  remoteContent: string;
+  localContent: string;
+};
+
+export type DetectedUpdate = {
+  itemName: string;
+  newHash: string;
+  files: DetectedUpdateFile[];
+};
+
+export type ApprovedUpdatePlan = {
+  approvedUpdates: DetectedUpdate[];
+};
+
 export function groupBySource(lockfile: RegpickLockfile): Record<string, string[]> {
   const bySource: Record<string, string[]> = {};
   for (const name of Object.keys(lockfile.components)) {
