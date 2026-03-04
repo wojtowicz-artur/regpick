@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.18.0](https://github.com/wojtowicz-artur/regpick/compare/v0.17.0...v0.18.0) (2026-03-04)
+
+### Features
+
+* restructure project by moving config and lockfile handling to domain and core layers ([aa9205b](https://github.com/wojtowicz-artur/regpick/commit/aa9205be51053e9870fa28118edd4fc378458c22))
+
+### Code Refactoring
+
+* replace PipelineRenderer with runPipeline in add and update commands ([da282e5](https://github.com/wojtowicz-artur/regpick/commit/da282e5d26cba44ddcd2806bd8f39472eddb636c))
+* streamline code by removing unnecessary line breaks and improving readability ([6cfabdb](https://github.com/wojtowicz-artur/regpick/commit/6cfabdb04d77a7a0304110e0f298994f8a5cc846))
+
 ## [0.17.0](https://github.com/wojtowicz-artur/regpick/compare/v0.16.8...v0.17.0) (2026-03-04)
 
 ### Features
