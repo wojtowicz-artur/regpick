@@ -1,5 +1,6 @@
-import { Runtime } from "@/shell/runtime/ports.js";
 import { CommandContextTag } from "@/core/context.js";
+import { JournalService, JournalServiceImpl } from "@/core/journal.js";
+import { Runtime } from "@/shell/runtime/ports.js";
 import { Layer } from "effect";
 
 import mockRegistry from "@/__tests__/fixtures/shadcn-registry.json" with { type: "json" };
@@ -66,7 +67,7 @@ describe("add integration with shadcn compatibility", () => {
       Effect.either(
         Effect.provide(
           runAddCommand(),
-          Layer.merge(
+          Layer.mergeAll(
             Layer.succeed(CommandContextTag, {
               cwd: testDir,
               args: {
@@ -75,6 +76,7 @@ describe("add integration with shadcn compatibility", () => {
               },
             }),
             Layer.succeed(Runtime, runtime),
+            Layer.succeed(JournalService, JournalServiceImpl),
           ),
         ),
       ),
@@ -137,7 +139,7 @@ describe("add integration with shadcn compatibility", () => {
       Effect.either(
         Effect.provide(
           runAddCommand(),
-          Layer.merge(
+          Layer.mergeAll(
             Layer.succeed(CommandContextTag, {
               cwd: testDir,
               args: {
@@ -146,6 +148,7 @@ describe("add integration with shadcn compatibility", () => {
               },
             }),
             Layer.succeed(Runtime, runtime),
+            Layer.succeed(JournalService, JournalServiceImpl),
           ),
         ),
       ),
@@ -213,7 +216,7 @@ describe("add integration with shadcn compatibility", () => {
       Effect.either(
         Effect.provide(
           runAddCommand(),
-          Layer.merge(
+          Layer.mergeAll(
             Layer.succeed(CommandContextTag, {
               cwd: testDir,
               args: {
@@ -222,6 +225,7 @@ describe("add integration with shadcn compatibility", () => {
               },
             }),
             Layer.succeed(Runtime, runtime),
+            Layer.succeed(JournalService, JournalServiceImpl),
           ),
         ),
       ),
@@ -244,7 +248,7 @@ describe("add integration with shadcn compatibility", () => {
       Effect.either(
         Effect.provide(
           runAddCommand(),
-          Layer.merge(
+          Layer.mergeAll(
             Layer.succeed(CommandContextTag, {
               cwd: testDir,
               args: {
@@ -253,6 +257,7 @@ describe("add integration with shadcn compatibility", () => {
               },
             }),
             Layer.succeed(Runtime, runtime),
+            Layer.succeed(JournalService, JournalServiceImpl),
           ),
         ),
       ),
@@ -285,7 +290,7 @@ describe("add integration with shadcn compatibility", () => {
       Effect.either(
         Effect.provide(
           runAddCommand(),
-          Layer.merge(
+          Layer.mergeAll(
             Layer.succeed(CommandContextTag, {
               cwd: testDir,
               args: {
@@ -294,6 +299,7 @@ describe("add integration with shadcn compatibility", () => {
               },
             }),
             Layer.succeed(Runtime, runtime),
+            Layer.succeed(JournalService, JournalServiceImpl),
           ),
         ),
       ),
@@ -331,7 +337,7 @@ describe("add integration with shadcn compatibility", () => {
       Effect.either(
         Effect.provide(
           runAddCommand(),
-          Layer.merge(
+          Layer.mergeAll(
             Layer.succeed(CommandContextTag, {
               cwd: testDir,
               args: {
@@ -340,6 +346,7 @@ describe("add integration with shadcn compatibility", () => {
               },
             }),
             Layer.succeed(Runtime, runtime),
+            Layer.succeed(JournalService, JournalServiceImpl),
           ),
         ),
       ),
@@ -370,7 +377,7 @@ describe("add integration with shadcn compatibility", () => {
       Effect.either(
         Effect.provide(
           runAddCommand(),
-          Layer.merge(
+          Layer.mergeAll(
             Layer.succeed(CommandContextTag, {
               cwd: testDir,
               args: {
@@ -379,6 +386,7 @@ describe("add integration with shadcn compatibility", () => {
               },
             }),
             Layer.succeed(Runtime, runtime),
+            Layer.succeed(JournalService, JournalServiceImpl),
           ),
         ),
       ),

@@ -1,5 +1,6 @@
 import { CommandContextTag, ConfigTag } from "@/core/context.js";
 import { appError, toAppError, type AppError } from "@/core/errors.js";
+import { JournalService } from "@/core/journal.js";
 import { PipelineRenderer } from "@/core/pipeline.js";
 import { MemoryVFS } from "@/core/vfs.js";
 import { buildInstallPlan, resolveRegistryDependencies } from "@/domain/addPlan.js";
@@ -21,6 +22,7 @@ import type {
   RegpickPlugin,
 } from "@/types.js";
 import { Effect } from "effect";
+import crypto from "node:crypto";
 
 type HydratedWrite = {
   itemName: string;
@@ -392,7 +394,7 @@ function resolveContents(
 export function runAddCommand(): Effect.Effect<
   CommandOutcome,
   AppError,
-  Runtime | CommandContextTag
+  Runtime | CommandContextTag | JournalService
 > {
   return Effect.gen(function* () {
     const { config } = yield* queryLoadConfiguration();
@@ -459,7 +461,29 @@ export function runAddCommand(): Effect.Effect<
         ) as import("../core/pipeline.js").Plugin,
       ]);
 
+      const journal = yield* JournalService;
+      let lockfileBackup: any;
+      try {
+        const { readLockfile } = yield* Effect.promise(() => import("@/shell/lockfile.js"));
+        lockfileBackup = yield* readLockfile(context.cwd, runtime).pipe(
+          Effect.catchAll(() => Effect.succeed(undefined)),
+        );
+      } catch {
+        // Ignored
+      }
+
+      const entry = {
+        id: crypto.randomUUID(),
+        command: "add" as const,
+        status: "pending" as const,
+        plannedFiles: hydratedWrites.map((w) => w.absoluteTarget),
+        lockfileBackup: lockfileBackup,
+      };
+
+      yield* journal.writeIntent(entry, context.cwd);
+
       yield* pipeline.run({ vfs, cwd: context.cwd, runtime: runtime }, vfsFiles).pipe(
+        Effect.tapError(() => journal.clearIntent(context.cwd)),
         Effect.catchAll((error) => {
           vfs.rollback();
           return Effect.gen(function* () {
@@ -467,6 +491,7 @@ export function runAddCommand(): Effect.Effect<
             return yield* Effect.fail(error);
           });
         }),
+        Effect.tap(() => journal.clearIntent(context.cwd)),
       );
 
       yield* runtime.prompt.info(

@@ -3,6 +3,7 @@ import { styleText } from "node:util";
 
 import { CommandContextTag, ConfigTag } from "@/core/context.js";
 import { appError, toAppError, type AppError } from "@/core/errors.js";
+import { JournalService } from "@/core/journal.js";
 import { PipelineRenderer, type PersistableVFS } from "@/core/pipeline.js";
 import { MemoryVFS } from "@/core/vfs.js";
 import { buildUpdatePlanForItem, groupBySource } from "@/domain/updatePlan.js";
@@ -18,6 +19,7 @@ import type {
   RegpickLockfile,
   RegpickPlugin,
 } from "@/types.js";
+import crypto from "node:crypto";
 import path from "node:path";
 
 type DetectedUpdateFile = {
@@ -257,7 +259,7 @@ function interactApprovalPhase(
 export function runUpdateCommand(): Effect.Effect<
   CommandOutcome,
   AppError,
-  Runtime | CommandContextTag
+  Runtime | CommandContextTag | JournalService
 > {
   return Effect.gen(function* () {
     const state = yield* queryLoadState();
@@ -361,7 +363,19 @@ export function runUpdateCommand(): Effect.Effect<
         },
       ]);
 
+      const journal = yield* JournalService;
+      const entry = {
+        id: crypto.randomUUID(),
+        command: "update" as const,
+        status: "pending" as const,
+        plannedFiles: vfsFiles.map((f) => f.id),
+        lockfileBackup: state.lockfile,
+      };
+
+      yield* journal.writeIntent(entry, context.cwd);
+
       yield* pipeline.run({ vfs, cwd: context.cwd, runtime: runtime }, vfsFiles).pipe(
+        Effect.tapError(() => journal.clearIntent(context.cwd)),
         Effect.catchAll((error) => {
           vfs.rollback();
           return Effect.gen(function* () {
@@ -369,6 +383,7 @@ export function runUpdateCommand(): Effect.Effect<
             return yield* Effect.fail(error);
           });
         }),
+        Effect.tap(() => journal.clearIntent(context.cwd)),
       );
 
       return {

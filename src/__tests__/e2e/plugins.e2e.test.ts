@@ -89,7 +89,14 @@ export default {
       await fs.writeFile(path.join(testDir, "regpick.mjs"), configContentUpdated);
 
       // Run update - assuming it finds the mock-proto://my-custom-registry source from lockfile gracefully
-      await execa("node", [entryPath, "update", "--yes"], { cwd: testDir });
+      const updateRes = await execa("node", [entryPath, "update", "--yes"], {
+        cwd: testDir,
+        reject: false,
+      });
+      if (updateRes.exitCode !== 0) {
+        console.error("UPDATE FAILED", updateRes.stdout, updateRes.stderr);
+        throw new Error("Update crashed");
+      }
 
       const contentUpdated = await fs.readFile(componentPath, "utf-8");
       expect(contentUpdated).toContain(

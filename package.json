@@ -39,9 +39,10 @@
   "scripts": {
     "docs:dev": "npm run dev --prefix website",
     "docs:build": "npm run build --prefix website",
-    "build": "tsdown",
+    "build": "npm run typecheck && npm run lint && tsdown",
     "fmt": "oxfmt",
     "lint": "oxlint src",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",

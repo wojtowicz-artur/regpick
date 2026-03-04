@@ -4,6 +4,7 @@ import { styleText } from "node:util";
 
 import { CommandContextTag } from "@/core/context.js";
 import { type AppError, toAppError } from "@/core/errors.js";
+import { JournalService, JournalServiceImpl } from "@/core/journal.js";
 import { parseCliArgs } from "@/shell/cli/args.js";
 import type { CommandContext, CommandOutcome } from "@/types.js";
 
@@ -68,10 +69,18 @@ function run(): Effect.Effect<void, never> {
     runtime.prompt.intro(styleText("cyan", "regpick"));
 
     const executeCommand = Effect.gen(function* () {
+      const journal = yield* JournalService;
+      const rolledBack = yield* journal.rollbackIntent(context.cwd);
+      if (rolledBack) {
+        yield* runtime.prompt.error(
+          styleText("yellow", "Previous incomplete operation detected and rolled back."),
+        );
+      }
+
       let commandEffect: Effect.Effect<
         CommandOutcome,
         AppError,
-        import("@/shell/runtime/ports.js").Runtime | CommandContextTag
+        import("@/shell/runtime/ports.js").Runtime | CommandContextTag | JournalService
       >;
 
       switch (command) {
@@ -133,9 +142,10 @@ function run(): Effect.Effect<void, never> {
       ),
     );
 
-    const layer = Layer.merge(
+    const layer = Layer.mergeAll(
       Layer.succeed(Runtime, runtime),
       Layer.succeed(CommandContextTag, context),
+      Layer.succeed(JournalService, JournalServiceImpl),
     );
     yield* executeCommand.pipe(Effect.provide(layer));
   });
@@ -163,7 +173,7 @@ function handleAppError(error: AppError, write: (message: string) => void): void
     }
   }
 
-  write(msg);
+  console.error(msg);
 }
 
 Effect.runPromise(run());

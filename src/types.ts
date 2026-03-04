@@ -102,6 +102,14 @@ export type InstallPlan = {
 export type LockfileItem = ValibotLockfileItem;
 export type RegpickLockfile = ValibotRegpickLockfile;
 
+export type JournalEntry = {
+  id: string;
+  command: "add" | "update";
+  status: "pending";
+  plannedFiles: string[];
+  lockfileBackup?: RegpickLockfile;
+};
+
 export type CommandOutcome =
   | {
       kind: "success";
