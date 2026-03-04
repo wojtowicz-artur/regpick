@@ -1,4 +1,4 @@
-import { Effect, Schema as S } from "effect";
+import { Array, Effect, Schema as S } from "effect";
 import path from "node:path";
 
 import { appError, type AppError } from "@/core/errors.js";
@@ -20,10 +20,6 @@ const PackageJsonSchema = S.Struct({
     default: () => ({}),
   }),
 });
-
-function unique(values: string[]): string[] {
-  return [...new Set(values.filter(Boolean))];
-}
 
 export function collectMissingDependencies(
   items: RegistryItem[],
@@ -55,8 +51,10 @@ export function collectMissingDependencies(
       ...packageJson.peerDependencies,
     };
 
-    const allDeps = unique(items.flatMap((item) => item.dependencies || []));
-    const allDevDeps = unique(items.flatMap((item) => item.devDependencies || []));
+    const allDeps = Array.dedupe(items.flatMap((item) => item.dependencies || []).filter(Boolean));
+    const allDevDeps = Array.dedupe(
+      items.flatMap((item) => item.devDependencies || []).filter(Boolean),
+    );
 
     const missingDependencies = allDeps.filter((dep) => !(declared as Record<string, string>)[dep]);
     const missingDevDependencies = allDevDeps.filter(

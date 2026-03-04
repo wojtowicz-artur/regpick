@@ -1,16 +1,16 @@
 import type { AppError } from "@/core/errors.js";
 import { resolveOutputPathFromPolicy } from "@/domain/pathPolicy.js";
 import type { InstallPlan, PlannedWrite, RegistryItem, RegpickConfig } from "@/types.js";
-import { Effect } from "effect";
-
-function unique(values: string[]): string[] {
-  return [...new Set(values.filter(Boolean))];
-}
+import { Array, Effect } from "effect";
 
 function buildDependencyPlan(selectedItems: RegistryItem[]): InstallPlan["dependencyPlan"] {
   return {
-    dependencies: unique(selectedItems.flatMap((item) => item.dependencies || [])),
-    devDependencies: unique(selectedItems.flatMap((item) => item.devDependencies || [])),
+    dependencies: Array.dedupe(
+      selectedItems.flatMap((item) => item.dependencies || []).filter(Boolean),
+    ),
+    devDependencies: Array.dedupe(
+      selectedItems.flatMap((item) => item.devDependencies || []).filter(Boolean),
+    ),
   };
 }
 
@@ -41,8 +41,8 @@ export function resolveRegistryDependencies(
   }
 
   return {
-    resolvedItems: Array.from(allResolvedItems.values()),
-    missingDependencies: unique(missingDependencies),
+    resolvedItems: Array.fromIterable(allResolvedItems.values()),
+    missingDependencies: Array.dedupe(missingDependencies.filter(Boolean)),
   };
 }
 

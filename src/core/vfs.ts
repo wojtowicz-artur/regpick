@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import { Volume } from "memfs";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -86,21 +87,26 @@ export class MemoryVFS implements PersistableVFS {
     }
 
     // 3. Dump files safely handling all outcomes via Promise.allSettled
-    const writeResults = await Promise.allSettled(
-      entries.map(async ([filePath]) => {
-        const realTargetPath = path.normalize(filePath);
-        // Read raw buffer from memfs to avoid encoding corruptions
-        const raw = this.memory.readFileSync(filePath);
-        await fs.writeFile(realTargetPath, raw as Buffer);
-      }),
+    const writeResults = await Effect.runPromise(
+      Effect.all(
+        entries.map(([filePath]) =>
+          Effect.tryPromise(async () => {
+            const realTargetPath = path.normalize(filePath);
+            // Read raw buffer from memfs to avoid encoding corruptions
+            const raw = this.memory.readFileSync(filePath);
+            await fs.writeFile(realTargetPath, raw as Buffer);
+          }),
+        ),
+        { concurrency: "unbounded", mode: "either" },
+      ),
     );
 
-    const failures = writeResults.filter(
-      (res): res is PromiseRejectedResult => res.status === "rejected",
-    );
+    const failures = writeResults.filter((res) => res._tag === "Left");
 
     if (failures.length > 0) {
-      const errorMessages = failures.map((f) => f.reason?.message || String(f.reason)).join("\n");
+      const errorMessages = failures
+        .map((f) => (f as any).left?.message || String((f as any).left))
+        .join("\n");
       throw new Error(`flushToDisk failed with ${failures.length} errors:\n${errorMessages}`);
     }
   }
