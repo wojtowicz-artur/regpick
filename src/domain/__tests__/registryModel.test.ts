@@ -1,4 +1,4 @@
-import { Either } from "effect";
+import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { extractItemReferences, normalizeManifestInline } from "@/domain/registryModel.js";
@@ -16,15 +16,14 @@ describe("registry model core", () => {
       ],
     };
 
-    const normalized = normalizeManifestInline(payload, {
-      type: "file",
-      pluginState: { baseDir: "/registry" },
-    });
-    expect(Either.isRight(normalized)).toBe(true);
-    if (Either.isRight(normalized)) {
-      expect(normalized.right).toHaveLength(1);
-      expect(normalized.right[0].name).toBe("check");
-    }
+    const normalized = Effect.runSync(
+      normalizeManifestInline(payload, {
+        type: "file",
+        pluginState: { baseDir: "/registry" },
+      }),
+    );
+    expect(normalized).toHaveLength(1);
+    expect(normalized[0].name).toBe("check");
   });
 
   it("extracts item references from registry.json entries", () => {

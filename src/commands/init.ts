@@ -1,4 +1,4 @@
-import { appError, type AppError } from "@/core/errors.js";
+import { appError } from "@/core/errors.js";
 import { decideInitAfterOverwritePrompt } from "@/domain/initCore.js";
 import {
   generateConfigCode,
@@ -7,7 +7,7 @@ import {
   resolveTargetConfigPath,
 } from "@/shell/config.js";
 import type { CommandContext, CommandOutcome, RegpickConfig } from "@/types.js";
-import { Effect, Either, Schema as S } from "effect";
+import { Effect, Schema as S } from "effect";
 import path from "node:path";
 
 type InitQueryState = {
@@ -138,7 +138,7 @@ const interactInitPhase = (context: CommandContext, state: InitQueryState) =>
     } satisfies ApprovedInitPlan;
   });
 
-const runInitCommandEff = (context: CommandContext) =>
+export const runInitCommand = (context: CommandContext) =>
   Effect.gen(function* () {
     const state = yield* queryInitState(context);
     const plan = yield* interactInitPhase(context, state);
@@ -172,10 +172,3 @@ const runInitCommandEff = (context: CommandContext) =>
       message: `${plan.isOverwrite ? "Overwrote" : "Created"} ${plan.configPath}`,
     } as CommandOutcome;
   });
-
-export async function runInitCommand(
-  context: CommandContext,
-): Promise<Either.Either<CommandOutcome, AppError>> {
-  const res = await Effect.runPromise(Effect.either(runInitCommandEff(context)));
-  return res._tag === "Right" ? Either.right(res.right) : Either.left(res.left);
-}

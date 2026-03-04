@@ -19,7 +19,7 @@ import type {
   RegpickConfig,
   RegpickPlugin,
 } from "@/types.js";
-import { Effect, Either } from "effect";
+import { Effect } from "effect";
 
 type HydratedWrite = {
   itemName: string;
@@ -361,7 +361,7 @@ function resolveContents(
   });
 }
 
-function runAddCommandEff(context: CommandContext): Effect.Effect<CommandOutcome, AppError> {
+export function runAddCommand(context: CommandContext): Effect.Effect<CommandOutcome, AppError> {
   return Effect.gen(function* () {
     const { config } = yield* queryLoadConfiguration(context);
     const source = yield* queryResolveRegistrySource(context, config);
@@ -446,11 +446,4 @@ function runAddCommandEff(context: CommandContext): Effect.Effect<CommandOutcome
       },
     } as CommandOutcome;
   });
-}
-
-export async function runAddCommand(
-  context: CommandContext,
-): Promise<Either.Either<CommandOutcome, AppError>> {
-  const result = await Effect.runPromise(Effect.either(runAddCommandEff(context)));
-  return result;
 }

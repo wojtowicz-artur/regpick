@@ -1,7 +1,7 @@
 import { appError, type AppError } from "@/core/errors.js";
 import { buildRegistryItemFromFile } from "@/domain/packCore.js";
 import type { CommandContext, CommandOutcome, RegistryItem } from "@/types.js";
-import { Effect, Either } from "effect";
+import { Effect } from "effect";
 import path from "node:path";
 
 type PackQueryState = {
@@ -121,7 +121,7 @@ const generateRegistryItems = (
  * @param context - Command context.
  * @returns Completion confirmation schema wrapper.
  */
-function runPackCommandEff(context: CommandContext): Effect.Effect<CommandOutcome, AppError> {
+export function runPackCommand(context: CommandContext): Effect.Effect<CommandOutcome, AppError> {
   return Effect.gen(function* () {
     const state = yield* queryPackState(context);
 
@@ -157,13 +157,4 @@ function runPackCommandEff(context: CommandContext): Effect.Effect<CommandOutcom
       message: `Generated registry.json`,
     } as CommandOutcome;
   });
-}
-
-export async function runPackCommand(
-  context: CommandContext,
-): Promise<Either.Either<CommandOutcome, AppError>> {
-  const res = await Effect.runPromise(Effect.either(runPackCommandEff(context)));
-  return res._tag === "Right"
-    ? Either.right(res.right as CommandOutcome)
-    : Either.left(res.left as AppError);
 }

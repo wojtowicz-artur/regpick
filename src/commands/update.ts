@@ -105,18 +105,21 @@ function queryAvailableUpdates(
         );
 
         const currentHash = lockfile.components[itemName].hash;
-        const updatePlanRes = buildUpdatePlanForItem(
-          itemName,
-          registryItem,
-          resolvedFiles,
-          currentHash,
-          context.cwd,
-          config,
+        const updatePlanRes = yield* Effect.catchAll(
+          buildUpdatePlanForItem(
+            itemName,
+            registryItem,
+            resolvedFiles,
+            currentHash,
+            context.cwd,
+            config,
+          ),
+          () => Effect.succeed(null),
         );
 
-        if (Either.isLeft(updatePlanRes)) continue;
+        if (!updatePlanRes) continue;
 
-        const updateAction = updatePlanRes.right;
+        const updateAction = updatePlanRes;
 
         if (updateAction.status === "requires-diff-prompt") {
           const filesWithLocal: DetectedUpdateFile[] = [];
@@ -222,7 +225,7 @@ function interactApprovalPhase(
 /**
  * Main controller for the `update` command effect loop.
  */
-function runUpdateCommandEff(context: CommandContext): Effect.Effect<CommandOutcome, AppError> {
+export function runUpdateCommand(context: CommandContext): Effect.Effect<CommandOutcome, AppError> {
   return Effect.gen(function* () {
     const state = yield* queryLoadState(context);
 
@@ -310,10 +313,4 @@ function runUpdateCommandEff(context: CommandContext): Effect.Effect<CommandOutc
       message: `Updated ${approvedCount} components.`,
     } as CommandOutcome;
   });
-}
-
-export async function runUpdateCommand(
-  context: CommandContext,
-): Promise<Either.Either<CommandOutcome, AppError>> {
-  return await Effect.runPromise(Effect.either(runUpdateCommandEff(context)));
 }

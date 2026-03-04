@@ -1,4 +1,4 @@
-import { Either } from "effect";
+import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { buildInstallPlan, resolveRegistryDependencies } from "@/domain/addPlan.js";
@@ -51,24 +51,19 @@ const items: RegistryItem[] = [
 
 describe("add plan core", () => {
   it("builds deduplicated dependency plan", () => {
-    const planRes = buildInstallPlan(items, "/tmp/project", config);
-    expect(Either.isRight(planRes)).toBe(true);
-    if (Either.isRight(planRes)) {
-      expect(planRes.right.dependencyPlan.dependencies).toEqual(["react", "clsx"]);
-      expect(planRes.right.dependencyPlan.devDependencies).toEqual(["@types/react"]);
-    }
+    const planRes = Effect.runSync(buildInstallPlan(items, "/tmp/project", config));
+    expect(planRes.dependencyPlan.dependencies).toEqual(["react", "clsx"]);
+    expect(planRes.dependencyPlan.devDependencies).toEqual(["@types/react"]);
   });
 
   it("detects conflicts based on existing target paths", () => {
-    const firstPlanRes = buildInstallPlan(items, "/tmp/project", config);
-    expect(Either.isRight(firstPlanRes)).toBe(true);
-    if (Either.isLeft(firstPlanRes)) return;
-    const existingTargets = new Set([firstPlanRes.right.plannedWrites[0].absoluteTarget]);
-    const planWithConflictsRes = buildInstallPlan(items, "/tmp/project", config, existingTargets);
-    expect(Either.isRight(planWithConflictsRes)).toBe(true);
-    if (Either.isLeft(planWithConflictsRes)) return;
-    expect(planWithConflictsRes.right.conflicts).toHaveLength(1);
-    expect(planWithConflictsRes.right.conflicts[0].itemName).toBe("check");
+    const firstPlanRes = Effect.runSync(buildInstallPlan(items, "/tmp/project", config));
+    const existingTargets = new Set([firstPlanRes.plannedWrites[0].absoluteTarget]);
+    const planWithConflictsRes = Effect.runSync(
+      buildInstallPlan(items, "/tmp/project", config, existingTargets),
+    );
+    expect(planWithConflictsRes.conflicts).toHaveLength(1);
+    expect(planWithConflictsRes.conflicts[0].itemName).toBe("check");
   });
 
   describe("resolveRegistryDependencies", () => {

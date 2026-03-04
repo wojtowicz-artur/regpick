@@ -1,4 +1,4 @@
-import { Either } from "effect";
+import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -53,11 +53,11 @@ describe("selection core", () => {
   });
 
   it("selects all when --all is set", () => {
-    expect(selectItemsFromFlags(items, context({ all: true }))).toEqual(Either.right(items));
+    expect(Effect.runSync(selectItemsFromFlags(items, context({ all: true })))).toEqual(items);
   });
 
   it("selects explicit items when --select is set", () => {
-    const result = selectItemsFromFlags(items, context({ select: "check" }));
-    expect(Either.isRight(result) && result.right?.map((item) => item.name)).toEqual(["check"]);
+    const result = Effect.runSync(selectItemsFromFlags(items, context({ select: "check" })));
+    expect(result?.map((item) => item.name)).toEqual(["check"]);
   });
 });

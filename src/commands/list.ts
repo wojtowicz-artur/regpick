@@ -1,4 +1,4 @@
-import { Effect, Either } from "effect";
+import { Effect } from "effect";
 
 import { appError, type AppError } from "@/core/errors.js";
 import { resolveListSourceDecision } from "@/domain/listCore.js";
@@ -106,7 +106,7 @@ function presentItems(context: CommandContext, items: RegistryItem[]): Effect.Ef
 /**
  * Main controller for the `list` command.
  */
-function runListCommandEff(context: CommandContext): Effect.Effect<CommandOutcome, AppError> {
+export function runListCommand(context: CommandContext): Effect.Effect<CommandOutcome, AppError> {
   return Effect.gen(function* () {
     const state = yield* queryListSourceState(context);
     const source = yield* interactSourcePhase(context, state);
@@ -135,10 +135,4 @@ function runListCommandEff(context: CommandContext): Effect.Effect<CommandOutcom
       message: `Listed ${items.length} item(s).`,
     } as CommandOutcome;
   });
-}
-
-export async function runListCommand(
-  context: CommandContext,
-): Promise<Either.Either<CommandOutcome, AppError>> {
-  return await Effect.runPromise(Effect.either(runListCommandEff(context)));
 }

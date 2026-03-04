@@ -126,7 +126,7 @@ function normalizeManifest(
       return yield* inlineItemsRes;
     }
 
-    const inlineItems = Either.isRight(inlineItemsRes) ? inlineItemsRes.right : [];
+    const inlineItems = yield* Effect.catchAll(inlineItemsRes, () => Effect.succeed([]));
 
     const resolvedItems = yield* Effect.all(
       references.map((ref) => resolveItemReference(ref, sourceMeta, runtime, plugins)),

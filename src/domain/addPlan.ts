@@ -1,7 +1,7 @@
 import type { AppError } from "@/core/errors.js";
 import { resolveOutputPathFromPolicy } from "@/domain/pathPolicy.js";
 import type { InstallPlan, PlannedWrite, RegistryItem, RegpickConfig } from "@/types.js";
-import { Either } from "effect";
+import { Effect } from "effect";
 
 function unique(values: string[]): string[] {
   return [...new Set(values.filter(Boolean))];
@@ -46,38 +46,41 @@ export function resolveRegistryDependencies(
   };
 }
 
-export function buildInstallPlan(
+export const buildInstallPlan = (
   selectedItems: RegistryItem[],
   cwd: string,
   config: RegpickConfig,
   existingTargets: Set<string> = new Set(),
-): Either.Either<InstallPlan, AppError> {
-  const plannedWrites: PlannedWrite[] = [];
-  const conflicts: PlannedWrite[] = [];
+): Effect.Effect<InstallPlan, AppError> =>
+  Effect.gen(function* () {
+    const plannedWrites: PlannedWrite[] = [];
+    const conflicts: PlannedWrite[] = [];
 
-  for (const item of selectedItems) {
-    for (const file of item.files) {
-      const outputRes = resolveOutputPathFromPolicy(item, file, cwd, config);
-      if (Either.isLeft(outputRes)) return Either.left(outputRes.left);
-
-      const { absoluteTarget, relativeTarget } = outputRes.right;
-      const planned: PlannedWrite = {
-        itemName: item.name,
-        sourceFile: file,
-        absoluteTarget,
-        relativeTarget,
-      };
-      plannedWrites.push(planned);
-      if (existingTargets.has(absoluteTarget)) {
-        conflicts.push(planned);
+    for (const item of selectedItems) {
+      for (const file of item.files) {
+        const { absoluteTarget, relativeTarget } = yield* resolveOutputPathFromPolicy(
+          item,
+          file,
+          cwd,
+          config,
+        );
+        const planned: PlannedWrite = {
+          itemName: item.name,
+          sourceFile: file,
+          absoluteTarget,
+          relativeTarget,
+        };
+        plannedWrites.push(planned);
+        if (existingTargets.has(absoluteTarget)) {
+          conflicts.push(planned);
+        }
       }
     }
-  }
 
-  return Either.right({
-    selectedItems,
-    plannedWrites,
-    dependencyPlan: buildDependencyPlan(selectedItems),
-    conflicts,
+    return yield* Effect.succeed({
+      selectedItems,
+      plannedWrites,
+      dependencyPlan: buildDependencyPlan(selectedItems),
+      conflicts,
+    });
   });
-}

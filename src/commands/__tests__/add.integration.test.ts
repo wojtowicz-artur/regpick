@@ -58,14 +58,18 @@ describe("add integration with shadcn compatibility", () => {
     });
 
     // 3. Run add command
-    const result = await runAddCommand({
-      cwd: testDir,
-      runtime,
-      args: {
-        flags: { yes: true },
-        positionals: ["add", "https://example.com/registry.json", "button"],
-      },
-    });
+    const result = await Effect.runPromise(
+      Effect.either(
+        runAddCommand({
+          cwd: testDir,
+          runtime,
+          args: {
+            flags: { yes: true },
+            positionals: ["add", "https://example.com/registry.json", "button"],
+          },
+        }),
+      ),
+    );
 
     // 4. Assertions
     if (Either.isLeft(result)) console.log(result.left);
@@ -120,14 +124,18 @@ describe("add integration with shadcn compatibility", () => {
     });
 
     // 2. Run add card
-    const result = await runAddCommand({
-      cwd: testDir,
-      runtime,
-      args: {
-        flags: { yes: true },
-        positionals: ["add", "https://example.com/registry.json", "card"],
-      },
-    });
+    const result = await Effect.runPromise(
+      Effect.either(
+        runAddCommand({
+          cwd: testDir,
+          runtime,
+          args: {
+            flags: { yes: true },
+            positionals: ["add", "https://example.com/registry.json", "card"],
+          },
+        }),
+      ),
+    );
 
     // 3. Assertions
     if (Either.isLeft(result)) console.log(result.left);
@@ -187,14 +195,18 @@ describe("add integration with shadcn compatibility", () => {
     mockPrompt.confirm.mockReturnValueOnce(Effect.succeed(true)); // "Install 1 item(s)?"
     mockPrompt.confirm.mockReturnValueOnce(Effect.succeed(Symbol.for("cancel"))); // "Install missing packages with npm?"
 
-    const result = await runAddCommand({
-      cwd: testDir,
-      runtime,
-      args: {
-        flags: { yes: false },
-        positionals: ["add", "https://example.com/registry.json", "button"],
-      },
-    });
+    const result = await Effect.runPromise(
+      Effect.either(
+        runAddCommand({
+          cwd: testDir,
+          runtime,
+          args: {
+            flags: { yes: false },
+            positionals: ["add", "https://example.com/registry.json", "button"],
+          },
+        }),
+      ),
+    );
 
     expect(Either.isRight(result)).toBe(false);
     if (Either.isLeft(result)) {
@@ -209,14 +221,18 @@ describe("add integration with shadcn compatibility", () => {
     // missing regpick.json
     await fs.writeFile(path.join(testDir, "package.json"), JSON.stringify({ dependencies: {} }));
 
-    const result = await runAddCommand({
-      cwd: testDir,
-      runtime,
-      args: {
-        flags: { yes: true },
-        positionals: ["add", "https://example.com/registry.json", "button"],
-      },
-    });
+    const result = await Effect.runPromise(
+      Effect.either(
+        runAddCommand({
+          cwd: testDir,
+          runtime,
+          args: {
+            flags: { yes: true },
+            positionals: ["add", "https://example.com/registry.json", "button"],
+          },
+        }),
+      ),
+    );
 
     expect(Either.isRight(result)).toBe(false);
     if (Either.isLeft(result)) {
@@ -241,14 +257,18 @@ describe("add integration with shadcn compatibility", () => {
       } as any),
     );
 
-    const result = await runAddCommand({
-      cwd: testDir,
-      runtime,
-      args: {
-        flags: { yes: true },
-        positionals: ["add", "https://example.com/registry.json", "button"],
-      },
-    });
+    const result = await Effect.runPromise(
+      Effect.either(
+        runAddCommand({
+          cwd: testDir,
+          runtime,
+          args: {
+            flags: { yes: true },
+            positionals: ["add", "https://example.com/registry.json", "button"],
+          },
+        }),
+      ),
+    );
 
     expect(Either.isRight(result)).toBe(false);
     if (Either.isLeft(result)) {
@@ -278,14 +298,18 @@ describe("add integration with shadcn compatibility", () => {
     await fs.mkdir(uiDir, { recursive: true });
     await fs.chmod(uiDir, 0o500);
 
-    const result = await runAddCommand({
-      cwd: testDir,
-      runtime,
-      args: {
-        flags: { yes: true },
-        positionals: ["add", "https://example.com/registry.json", "card"],
-      },
-    });
+    const result = await Effect.runPromise(
+      Effect.either(
+        runAddCommand({
+          cwd: testDir,
+          runtime,
+          args: {
+            flags: { yes: true },
+            positionals: ["add", "https://example.com/registry.json", "card"],
+          },
+        }),
+      ),
+    );
 
     expect(Either.isRight(result)).toBe(false);
     if (Either.isLeft(result)) {
@@ -308,14 +332,18 @@ describe("add integration with shadcn compatibility", () => {
       Effect.succeed(JSON.stringify({ unexpectedField: "invalid dataset" })),
     );
 
-    const result = await runAddCommand({
-      cwd: testDir,
-      runtime,
-      args: {
-        flags: { yes: true },
-        positionals: ["add", "https://example.com/registry.json", "button"],
-      },
-    });
+    const result = await Effect.runPromise(
+      Effect.either(
+        runAddCommand({
+          cwd: testDir,
+          runtime,
+          args: {
+            flags: { yes: true },
+            positionals: ["add", "https://example.com/registry.json", "button"],
+          },
+        }),
+      ),
+    );
 
     expect(Either.isRight(result)).toBe(false);
     if (Either.isLeft(result)) {
