@@ -18,6 +18,7 @@ import type {
   RegpickLockfile,
   RegpickPlugin,
 } from "@/types.js";
+import { CommandContextTag } from "@/core/context.js";
 
 type DetectedUpdateFile = {
   target: string;
@@ -38,11 +39,14 @@ type ApprovedUpdatePlan = {
 /**
  * Evaluates local lockfile dependencies against root config boundaries.
  */
-function queryLoadState(
-  context: CommandContext,
-): Effect.Effect<{ config: RegpickConfig; lockfile: RegpickLockfile }, AppError, Runtime> {
+function queryLoadState(): Effect.Effect<
+  { config: RegpickConfig; lockfile: RegpickLockfile },
+  AppError,
+  Runtime | CommandContextTag
+> {
   return Effect.gen(function* () {
     const runtime = yield* Runtime;
+    const context = yield* CommandContextTag;
     const configRes = yield* readConfig(context.cwd).pipe(
       Effect.mapError((e) => appError("RuntimeError", String(e))),
     );
@@ -64,13 +68,13 @@ function queryLoadState(
  * Scans all defined component origins matching hashes to registry states.
  */
 function queryAvailableUpdates(
-  context: CommandContext,
   config: RegpickConfig,
   lockfile: RegpickLockfile,
   plugins: RegpickPlugin[],
-): Effect.Effect<DetectedUpdate[], AppError, Runtime> {
+): Effect.Effect<DetectedUpdate[], AppError, Runtime | CommandContextTag> {
   return Effect.gen(function* () {
     const runtime = yield* Runtime;
+    const context = yield* CommandContextTag;
     const bySource = groupBySource(lockfile);
 
     const updatesNested = yield* Effect.forEach(
@@ -192,11 +196,11 @@ function printDiff(oldContent: string, newContent: string): Effect.Effect<void, 
  * Determines final decisions on diff changes required by targeted registries.
  */
 function interactApprovalPhase(
-  context: CommandContext,
   availableUpdates: DetectedUpdate[],
-): Effect.Effect<ApprovedUpdatePlan, AppError, Runtime> {
+): Effect.Effect<ApprovedUpdatePlan, AppError, Runtime | CommandContextTag> {
   return Effect.gen(function* () {
     const runtime = yield* Runtime;
+    const context = yield* CommandContextTag;
     const approvedUpdatesOpt = yield* Effect.forEach(
       availableUpdates,
       (update) =>
@@ -255,12 +259,15 @@ function interactApprovalPhase(
 /**
  * Main controller for the `update` command effect loop.
  */
-export function runUpdateCommand(
-  context: CommandContext,
-): Effect.Effect<CommandOutcome, AppError, Runtime> {
+export function runUpdateCommand(): Effect.Effect<
+  CommandOutcome,
+  AppError,
+  Runtime | CommandContextTag
+> {
   return Effect.gen(function* () {
     const runtime = yield* Runtime;
-    const state = yield* queryLoadState(context);
+    const context = yield* CommandContextTag;
+    const state = yield* queryLoadState();
 
     const componentNames = Object.keys(state.lockfile.components);
     if (componentNames.length === 0) {
@@ -277,7 +284,7 @@ export function runUpdateCommand(
 
     const plugins = [...customPlugins, HttpPlugin(), FilePlugin(), DirectoryPlugin()];
 
-    const updates = yield* queryAvailableUpdates(context, state.config, state.lockfile, plugins);
+    const updates = yield* queryAvailableUpdates(state.config, state.lockfile, plugins);
 
     if (updates.length === 0) {
       return {
@@ -291,7 +298,7 @@ export function runUpdateCommand(
     if (context.args?.flags?.yes) {
       approvedPlan = { approvedUpdates: updates };
     } else {
-      approvedPlan = yield* interactApprovalPhase(context, updates);
+      approvedPlan = yield* interactApprovalPhase(updates);
     }
 
     const approvedCount = approvedPlan.approvedUpdates.length;

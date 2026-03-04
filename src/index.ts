@@ -3,6 +3,7 @@ import path from "node:path";
 import { styleText } from "node:util";
 
 import { type AppError, toAppError } from "@/core/errors.js";
+import { CommandContextTag } from "@/core/context.js";
 import { parseCliArgs } from "@/shell/cli/args.js";
 import type { CommandContext, CommandOutcome } from "@/types.js";
 
@@ -70,33 +71,33 @@ function run(): Effect.Effect<void, never> {
       let commandEffect: Effect.Effect<
         CommandOutcome,
         AppError,
-        import("@/shell/runtime/ports.js").Runtime
+        import("@/shell/runtime/ports.js").Runtime | CommandContextTag
       >;
 
       switch (command) {
         case "init":
           commandEffect = yield* Effect.promise(() =>
-            import("@/commands/init.js").then((mod) => mod.runInitCommand(context)),
+            import("@/commands/init.js").then((mod) => mod.runInitCommand()),
           );
           break;
         case "list":
           commandEffect = yield* Effect.promise(() =>
-            import("@/commands/list.js").then((mod) => mod.runListCommand(context)),
+            import("@/commands/list.js").then((mod) => mod.runListCommand()),
           );
           break;
         case "add":
           commandEffect = yield* Effect.promise(() =>
-            import("@/commands/add.js").then((mod) => mod.runAddCommand(context)),
+            import("@/commands/add.js").then((mod) => mod.runAddCommand()),
           );
           break;
         case "update":
           commandEffect = yield* Effect.promise(() =>
-            import("@/commands/update.js").then((mod) => mod.runUpdateCommand(context)),
+            import("@/commands/update.js").then((mod) => mod.runUpdateCommand()),
           );
           break;
         case "pack":
           commandEffect = yield* Effect.promise(() =>
-            import("@/commands/pack.js").then((mod) => mod.runPackCommand(context)),
+            import("@/commands/pack.js").then((mod) => mod.runPackCommand()),
           );
           break;
         default:
@@ -132,7 +133,10 @@ function run(): Effect.Effect<void, never> {
       ),
     );
 
-    const layer = Layer.succeed(Runtime, runtime);
+    const layer = Layer.merge(
+      Layer.succeed(Runtime, runtime),
+      Layer.succeed(CommandContextTag, context),
+    );
     yield* executeCommand.pipe(Effect.provide(layer));
   });
 }

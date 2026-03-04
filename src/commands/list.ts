@@ -1,12 +1,13 @@
 import { Effect } from "effect";
 
+import { CommandContextTag } from "@/core/context.js";
 import { appError, type AppError } from "@/core/errors.js";
 import { resolveListSourceDecision } from "@/domain/listCore.js";
 import { readConfig } from "@/shell/config.js";
 import { DirectoryPlugin, FilePlugin, HttpPlugin, loadPlugins } from "@/shell/plugins/index.js";
 import { loadRegistry } from "@/shell/registry.js";
 import { Runtime } from "@/shell/runtime/ports.js";
-import type { CommandContext, CommandOutcome, RegistryItem, RegpickPlugin } from "@/types.js";
+import type { CommandOutcome, RegistryItem, RegpickPlugin } from "@/types.js";
 
 type ListSourceState = {
   source: string | null;
@@ -17,8 +18,9 @@ type ListSourceState = {
 /**
  * Resolves list source configuration states.
  */
-function queryListSourceState(context: CommandContext): Effect.Effect<ListSourceState, AppError> {
+function queryListSourceState(): Effect.Effect<ListSourceState, AppError, CommandContextTag> {
   return Effect.gen(function* () {
+    const context = yield* CommandContextTag;
     const res = yield* readConfig(context.cwd).pipe(
       Effect.mapError((e) => appError("RuntimeError", String(e))),
     );
@@ -46,11 +48,11 @@ function queryListSourceState(context: CommandContext): Effect.Effect<ListSource
  * Prompts user for a registry source, if one was not passed as an argument.
  */
 function interactSourcePhase(
-  context: CommandContext,
   state: ListSourceState,
-): Effect.Effect<string | null, AppError, Runtime> {
+): Effect.Effect<string | null, AppError, Runtime | CommandContextTag> {
   return Effect.gen(function* () {
     const runtime = yield* Runtime;
+    const context = yield* CommandContextTag;
     if (!state.requiresPrompt) {
       return state.source;
     }
@@ -74,12 +76,12 @@ function interactSourcePhase(
  * Fetches the registry payloads for displaying available elements.
  */
 function queryRegistryItems(
-  context: CommandContext,
   source: string,
   plugins: RegpickPlugin[],
-): Effect.Effect<RegistryItem[], AppError, Runtime> {
+): Effect.Effect<RegistryItem[], AppError, Runtime | CommandContextTag> {
   return Effect.gen(function* () {
     const runtime = yield* Runtime;
+    const context = yield* CommandContextTag;
     const { items } = yield* loadRegistry(source, context.cwd, runtime, plugins);
     return items;
   });
@@ -98,11 +100,11 @@ function formatItemLabel(item: RegistryItem): string {
  * Renders elements into the STD provider view.
  */
 function presentItems(
-  context: CommandContext,
   items: RegistryItem[],
-): Effect.Effect<void, never, Runtime> {
+): Effect.Effect<void, never, Runtime | CommandContextTag> {
   return Effect.gen(function* () {
     const runtime = yield* Runtime;
+    const context = yield* CommandContextTag;
     yield* runtime.prompt.info(`Found ${items.length} items.`);
     yield* Effect.forEach(
       items,
@@ -118,13 +120,16 @@ function presentItems(
 /**
  * Main controller for the `list` command.
  */
-export function runListCommand(
-  context: CommandContext,
-): Effect.Effect<CommandOutcome, AppError, Runtime> {
+export function runListCommand(): Effect.Effect<
+  CommandOutcome,
+  AppError,
+  Runtime | CommandContextTag
+> {
   return Effect.gen(function* () {
     const runtime = yield* Runtime;
-    const state = yield* queryListSourceState(context);
-    const source = yield* interactSourcePhase(context, state);
+    const context = yield* CommandContextTag;
+    const state = yield* queryListSourceState();
+    const source = yield* interactSourcePhase(state);
 
     if (!source) {
       return {
@@ -133,7 +138,7 @@ export function runListCommand(
       } as CommandOutcome;
     }
 
-    const items = yield* queryRegistryItems(context, source, state.plugins);
+    const items = yield* queryRegistryItems(source, state.plugins);
 
     if (!items.length) {
       yield* runtime.prompt.warn("No items found in registry.");
@@ -143,7 +148,7 @@ export function runListCommand(
       } as CommandOutcome;
     }
 
-    yield* presentItems(context, items);
+    yield* presentItems(items);
 
     return {
       kind: "success",

@@ -21,6 +21,7 @@ import type {
 } from "@/types.js";
 import { Effect } from "effect";
 import { Runtime } from "@/shell/runtime/ports.js";
+import { CommandContextTag } from "@/core/context.js";
 
 type HydratedWrite = {
   itemName: string;
@@ -53,11 +54,14 @@ interface CustomQueryItemsResult {
 /**
  * Loads the core Regpick Configuration for the workspace.
  */
-function queryLoadConfiguration(
-  context: CommandContext,
-): Effect.Effect<{ config: RegpickConfig; configPath: string }, AppError, Runtime> {
+function queryLoadConfiguration(): Effect.Effect<
+  { config: RegpickConfig; configPath: string },
+  AppError,
+  Runtime | CommandContextTag
+> {
   return Effect.gen(function* () {
     const runtime = yield* Runtime;
+    const context = yield* CommandContextTag;
     const res = yield* readConfig(context.cwd).pipe(
       Effect.mapError((e) => appError("RuntimeError", String(e))),
     );
@@ -75,11 +79,11 @@ function queryLoadConfiguration(
  * Identify Registry Source URL based on user input, flags, or interactive prompt.
  */
 function queryResolveRegistrySource(
-  context: CommandContext,
   config: RegpickConfig,
-): Effect.Effect<string | null, AppError, Runtime> {
+): Effect.Effect<string | null, AppError, Runtime | CommandContextTag> {
   return Effect.gen(function* () {
     const runtime = yield* Runtime;
+    const context = yield* CommandContextTag;
     const sourcePosIdx = context.args.positionals[0] === "add" ? 1 : 0;
     const argValue = context.args.positionals[sourcePosIdx];
 
@@ -132,12 +136,12 @@ function queryResolveRegistrySource(
  * Loads registry, selects items, and resolves structural dependencies via query boundary.
  */
 function queryRegistryItemsToProcess(
-  context: CommandContext,
   source: string,
   plugins: RegpickPlugin[],
-): Effect.Effect<CustomQueryItemsResult, AppError, Runtime> {
+): Effect.Effect<CustomQueryItemsResult, AppError, Runtime | CommandContextTag> {
   return Effect.gen(function* () {
     const runtime = yield* Runtime;
+    const context = yield* CommandContextTag;
     const sourcePosIdx = context.args.positionals[0] === "add" ? 1 : 0;
     const itemPosIdx = sourcePosIdx + 1;
 
@@ -196,12 +200,12 @@ function queryRegistryItemsToProcess(
 }
 
 function queryPlanState(
-  context: CommandContext,
   config: RegpickConfig,
   selectedItems: RegistryItem[],
-): Effect.Effect<InteractiveAddState, AppError, Runtime> {
+): Effect.Effect<InteractiveAddState, AppError, Runtime | CommandContextTag> {
   return Effect.gen(function* () {
     const runtime = yield* Runtime;
+    const context = yield* CommandContextTag;
     const probeRes = yield* buildInstallPlan(selectedItems, context.cwd, config);
 
     const existingTargets = new Set<string>();
@@ -230,12 +234,12 @@ function queryPlanState(
 }
 
 function processInteractionApproval(
-  context: CommandContext,
   config: RegpickConfig,
   state: InteractiveAddState,
-): Effect.Effect<ApprovedAddPlan, AppError, Runtime> {
+): Effect.Effect<ApprovedAddPlan, AppError, Runtime | CommandContextTag> {
   return Effect.gen(function* () {
     const runtime = yield* Runtime;
+    const context = yield* CommandContextTag;
     const assumeYes = Boolean(context.args.flags.yes);
 
     if (!assumeYes) {
@@ -342,14 +346,14 @@ function processInteractionApproval(
 }
 
 function resolveContents(
-  context: CommandContext,
   config: RegpickConfig,
   finalWrites: PlannedWrite[],
   selectedItems: RegistryItem[],
   plugins: RegpickPlugin[],
-): Effect.Effect<HydratedWrite[], AppError, Runtime> {
+): Effect.Effect<HydratedWrite[], AppError, Runtime | CommandContextTag> {
   return Effect.gen(function* () {
     const runtime = yield* Runtime;
+    const context = yield* CommandContextTag;
     const writes: HydratedWrite[] = [];
 
     yield* Effect.forEach(
@@ -383,13 +387,16 @@ function resolveContents(
   });
 }
 
-export function runAddCommand(
-  context: CommandContext,
-): Effect.Effect<CommandOutcome, AppError, Runtime> {
+export function runAddCommand(): Effect.Effect<
+  CommandOutcome,
+  AppError,
+  Runtime | CommandContextTag
+> {
   return Effect.gen(function* () {
     const runtime = yield* Runtime;
-    const { config } = yield* queryLoadConfiguration(context);
-    const source = yield* queryResolveRegistrySource(context, config);
+    const context = yield* CommandContextTag;
+    const { config } = yield* queryLoadConfiguration();
+    const source = yield* queryResolveRegistrySource(config);
 
     if (!source) {
       return { kind: "noop", message: "No source provided" } as CommandOutcome;
@@ -399,16 +406,15 @@ export function runAddCommand(
 
     const plugins = [...customPlugins, HttpPlugin(), FilePlugin(), DirectoryPlugin()];
 
-    const itemsToProc = yield* queryRegistryItemsToProcess(context, source, plugins);
+    const itemsToProc = yield* queryRegistryItemsToProcess(source, plugins);
 
     for (const d of itemsToProc.missingRegistryDeps || []) {
       yield* runtime.prompt.warn(`Registry dependency "${d}" not found in current registry.`);
     }
 
-    const state = yield* queryPlanState(context, config, itemsToProc.selectedItems);
-    const approved = yield* processInteractionApproval(context, config, state);
+    const state = yield* queryPlanState(config, itemsToProc.selectedItems);
+    const approved = yield* processInteractionApproval(config, state);
     const hydratedWrites = yield* resolveContents(
-      context,
       config,
       approved.finalWrites,
       approved.selectedItems,

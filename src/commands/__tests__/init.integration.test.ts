@@ -1,4 +1,5 @@
 import { Runtime } from "@/shell/runtime/ports.js";
+import { CommandContextTag } from "@/core/context.js";
 import { Layer } from "effect";
 
 import { createMockPrompt } from "@/__tests__/helpers/integration.js";
@@ -45,11 +46,14 @@ describe("init integration", () => {
     const result = await Effect.runPromise(
       Effect.either(
         Effect.provide(
-          runInitCommand({
-            cwd: testDir,
-            args: { flags: { yes: true }, positionals: [] },
-          }),
-          Layer.succeed(Runtime, runtime),
+          runInitCommand(),
+          Layer.merge(
+            Layer.succeed(CommandContextTag, {
+              cwd: testDir,
+              args: { flags: { yes: true }, positionals: [] },
+            }),
+            Layer.succeed(Runtime, runtime),
+          ),
         ),
       ),
     );
@@ -77,11 +81,14 @@ describe("init integration", () => {
     const result = await Effect.runPromise(
       Effect.either(
         Effect.provide(
-          runInitCommand({
-            cwd: testDir,
-            args: { flags: { yes: true }, positionals: [] },
-          }),
-          Layer.succeed(Runtime, runtime),
+          runInitCommand(),
+          Layer.merge(
+            Layer.succeed(CommandContextTag, {
+              cwd: testDir,
+              args: { flags: { yes: true }, positionals: [] },
+            }),
+            Layer.succeed(Runtime, runtime),
+          ),
         ),
       ),
     );
@@ -105,11 +112,14 @@ describe("init integration", () => {
     const result = await Effect.runPromise(
       Effect.either(
         Effect.provide(
-          runInitCommand({
-            cwd: testDir,
-            args: { flags: { yes: false }, positionals: [] },
-          }),
-          Layer.succeed(Runtime, runtime),
+          runInitCommand(),
+          Layer.merge(
+            Layer.succeed(CommandContextTag, {
+              cwd: testDir,
+              args: { flags: { yes: false }, positionals: [] },
+            }),
+            Layer.succeed(Runtime, runtime),
+          ),
         ),
       ),
     );
@@ -139,11 +149,14 @@ describe("init integration", () => {
     const result = await Effect.runPromise(
       Effect.either(
         Effect.provide(
-          runInitCommand({
-            cwd: testDir,
-            args: { flags: { yes: false }, positionals: [] },
-          }),
-          Layer.succeed(Runtime, runtime),
+          runInitCommand(),
+          Layer.merge(
+            Layer.succeed(CommandContextTag, {
+              cwd: testDir,
+              args: { flags: { yes: false }, positionals: [] },
+            }),
+            Layer.succeed(Runtime, runtime),
+          ),
         ),
       ),
     );
@@ -166,11 +179,14 @@ describe("init integration", () => {
     const result = await Effect.runPromise(
       Effect.either(
         Effect.provide(
-          runInitCommand({
-            cwd: testDir,
-            args: { flags: { yes: true }, positionals: [] },
-          }),
-          Layer.succeed(Runtime, runtime),
+          runInitCommand(),
+          Layer.merge(
+            Layer.succeed(CommandContextTag, {
+              cwd: testDir,
+              args: { flags: { yes: true }, positionals: [] },
+            }),
+            Layer.succeed(Runtime, runtime),
+          ),
         ),
       ),
     );

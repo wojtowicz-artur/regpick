@@ -1,4 +1,5 @@
 import { Runtime } from "@/shell/runtime/ports.js";
+import { CommandContextTag } from "@/core/context.js";
 import { Layer } from "effect";
 
 import mockRegistry from "@/__tests__/fixtures/shadcn-registry.json" with { type: "json" };
@@ -64,14 +65,17 @@ describe("add integration with shadcn compatibility", () => {
     const result = await Effect.runPromise(
       Effect.either(
         Effect.provide(
-          runAddCommand({
-            cwd: testDir,
-            args: {
-              flags: { yes: true },
-              positionals: ["add", "https://example.com/registry.json", "button"],
-            },
-          }),
-          Layer.succeed(Runtime, runtime),
+          runAddCommand(),
+          Layer.merge(
+            Layer.succeed(CommandContextTag, {
+              cwd: testDir,
+              args: {
+                flags: { yes: true },
+                positionals: ["add", "https://example.com/registry.json", "button"],
+              },
+            }),
+            Layer.succeed(Runtime, runtime),
+          ),
         ),
       ),
     );
@@ -132,14 +136,17 @@ describe("add integration with shadcn compatibility", () => {
     const result = await Effect.runPromise(
       Effect.either(
         Effect.provide(
-          runAddCommand({
-            cwd: testDir,
-            args: {
-              flags: { yes: true },
-              positionals: ["add", "https://example.com/registry.json", "card"],
-            },
-          }),
-          Layer.succeed(Runtime, runtime),
+          runAddCommand(),
+          Layer.merge(
+            Layer.succeed(CommandContextTag, {
+              cwd: testDir,
+              args: {
+                flags: { yes: true },
+                positionals: ["add", "https://example.com/registry.json", "card"],
+              },
+            }),
+            Layer.succeed(Runtime, runtime),
+          ),
         ),
       ),
     );
@@ -205,14 +212,17 @@ describe("add integration with shadcn compatibility", () => {
     const result = await Effect.runPromise(
       Effect.either(
         Effect.provide(
-          runAddCommand({
-            cwd: testDir,
-            args: {
-              flags: { yes: false },
-              positionals: ["add", "https://example.com/registry.json", "button"],
-            },
-          }),
-          Layer.succeed(Runtime, runtime),
+          runAddCommand(),
+          Layer.merge(
+            Layer.succeed(CommandContextTag, {
+              cwd: testDir,
+              args: {
+                flags: { yes: false },
+                positionals: ["add", "https://example.com/registry.json", "button"],
+              },
+            }),
+            Layer.succeed(Runtime, runtime),
+          ),
         ),
       ),
     );
@@ -233,14 +243,17 @@ describe("add integration with shadcn compatibility", () => {
     const result = await Effect.runPromise(
       Effect.either(
         Effect.provide(
-          runAddCommand({
-            cwd: testDir,
-            args: {
-              flags: { yes: true },
-              positionals: ["add", "https://example.com/registry.json", "button"],
-            },
-          }),
-          Layer.succeed(Runtime, runtime),
+          runAddCommand(),
+          Layer.merge(
+            Layer.succeed(CommandContextTag, {
+              cwd: testDir,
+              args: {
+                flags: { yes: true },
+                positionals: ["add", "https://example.com/registry.json", "button"],
+              },
+            }),
+            Layer.succeed(Runtime, runtime),
+          ),
         ),
       ),
     );
@@ -271,14 +284,17 @@ describe("add integration with shadcn compatibility", () => {
     const result = await Effect.runPromise(
       Effect.either(
         Effect.provide(
-          runAddCommand({
-            cwd: testDir,
-            args: {
-              flags: { yes: true },
-              positionals: ["add", "https://example.com/registry.json", "button"],
-            },
-          }),
-          Layer.succeed(Runtime, runtime),
+          runAddCommand(),
+          Layer.merge(
+            Layer.succeed(CommandContextTag, {
+              cwd: testDir,
+              args: {
+                flags: { yes: true },
+                positionals: ["add", "https://example.com/registry.json", "button"],
+              },
+            }),
+            Layer.succeed(Runtime, runtime),
+          ),
         ),
       ),
     );
@@ -314,14 +330,17 @@ describe("add integration with shadcn compatibility", () => {
     const result = await Effect.runPromise(
       Effect.either(
         Effect.provide(
-          runAddCommand({
-            cwd: testDir,
-            args: {
-              flags: { yes: true },
-              positionals: ["add", "https://example.com/registry.json", "card"],
-            },
-          }),
-          Layer.succeed(Runtime, runtime),
+          runAddCommand(),
+          Layer.merge(
+            Layer.succeed(CommandContextTag, {
+              cwd: testDir,
+              args: {
+                flags: { yes: true },
+                positionals: ["add", "https://example.com/registry.json", "card"],
+              },
+            }),
+            Layer.succeed(Runtime, runtime),
+          ),
         ),
       ),
     );
@@ -350,14 +369,17 @@ describe("add integration with shadcn compatibility", () => {
     const result = await Effect.runPromise(
       Effect.either(
         Effect.provide(
-          runAddCommand({
-            cwd: testDir,
-            args: {
-              flags: { yes: true },
-              positionals: ["add", "https://example.com/registry.json", "button"],
-            },
-          }),
-          Layer.succeed(Runtime, runtime),
+          runAddCommand(),
+          Layer.merge(
+            Layer.succeed(CommandContextTag, {
+              cwd: testDir,
+              args: {
+                flags: { yes: true },
+                positionals: ["add", "https://example.com/registry.json", "button"],
+              },
+            }),
+            Layer.succeed(Runtime, runtime),
+          ),
         ),
       ),
     );

@@ -10,6 +10,7 @@ import type { CommandContext, CommandOutcome, RegpickConfig } from "@/types.js";
 import { Effect, Schema as S } from "effect";
 import path from "node:path";
 import { Runtime } from "@/shell/runtime/ports.js";
+import { CommandContextTag } from "@/core/context.js";
 
 type InitQueryState = {
   configPath: string;
@@ -23,9 +24,10 @@ type ApprovedInitPlan = {
   isOverwrite: boolean;
 };
 
-const queryInitState = (context: CommandContext) =>
+const queryInitState = () =>
   Effect.gen(function* () {
     const runtime = yield* Runtime;
+    const context = yield* CommandContextTag;
     const configPath = yield* resolveTargetConfigPath(context.cwd).pipe(
       Effect.mapError((err) => appError("RuntimeError", String(err))),
     );
@@ -44,9 +46,10 @@ const queryInitState = (context: CommandContext) =>
     } satisfies InitQueryState;
   });
 
-const interactInitPhase = (context: CommandContext, state: InitQueryState) =>
+const interactInitPhase = (state: InitQueryState) =>
   Effect.gen(function* () {
     const runtime = yield* Runtime;
+    const context = yield* CommandContextTag;
     if (state.exists) {
       const shouldOverwriteOrCancel = yield* runtime.prompt.confirm({
         message: `${state.configPath} already exists. Overwrite?`,
@@ -141,11 +144,12 @@ const interactInitPhase = (context: CommandContext, state: InitQueryState) =>
     } satisfies ApprovedInitPlan;
   });
 
-export const runInitCommand = (context: CommandContext) =>
+export const runInitCommand = () =>
   Effect.gen(function* () {
     const runtime = yield* Runtime;
-    const state = yield* queryInitState(context);
-    const plan = yield* interactInitPhase(context, state);
+    const context = yield* CommandContextTag;
+    const state = yield* queryInitState();
+    const plan = yield* interactInitPhase(state);
 
     if (!plan)
       return {

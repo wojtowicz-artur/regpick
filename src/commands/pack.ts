@@ -4,6 +4,7 @@ import { Runtime } from "@/shell/runtime/ports.js";
 import type { CommandContext, CommandOutcome, RegistryItem } from "@/types.js";
 import { Effect } from "effect";
 import path from "node:path";
+import { CommandContextTag } from "@/core/context.js";
 
 type PackQueryState = {
   targetDir: string;
@@ -23,9 +24,12 @@ type PackGeneratedRegistry = {
  * @param context - Command context.
  * @returns Matched typescript files within the target space.
  */
-const getFilesRecursive = (dir: string): Effect.Effect<string[], AppError, Runtime> =>
+const getFilesRecursive = (
+  dir: string,
+): Effect.Effect<string[], AppError, Runtime | CommandContextTag> =>
   Effect.gen(function* () {
     const runtime = yield* Runtime;
+    const context = yield* CommandContextTag;
     const result: string[] = [];
 
     const scan = (currentDir: string): Effect.Effect<void, AppError> =>
@@ -58,11 +62,10 @@ const getFilesRecursive = (dir: string): Effect.Effect<string[], AppError, Runti
  * @param context - Command context.
  * @returns Verified target scan list paths.
  */
-const queryPackState = (
-  context: CommandContext,
-): Effect.Effect<PackQueryState, AppError, Runtime> =>
+const queryPackState = (): Effect.Effect<PackQueryState, AppError, Runtime | CommandContextTag> =>
   Effect.gen(function* () {
     const runtime = yield* Runtime;
+    const context = yield* CommandContextTag;
     const targetDirArg = context.args.positionals[1] || ".";
     const targetDir = path.resolve(context.cwd, targetDirArg);
 
@@ -89,11 +92,11 @@ const queryPackState = (
  * @returns Final collection mapped parameters target states.
  */
 const generateRegistryItems = (
-  context: CommandContext,
   state: PackQueryState,
-): Effect.Effect<PackGeneratedRegistry, AppError, Runtime> =>
+): Effect.Effect<PackGeneratedRegistry, AppError, Runtime | CommandContextTag> =>
   Effect.gen(function* () {
     const runtime = yield* Runtime;
+    const context = yield* CommandContextTag;
     const items = yield* Effect.forEach(
       state.files,
       (file) =>
@@ -124,19 +127,22 @@ const generateRegistryItems = (
  * @param context - Command context.
  * @returns Completion confirmation schema wrapper.
  */
-export function runPackCommand(
-  context: CommandContext,
-): Effect.Effect<CommandOutcome, AppError, Runtime> {
+export function runPackCommand(): Effect.Effect<
+  CommandOutcome,
+  AppError,
+  Runtime | CommandContextTag
+> {
   return Effect.gen(function* () {
     const runtime = yield* Runtime;
-    const state = yield* queryPackState(context);
+    const context = yield* CommandContextTag;
+    const state = yield* queryPackState();
 
     if (state.files.length === 0) {
       yield* runtime.prompt.warn("No .ts or .tsx files found.");
       return { kind: "noop", message: "No files found." } as CommandOutcome;
     }
 
-    const registry = yield* generateRegistryItems(context, state);
+    const registry = yield* generateRegistryItems(state);
 
     const content = JSON.stringify(
       {
