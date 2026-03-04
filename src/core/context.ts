@@ -6,7 +6,4 @@ export class CommandContextTag extends Context.Tag("CommandContext")<
   CommandContext
 >() {}
 
-export class ConfigTag extends Context.Tag("RegpickConfig")<
-  ConfigTag,
-  RegpickConfig
->() {}
+export class ConfigTag extends Context.Tag("RegpickConfig")<ConfigTag, RegpickConfig>() {}

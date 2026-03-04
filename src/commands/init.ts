@@ -1,3 +1,4 @@
+import { CommandContextTag } from "@/core/context.js";
 import { appError } from "@/core/errors.js";
 import { decideInitAfterOverwritePrompt } from "@/domain/initCore.js";
 import {
@@ -6,11 +7,10 @@ import {
   RegpickConfigSchema,
   resolveTargetConfigPath,
 } from "@/shell/config.js";
-import type { CommandContext, CommandOutcome, RegpickConfig } from "@/types.js";
+import { Runtime } from "@/shell/runtime/ports.js";
+import type { CommandOutcome, RegpickConfig } from "@/types.js";
 import { Effect, Schema as S } from "effect";
 import path from "node:path";
-import { Runtime } from "@/shell/runtime/ports.js";
-import { CommandContextTag } from "@/core/context.js";
 
 type InitQueryState = {
   configPath: string;
@@ -147,7 +147,6 @@ const interactInitPhase = (state: InitQueryState) =>
 export const runInitCommand = () =>
   Effect.gen(function* () {
     const runtime = yield* Runtime;
-    const context = yield* CommandContextTag;
     const state = yield* queryInitState();
     const plan = yield* interactInitPhase(state);
 

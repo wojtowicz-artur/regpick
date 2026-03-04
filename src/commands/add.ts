@@ -77,7 +77,11 @@ function queryLoadConfiguration(): Effect.Effect<
 /**
  * Identify Registry Source URL based on user input, flags, or interactive prompt.
  */
-function queryResolveRegistrySource(): Effect.Effect<string | null, AppError, Runtime | CommandContextTag | ConfigTag> {
+function queryResolveRegistrySource(): Effect.Effect<
+  string | null,
+  AppError,
+  Runtime | CommandContextTag | ConfigTag
+> {
   return Effect.gen(function* () {
     const config = yield* ConfigTag;
     const runtime = yield* Runtime;
@@ -231,7 +235,9 @@ function queryPlanState(
   });
 }
 
-function processInteractionApproval(state: InteractiveAddState): Effect.Effect<ApprovedAddPlan, AppError, Runtime | CommandContextTag | ConfigTag> {
+function processInteractionApproval(
+  state: InteractiveAddState,
+): Effect.Effect<ApprovedAddPlan, AppError, Runtime | CommandContextTag | ConfigTag> {
   return Effect.gen(function* () {
     const config = yield* ConfigTag;
     const runtime = yield* Runtime;
@@ -341,7 +347,8 @@ function processInteractionApproval(state: InteractiveAddState): Effect.Effect<A
   });
 }
 
-function resolveContents(finalWrites: PlannedWrite[],
+function resolveContents(
+  finalWrites: PlannedWrite[],
   selectedItems: RegistryItem[],
   plugins: RegpickPlugin[],
 ): Effect.Effect<HydratedWrite[], AppError, Runtime | CommandContextTag | ConfigTag> {
@@ -392,81 +399,87 @@ export function runAddCommand(): Effect.Effect<
 
     const logic = Effect.gen(function* () {
       const runtime = yield* Runtime;
-    const context = yield* CommandContextTag;
-          const source = yield* queryResolveRegistrySource();
+      const context = yield* CommandContextTag;
+      const source = yield* queryResolveRegistrySource();
 
-    if (!source) {
-      return { kind: "noop", message: "No source provided" } as CommandOutcome;
-    }
-
-    const customPlugins = yield* loadPlugins((yield* ConfigTag).plugins || [], context.cwd);
-
-    const plugins = [...customPlugins, HttpPlugin(), FilePlugin(), DirectoryPlugin()];
-
-    const itemsToProc = yield* queryRegistryItemsToProcess(source, plugins);
-
-    for (const d of itemsToProc.missingRegistryDeps || []) {
-      yield* runtime.prompt.warn(`Registry dependency "${d}" not found in current registry.`);
-    }
-
-    const state = yield* queryPlanState(itemsToProc.selectedItems);
-    const approved = yield* processInteractionApproval(state);
-    const hydratedWrites = yield* resolveContents(approved.finalWrites,
-      approved.selectedItems,
-      plugins,
-    );
-
-    const vfs = new MemoryVFS();
-    const vfsFiles = hydratedWrites.map((w) => ({
-      id: w.absoluteTarget,
-      code: w.finalContent,
-    }));
-
-    const installedItemsInfo: RegistryItem[] = [];
-    for (const write of hydratedWrites) {
-      const originalItem = approved.selectedItems.find((i) => i.name === write.itemName);
-      if (originalItem && !installedItemsInfo.some((i) => i.name === originalItem.name)) {
-        installedItemsInfo.push(originalItem);
+      if (!source) {
+        return {
+          kind: "noop",
+          message: "No source provided",
+        } as CommandOutcome;
       }
-    }
 
-    const userPlugins = (config.plugins?.filter((p) => typeof p === "object") ||
-      []) as import("../core/pipeline.js").Plugin[];
+      const customPlugins = yield* loadPlugins((yield* ConfigTag).plugins || [], context.cwd);
 
-    const depPlan = approved.shouldInstallDeps
-      ? approved.dependencyPlan
-      : { dependencies: [], devDependencies: [] };
+      const plugins = [...customPlugins, HttpPlugin(), FilePlugin(), DirectoryPlugin()];
 
-    const pipeline = new PipelineRenderer([
-      ...userPlugins,
-      coreAddPlugin(depPlan, yield* ConfigTag, runtime,
-        installedItemsInfo,
-      ) as import("../core/pipeline.js").Plugin,
-    ]);
+      const itemsToProc = yield* queryRegistryItemsToProcess(source, plugins);
 
-    yield* pipeline.run({ vfs, cwd: context.cwd, runtime: runtime }, vfsFiles).pipe(
-      Effect.catchAll((error) => {
-        vfs.rollback();
-        return Effect.gen(function* () {
-          yield* runtime.prompt.error(`[Failed] Installation aborted: ${error.message}`);
-          return yield* Effect.fail(error);
-        });
-      }),
-    );
+      for (const d of itemsToProc.missingRegistryDeps || []) {
+        yield* runtime.prompt.warn(`Registry dependency "${d}" not found in current registry.`);
+      }
 
-    yield* runtime.prompt.info(
-      `Installed ${approved.selectedItems.length} item(s), wrote ${hydratedWrites.length} file(s).`,
-    );
+      const state = yield* queryPlanState(itemsToProc.selectedItems);
+      const approved = yield* processInteractionApproval(state);
+      const hydratedWrites = yield* resolveContents(
+        approved.finalWrites,
+        approved.selectedItems,
+        plugins,
+      );
 
-    return {
-      kind: "success",
-      message: `Installed ${approved.selectedItems.length} item(s), wrote ${hydratedWrites.length} file(s).`,
-      details: {
-        writesCount: hydratedWrites.length,
-        itemsCount: approved.selectedItems.length,
-      },
-    } as CommandOutcome;
-  
+      const vfs = new MemoryVFS();
+      const vfsFiles = hydratedWrites.map((w) => ({
+        id: w.absoluteTarget,
+        code: w.finalContent,
+      }));
+
+      const installedItemsInfo: RegistryItem[] = [];
+      for (const write of hydratedWrites) {
+        const originalItem = approved.selectedItems.find((i) => i.name === write.itemName);
+        if (originalItem && !installedItemsInfo.some((i) => i.name === originalItem.name)) {
+          installedItemsInfo.push(originalItem);
+        }
+      }
+
+      const userPlugins = (config.plugins?.filter((p) => typeof p === "object") ||
+        []) as import("../core/pipeline.js").Plugin[];
+
+      const depPlan = approved.shouldInstallDeps
+        ? approved.dependencyPlan
+        : { dependencies: [], devDependencies: [] };
+
+      const pipeline = new PipelineRenderer([
+        ...userPlugins,
+        coreAddPlugin(
+          depPlan,
+          yield* ConfigTag,
+          runtime,
+          installedItemsInfo,
+        ) as import("../core/pipeline.js").Plugin,
+      ]);
+
+      yield* pipeline.run({ vfs, cwd: context.cwd, runtime: runtime }, vfsFiles).pipe(
+        Effect.catchAll((error) => {
+          vfs.rollback();
+          return Effect.gen(function* () {
+            yield* runtime.prompt.error(`[Failed] Installation aborted: ${error.message}`);
+            return yield* Effect.fail(error);
+          });
+        }),
+      );
+
+      yield* runtime.prompt.info(
+        `Installed ${approved.selectedItems.length} item(s), wrote ${hydratedWrites.length} file(s).`,
+      );
+
+      return {
+        kind: "success",
+        message: `Installed ${approved.selectedItems.length} item(s), wrote ${hydratedWrites.length} file(s).`,
+        details: {
+          writesCount: hydratedWrites.length,
+          itemsCount: approved.selectedItems.length,
+        },
+      } as CommandOutcome;
     });
 
     return yield* Effect.provideService(logic, ConfigTag, config);

@@ -1,10 +1,10 @@
+import { CommandContextTag } from "@/core/context.js";
 import { appError, type AppError } from "@/core/errors.js";
 import { buildRegistryItemFromFile } from "@/domain/packCore.js";
 import { Runtime } from "@/shell/runtime/ports.js";
-import type { CommandContext, CommandOutcome, RegistryItem } from "@/types.js";
+import type { CommandOutcome, RegistryItem } from "@/types.js";
 import { Effect } from "effect";
 import path from "node:path";
-import { CommandContextTag } from "@/core/context.js";
 
 type PackQueryState = {
   targetDir: string;
@@ -29,7 +29,6 @@ const getFilesRecursive = (
 ): Effect.Effect<string[], AppError, Runtime | CommandContextTag> =>
   Effect.gen(function* () {
     const runtime = yield* Runtime;
-    const context = yield* CommandContextTag;
     const result: string[] = [];
 
     const scan = (currentDir: string): Effect.Effect<void, AppError> =>
@@ -134,7 +133,6 @@ export function runPackCommand(): Effect.Effect<
 > {
   return Effect.gen(function* () {
     const runtime = yield* Runtime;
-    const context = yield* CommandContextTag;
     const state = yield* queryPackState();
 
     if (state.files.length === 0) {

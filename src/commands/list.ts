@@ -52,7 +52,6 @@ function interactSourcePhase(
 ): Effect.Effect<string | null, AppError, Runtime | CommandContextTag> {
   return Effect.gen(function* () {
     const runtime = yield* Runtime;
-    const context = yield* CommandContextTag;
     if (!state.requiresPrompt) {
       return state.source;
     }
@@ -104,7 +103,6 @@ function presentItems(
 ): Effect.Effect<void, never, Runtime | CommandContextTag> {
   return Effect.gen(function* () {
     const runtime = yield* Runtime;
-    const context = yield* CommandContextTag;
     yield* runtime.prompt.info(`Found ${items.length} items.`);
     yield* Effect.forEach(
       items,
@@ -127,7 +125,6 @@ export function runListCommand(): Effect.Effect<
 > {
   return Effect.gen(function* () {
     const runtime = yield* Runtime;
-    const context = yield* CommandContextTag;
     const state = yield* queryListSourceState();
     const source = yield* interactSourcePhase(state);
 

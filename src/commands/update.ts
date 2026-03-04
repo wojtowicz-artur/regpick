@@ -1,6 +1,7 @@
 import { Effect, Either } from "effect";
 import { styleText } from "node:util";
 
+import { CommandContextTag, ConfigTag } from "@/core/context.js";
 import { appError, type AppError } from "@/core/errors.js";
 import { PipelineRenderer, type PersistableVFS } from "@/core/pipeline.js";
 import { MemoryVFS } from "@/core/vfs.js";
@@ -11,14 +12,12 @@ import { DirectoryPlugin, FilePlugin, HttpPlugin, loadPlugins } from "@/shell/pl
 import { loadRegistry, resolveFileContent } from "@/shell/registry.js";
 import { Runtime } from "@/shell/runtime/ports.js";
 import type {
-  CommandContext,
   CommandOutcome,
   RegistryFile,
   RegpickConfig,
   RegpickLockfile,
   RegpickPlugin,
 } from "@/types.js";
-import { CommandContextTag, ConfigTag } from "@/core/context.js";
 
 type DetectedUpdateFile = {
   target: string;
@@ -67,7 +66,8 @@ function queryLoadState(): Effect.Effect<
 /**
  * Scans all defined component origins matching hashes to registry states.
  */
-function queryAvailableUpdates(lockfile: RegpickLockfile,
+function queryAvailableUpdates(
+  lockfile: RegpickLockfile,
   plugins: RegpickPlugin[],
 ): Effect.Effect<DetectedUpdate[], AppError, Runtime | CommandContextTag | ConfigTag> {
   return Effect.gen(function* () {
@@ -199,7 +199,6 @@ function interactApprovalPhase(
 ): Effect.Effect<ApprovedUpdatePlan, AppError, Runtime | CommandContextTag | ConfigTag> {
   return Effect.gen(function* () {
     const runtime = yield* Runtime;
-    const context = yield* CommandContextTag;
     const approvedUpdatesOpt = yield* Effect.forEach(
       availableUpdates,
       (update) =>
@@ -268,97 +267,96 @@ export function runUpdateCommand(): Effect.Effect<
 
     const logic = Effect.gen(function* () {
       const runtime = yield* Runtime;
-    const context = yield* CommandContextTag;
-      
-    const componentNames = Object.keys(state.lockfile.components);
-    if (componentNames.length === 0) {
-      yield* runtime.prompt.info("No components installed. Nothing to update.");
-      return {
-        kind: "noop",
-        message: "No components to update.",
-      } as CommandOutcome;
-    }
+      const context = yield* CommandContextTag;
 
-    const customPlugins = yield* loadPlugins((yield* ConfigTag).plugins || [], context.cwd).pipe(
-      Effect.mapError((e) => appError("RuntimeError", String(e))),
-    );
+      const componentNames = Object.keys(state.lockfile.components);
+      if (componentNames.length === 0) {
+        yield* runtime.prompt.info("No components installed. Nothing to update.");
+        return {
+          kind: "noop",
+          message: "No components to update.",
+        } as CommandOutcome;
+      }
 
-    const plugins = [...customPlugins, HttpPlugin(), FilePlugin(), DirectoryPlugin()];
+      const customPlugins = yield* loadPlugins((yield* ConfigTag).plugins || [], context.cwd).pipe(
+        Effect.mapError((e) => appError("RuntimeError", String(e))),
+      );
 
-    const updates = yield* queryAvailableUpdates(state.lockfile, plugins);
+      const plugins = [...customPlugins, HttpPlugin(), FilePlugin(), DirectoryPlugin()];
 
-    if (updates.length === 0) {
-      return {
-        kind: "noop",
-        message: "All components are up to date.",
-      } as CommandOutcome;
-    }
+      const updates = yield* queryAvailableUpdates(state.lockfile, plugins);
 
-    let approvedPlan: ApprovedUpdatePlan;
+      if (updates.length === 0) {
+        return {
+          kind: "noop",
+          message: "All components are up to date.",
+        } as CommandOutcome;
+      }
 
-    if (context.args?.flags?.yes) {
-      approvedPlan = { approvedUpdates: updates };
-    } else {
-      approvedPlan = yield* interactApprovalPhase(updates);
-    }
+      let approvedPlan: ApprovedUpdatePlan;
 
-    const approvedCount = approvedPlan.approvedUpdates.length;
-    if (approvedCount === 0) {
-      return {
-        kind: "noop",
-        message: "No updates approved.",
-      } as CommandOutcome;
-    }
+      if (context.args?.flags?.yes) {
+        approvedPlan = { approvedUpdates: updates };
+      } else {
+        approvedPlan = yield* interactApprovalPhase(updates);
+      }
 
-    const updatedLockfile = JSON.parse(JSON.stringify(state.lockfile));
-    const vfsFiles: { id: string; code: string }[] = [];
+      const approvedCount = approvedPlan.approvedUpdates.length;
+      if (approvedCount === 0) {
+        return {
+          kind: "noop",
+          message: "No updates approved.",
+        } as CommandOutcome;
+      }
 
-    yield* Effect.forEach(
-      approvedPlan.approvedUpdates,
-      (update) =>
-        Effect.sync(() => {
-          update.files.forEach((file) => {
-            vfsFiles.push({
-              id: file.target,
-              code: file.remoteContent,
+      const updatedLockfile = JSON.parse(JSON.stringify(state.lockfile));
+      const vfsFiles: { id: string; code: string }[] = [];
+
+      yield* Effect.forEach(
+        approvedPlan.approvedUpdates,
+        (update) =>
+          Effect.sync(() => {
+            update.files.forEach((file) => {
+              vfsFiles.push({
+                id: file.target,
+                code: file.remoteContent,
+              });
             });
-          });
-          updatedLockfile.components[update.itemName].hash = update.newHash;
-        }),
-      { concurrency: "unbounded" },
-    );
+            updatedLockfile.components[update.itemName].hash = update.newHash;
+          }),
+        { concurrency: "unbounded" },
+      );
 
-    const userPlugins = (yield* ConfigTag).plugins?.filter((p) => typeof p === "object") || [];
-    const vfs = new MemoryVFS();
+      const userPlugins = (yield* ConfigTag).plugins?.filter((p) => typeof p === "object") || [];
+      const vfs = new MemoryVFS();
 
-    const pipeline = new PipelineRenderer([
-      ...(userPlugins as import("../core/pipeline.js").Plugin[]),
-      {
-        name: "regpick:core-update",
-        async finish(ctx) {
-          if ("flushToDisk" in ctx.vfs) {
-            await (ctx.vfs as PersistableVFS).flushToDisk();
-          }
-          await Effect.runPromise(writeLockfile(ctx.cwd, updatedLockfile, runtime));
+      const pipeline = new PipelineRenderer([
+        ...(userPlugins as import("../core/pipeline.js").Plugin[]),
+        {
+          name: "regpick:core-update",
+          async finish(ctx) {
+            if ("flushToDisk" in ctx.vfs) {
+              await (ctx.vfs as PersistableVFS).flushToDisk();
+            }
+            await Effect.runPromise(writeLockfile(ctx.cwd, updatedLockfile, runtime));
+          },
         },
-      },
-    ]);
+      ]);
 
-    yield* pipeline.run({ vfs, cwd: context.cwd, runtime: runtime }, vfsFiles).pipe(
-      Effect.catchAll((error) => {
-        vfs.rollback();
-        return Effect.gen(function* () {
-          yield* runtime.prompt.error(`[Failed] Update aborted: ${error.message}`);
-          return yield* Effect.fail(error);
-        });
-      }),
-    );
+      yield* pipeline.run({ vfs, cwd: context.cwd, runtime: runtime }, vfsFiles).pipe(
+        Effect.catchAll((error) => {
+          vfs.rollback();
+          return Effect.gen(function* () {
+            yield* runtime.prompt.error(`[Failed] Update aborted: ${error.message}`);
+            return yield* Effect.fail(error);
+          });
+        }),
+      );
 
-    return {
-      kind: "success",
-      message: `Updated ${approvedCount} components.`,
-    } as CommandOutcome;
-  
+      return {
+        kind: "success",
+        message: `Updated ${approvedCount} components.`,
+      } as CommandOutcome;
     });
 
     return yield* Effect.provideService(logic, ConfigTag, state.config);
