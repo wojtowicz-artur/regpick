@@ -1,24 +1,15 @@
 import type { AppError } from "@/core/errors.js";
 import { resolveOutputPathFromPolicy } from "@/domain/pathPolicy.js";
-import type {
-  InstallPlan,
-  PlannedWrite,
-  RegistryItem,
-  RegpickConfig,
-} from "@/types.js";
+import type { InstallPlan, PlannedWrite, RegistryItem, RegpickConfig } from "@/types.js";
 import { Array, Effect } from "effect";
 
-function buildDependencyPlan(
-  selectedItems: RegistryItem[],
-): InstallPlan["dependencyPlan"] {
+function buildDependencyPlan(selectedItems: RegistryItem[]): InstallPlan["dependencyPlan"] {
   return {
     dependencies: Array.dedupe(
       selectedItems.flatMap((item) => item.dependencies || []).filter(Boolean),
     ),
     devDependencies: Array.dedupe(
-      selectedItems
-        .flatMap((item) => item.devDependencies || [])
-        .filter(Boolean),
+      selectedItems.flatMap((item) => item.devDependencies || []).filter(Boolean),
     ),
   };
 }
@@ -36,10 +27,7 @@ export function resolveRegistryDependencies(
     if (allResolvedItems.has(current.name)) continue;
     allResolvedItems.set(current.name, current);
 
-    if (
-      current.registryDependencies &&
-      current.registryDependencies.length > 0
-    ) {
+    if (current.registryDependencies && current.registryDependencies.length > 0) {
       for (const depName of current.registryDependencies) {
         if (allResolvedItems.has(depName)) continue;
         const found = allItems.find((i) => i.name === depName);
@@ -70,8 +58,12 @@ export const buildInstallPlan = (
 
     for (const item of selectedItems) {
       for (const file of item.files) {
-        const { absoluteTarget, relativeTarget } =
-          yield* resolveOutputPathFromPolicy(item, file, cwd, config);
+        const { absoluteTarget, relativeTarget } = yield* resolveOutputPathFromPolicy(
+          item,
+          file,
+          cwd,
+          config,
+        );
         const planned: PlannedWrite = {
           itemName: item.name,
           sourceFile: file,

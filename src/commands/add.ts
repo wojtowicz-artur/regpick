@@ -13,12 +13,7 @@ import {
   querySelectedItems,
   queryUserApproval,
 } from "@/shell/cli/addOrchestrator.js";
-import {
-  DirectoryPlugin,
-  FilePlugin,
-  HttpPlugin,
-  loadPlugins,
-} from "@/shell/plugins/index.js";
+import { DirectoryPlugin, FilePlugin, HttpPlugin, loadPlugins } from "@/shell/plugins/index.js";
 import type { CommandOutcome, RegistryItem } from "@/types.js";
 import { Effect } from "effect";
 import crypto from "node:crypto";
@@ -43,22 +38,12 @@ export function runAddCommand(): Effect.Effect<
         } as CommandOutcome;
       }
 
-      const customPlugins = yield* loadPlugins(
-        (yield* ConfigTag).plugins || [],
-        context.cwd,
-      );
-      const plugins = [
-        ...customPlugins,
-        HttpPlugin(),
-        FilePlugin(),
-        DirectoryPlugin(),
-      ];
+      const customPlugins = yield* loadPlugins((yield* ConfigTag).plugins || [], context.cwd);
+      const plugins = [...customPlugins, HttpPlugin(), FilePlugin(), DirectoryPlugin()];
       const itemsToProc = yield* querySelectedItems(source, plugins);
 
       for (const d of itemsToProc.missingRegistryDeps || []) {
-        yield* runtime.prompt.warn(
-          `Registry dependency "${d}" not found in current registry.`,
-        );
+        yield* runtime.prompt.warn(`Registry dependency "${d}" not found in current registry.`);
       }
 
       const state = yield* queryInstallationState(itemsToProc.selectedItems);
@@ -77,20 +62,14 @@ export function runAddCommand(): Effect.Effect<
 
       const installedItemsInfo: RegistryItem[] = [];
       for (const write of hydratedWrites) {
-        const originalItem = approved.selectedItems.find(
-          (i) => i.name === write.itemName,
-        );
-        if (
-          originalItem &&
-          !installedItemsInfo.some((i) => i.name === originalItem.name)
-        ) {
+        const originalItem = approved.selectedItems.find((i) => i.name === write.itemName);
+        if (originalItem && !installedItemsInfo.some((i) => i.name === originalItem.name)) {
           installedItemsInfo.push(originalItem);
         }
       }
 
-      const userPlugins = (config.plugins?.filter(
-        (p) => typeof p === "object",
-      ) || []) as import("../core/pipeline.js").Plugin[];
+      const userPlugins = (config.plugins?.filter((p) => typeof p === "object") ||
+        []) as import("../core/pipeline.js").Plugin[];
 
       const depPlan = approved.shouldInstallDeps
         ? approved.dependencyPlan
@@ -139,9 +118,7 @@ export function runAddCommand(): Effect.Effect<
         Effect.catchAll((error) => {
           vfs.rollback();
           return Effect.gen(function* () {
-            yield* runtime.prompt.error(
-              `[Failed] Installation aborted: ${error.message}`,
-            );
+            yield* runtime.prompt.error(`[Failed] Installation aborted: ${error.message}`);
             return yield* Effect.fail(error);
           });
         }),
