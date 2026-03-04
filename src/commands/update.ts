@@ -18,7 +18,7 @@ import type {
   RegpickLockfile,
   RegpickPlugin,
 } from "@/types.js";
-import { CommandContextTag } from "@/core/context.js";
+import { CommandContextTag, ConfigTag } from "@/core/context.js";
 
 type DetectedUpdateFile = {
   target: string;
@@ -67,12 +67,11 @@ function queryLoadState(): Effect.Effect<
 /**
  * Scans all defined component origins matching hashes to registry states.
  */
-function queryAvailableUpdates(
-  config: RegpickConfig,
-  lockfile: RegpickLockfile,
+function queryAvailableUpdates(lockfile: RegpickLockfile,
   plugins: RegpickPlugin[],
-): Effect.Effect<DetectedUpdate[], AppError, Runtime | CommandContextTag> {
+): Effect.Effect<DetectedUpdate[], AppError, Runtime | CommandContextTag | ConfigTag> {
   return Effect.gen(function* () {
+    const config = yield* ConfigTag;
     const runtime = yield* Runtime;
     const context = yield* CommandContextTag;
     const bySource = groupBySource(lockfile);
@@ -197,7 +196,7 @@ function printDiff(oldContent: string, newContent: string): Effect.Effect<void, 
  */
 function interactApprovalPhase(
   availableUpdates: DetectedUpdate[],
-): Effect.Effect<ApprovedUpdatePlan, AppError, Runtime | CommandContextTag> {
+): Effect.Effect<ApprovedUpdatePlan, AppError, Runtime | CommandContextTag | ConfigTag> {
   return Effect.gen(function* () {
     const runtime = yield* Runtime;
     const context = yield* CommandContextTag;
@@ -265,10 +264,12 @@ export function runUpdateCommand(): Effect.Effect<
   Runtime | CommandContextTag
 > {
   return Effect.gen(function* () {
-    const runtime = yield* Runtime;
-    const context = yield* CommandContextTag;
     const state = yield* queryLoadState();
 
+    const logic = Effect.gen(function* () {
+      const runtime = yield* Runtime;
+    const context = yield* CommandContextTag;
+      
     const componentNames = Object.keys(state.lockfile.components);
     if (componentNames.length === 0) {
       yield* runtime.prompt.info("No components installed. Nothing to update.");
@@ -278,13 +279,13 @@ export function runUpdateCommand(): Effect.Effect<
       } as CommandOutcome;
     }
 
-    const customPlugins = yield* loadPlugins(state.config.plugins || [], context.cwd).pipe(
+    const customPlugins = yield* loadPlugins((yield* ConfigTag).plugins || [], context.cwd).pipe(
       Effect.mapError((e) => appError("RuntimeError", String(e))),
     );
 
     const plugins = [...customPlugins, HttpPlugin(), FilePlugin(), DirectoryPlugin()];
 
-    const updates = yield* queryAvailableUpdates(state.config, state.lockfile, plugins);
+    const updates = yield* queryAvailableUpdates(state.lockfile, plugins);
 
     if (updates.length === 0) {
       return {
@@ -327,7 +328,7 @@ export function runUpdateCommand(): Effect.Effect<
       { concurrency: "unbounded" },
     );
 
-    const userPlugins = state.config.plugins?.filter((p) => typeof p === "object") || [];
+    const userPlugins = (yield* ConfigTag).plugins?.filter((p) => typeof p === "object") || [];
     const vfs = new MemoryVFS();
 
     const pipeline = new PipelineRenderer([
@@ -357,5 +358,9 @@ export function runUpdateCommand(): Effect.Effect<
       kind: "success",
       message: `Updated ${approvedCount} components.`,
     } as CommandOutcome;
+  
+    });
+
+    return yield* Effect.provideService(logic, ConfigTag, state.config);
   });
 }

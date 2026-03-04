@@ -1,4 +1,4 @@
-import { CommandContextTag } from "@/core/context.js";
+import { CommandContextTag, ConfigTag } from "@/core/context.js";
 import { appError, type AppError } from "@/core/errors.js";
 import { PipelineRenderer } from "@/core/pipeline.js";
 import { MemoryVFS } from "@/core/vfs.js";
@@ -77,10 +77,9 @@ function queryLoadConfiguration(): Effect.Effect<
 /**
  * Identify Registry Source URL based on user input, flags, or interactive prompt.
  */
-function queryResolveRegistrySource(
-  config: RegpickConfig,
-): Effect.Effect<string | null, AppError, Runtime | CommandContextTag> {
+function queryResolveRegistrySource(): Effect.Effect<string | null, AppError, Runtime | CommandContextTag | ConfigTag> {
   return Effect.gen(function* () {
+    const config = yield* ConfigTag;
     const runtime = yield* Runtime;
     const context = yield* CommandContextTag;
     const sourcePosIdx = context.args.positionals[0] === "add" ? 1 : 0;
@@ -137,7 +136,7 @@ function queryResolveRegistrySource(
 function queryRegistryItemsToProcess(
   source: string,
   plugins: RegpickPlugin[],
-): Effect.Effect<CustomQueryItemsResult, AppError, Runtime | CommandContextTag> {
+): Effect.Effect<CustomQueryItemsResult, AppError, Runtime | CommandContextTag | ConfigTag> {
   return Effect.gen(function* () {
     const runtime = yield* Runtime;
     const context = yield* CommandContextTag;
@@ -199,10 +198,10 @@ function queryRegistryItemsToProcess(
 }
 
 function queryPlanState(
-  config: RegpickConfig,
   selectedItems: RegistryItem[],
-): Effect.Effect<InteractiveAddState, AppError, Runtime | CommandContextTag> {
+): Effect.Effect<InteractiveAddState, AppError, Runtime | CommandContextTag | ConfigTag> {
   return Effect.gen(function* () {
+    const config = yield* ConfigTag;
     const runtime = yield* Runtime;
     const context = yield* CommandContextTag;
     const probeRes = yield* buildInstallPlan(selectedItems, context.cwd, config);
@@ -232,11 +231,9 @@ function queryPlanState(
   });
 }
 
-function processInteractionApproval(
-  config: RegpickConfig,
-  state: InteractiveAddState,
-): Effect.Effect<ApprovedAddPlan, AppError, Runtime | CommandContextTag> {
+function processInteractionApproval(state: InteractiveAddState): Effect.Effect<ApprovedAddPlan, AppError, Runtime | CommandContextTag | ConfigTag> {
   return Effect.gen(function* () {
+    const config = yield* ConfigTag;
     const runtime = yield* Runtime;
     const context = yield* CommandContextTag;
     const assumeYes = Boolean(context.args.flags.yes);
@@ -344,13 +341,12 @@ function processInteractionApproval(
   });
 }
 
-function resolveContents(
-  config: RegpickConfig,
-  finalWrites: PlannedWrite[],
+function resolveContents(finalWrites: PlannedWrite[],
   selectedItems: RegistryItem[],
   plugins: RegpickPlugin[],
-): Effect.Effect<HydratedWrite[], AppError, Runtime | CommandContextTag> {
+): Effect.Effect<HydratedWrite[], AppError, Runtime | CommandContextTag | ConfigTag> {
   return Effect.gen(function* () {
+    const config = yield* ConfigTag;
     const runtime = yield* Runtime;
     const context = yield* CommandContextTag;
     const writes: HydratedWrite[] = [];
@@ -392,16 +388,18 @@ export function runAddCommand(): Effect.Effect<
   Runtime | CommandContextTag
 > {
   return Effect.gen(function* () {
-    const runtime = yield* Runtime;
-    const context = yield* CommandContextTag;
     const { config } = yield* queryLoadConfiguration();
-    const source = yield* queryResolveRegistrySource(config);
+
+    const logic = Effect.gen(function* () {
+      const runtime = yield* Runtime;
+    const context = yield* CommandContextTag;
+          const source = yield* queryResolveRegistrySource();
 
     if (!source) {
       return { kind: "noop", message: "No source provided" } as CommandOutcome;
     }
 
-    const customPlugins = yield* loadPlugins(config.plugins || [], context.cwd);
+    const customPlugins = yield* loadPlugins((yield* ConfigTag).plugins || [], context.cwd);
 
     const plugins = [...customPlugins, HttpPlugin(), FilePlugin(), DirectoryPlugin()];
 
@@ -411,11 +409,9 @@ export function runAddCommand(): Effect.Effect<
       yield* runtime.prompt.warn(`Registry dependency "${d}" not found in current registry.`);
     }
 
-    const state = yield* queryPlanState(config, itemsToProc.selectedItems);
-    const approved = yield* processInteractionApproval(config, state);
-    const hydratedWrites = yield* resolveContents(
-      config,
-      approved.finalWrites,
+    const state = yield* queryPlanState(itemsToProc.selectedItems);
+    const approved = yield* processInteractionApproval(state);
+    const hydratedWrites = yield* resolveContents(approved.finalWrites,
       approved.selectedItems,
       plugins,
     );
@@ -443,10 +439,7 @@ export function runAddCommand(): Effect.Effect<
 
     const pipeline = new PipelineRenderer([
       ...userPlugins,
-      coreAddPlugin(
-        depPlan,
-        config,
-        runtime,
+      coreAddPlugin(depPlan, yield* ConfigTag, runtime,
         installedItemsInfo,
       ) as import("../core/pipeline.js").Plugin,
     ]);
@@ -473,5 +466,9 @@ export function runAddCommand(): Effect.Effect<
         itemsCount: approved.selectedItems.length,
       },
     } as CommandOutcome;
+  
+    });
+
+    return yield* Effect.provideService(logic, ConfigTag, config);
   });
 }
