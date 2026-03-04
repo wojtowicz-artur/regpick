@@ -19,7 +19,7 @@ import type {
   RegpickConfig,
   RegpickPlugin,
 } from "@/types.js";
-import { Effect, Either } from "effect";
+import { Effect } from "effect";
 
 type HydratedWrite = {
   itemName: string;
@@ -56,10 +56,9 @@ function queryLoadConfiguration(
   context: CommandContext,
 ): Effect.Effect<{ config: RegpickConfig; configPath: string }, AppError> {
   return Effect.gen(function* () {
-    const res = yield* Effect.tryPromise({
-      try: () => readConfig(context.cwd),
-      catch: (e): AppError => appError("RuntimeError", String(e)),
-    });
+    const res = yield* readConfig(context.cwd).pipe(
+      Effect.mapError((e) => appError("RuntimeError", String(e))),
+    );
 
     if (!res.configPath) {
       yield* context.runtime.prompt.error(
@@ -140,13 +139,7 @@ function queryRegistryItemsToProcess(
     const sourcePosIdx = context.args.positionals[0] === "add" ? 1 : 0;
     const itemPosIdx = sourcePosIdx + 1;
 
-    const loadResult = yield* Effect.tryPromise({
-      try: () => loadRegistry(source, context.cwd, context.runtime, plugins),
-      catch: (e): AppError => appError("RuntimeError", String(e)),
-    });
-
-    if (Either.isLeft(loadResult)) return yield* Effect.fail(loadResult.left);
-    const { items } = loadResult.right;
+    const { items } = yield* loadRegistry(source, context.cwd, context.runtime, plugins);
 
     if (!items.length) {
       yield* context.runtime.prompt.warn("No installable items in registry.");
@@ -158,13 +151,11 @@ function queryRegistryItemsToProcess(
       context.args.flags.select = itemName;
     }
 
-    const preselectedEither = selectItemsFromFlags(items, context);
+    const preselected = yield* selectItemsFromFlags(items, context);
     let selectedItems: RegistryItem[];
 
-    if (Either.isRight(preselectedEither) && preselectedEither.right) {
-      selectedItems = preselectedEither.right;
-    } else if (Either.isLeft(preselectedEither)) {
-      return yield* Effect.fail(preselectedEither.left);
+    if (preselected) {
+      selectedItems = preselected;
     } else {
       const selectedNames = yield* context.runtime.prompt.autocompleteMultiselect({
         message: "Select items to install",
@@ -208,23 +199,21 @@ function queryPlanState(
   selectedItems: RegistryItem[],
 ): Effect.Effect<InteractiveAddState, AppError> {
   return Effect.gen(function* () {
-    const probeRes = buildInstallPlan(selectedItems, context.cwd, config);
-    if (Either.isLeft(probeRes)) return yield* Effect.fail(probeRes.left);
+    const probeRes = yield* buildInstallPlan(selectedItems, context.cwd, config);
 
     const existingTargets = new Set<string>();
-    for (const write of probeRes.right.plannedWrites) {
+    for (const write of probeRes.plannedWrites) {
       const exists = yield* context.runtime.fs.pathExists(write.absoluteTarget);
       if (exists) existingTargets.add(write.absoluteTarget);
     }
 
-    const finalRes = buildInstallPlan(selectedItems, context.cwd, config, existingTargets);
-    if (Either.isLeft(finalRes)) return yield* Effect.fail(finalRes.left);
+    const finalRes = yield* buildInstallPlan(selectedItems, context.cwd, config, existingTargets);
 
     const deps = collectMissingDependencies(selectedItems, context.cwd, context.runtime);
 
     return {
       selectedItems,
-      plannedWrites: finalRes.right.plannedWrites,
+      plannedWrites: finalRes.plannedWrites,
       existingTargets,
       missingDependencies: deps.missingDependencies,
       missingDevDependencies: deps.missingDevDependencies,
@@ -350,20 +339,20 @@ function resolveContents(
       const item = selectedItems.find((i) => i.name === write.itemName);
       if (!item) continue;
 
-      const contentEither = yield* Effect.tryPromise({
-        try: () =>
-          resolveFileContent(write.sourceFile, item, context.cwd, context.runtime, plugins),
-        catch: (e): AppError => appError("RuntimeError", String(e)),
-      });
+      const content = yield* resolveFileContent(
+        write.sourceFile,
+        item,
+        context.cwd,
+        context.runtime,
+        plugins,
+      );
 
-      if (Either.isLeft(contentEither)) return yield* Effect.fail(contentEither.left);
-
-      const finalContent = applyAliases(contentEither.right, config);
+      const finalContent = applyAliases(content, config);
       writes.push({
         itemName: write.itemName,
         absoluteTarget: write.absoluteTarget,
         sourceFile: write.sourceFile,
-        originalContent: contentEither.right,
+        originalContent: content,
         finalContent,
       });
     }
@@ -372,7 +361,7 @@ function resolveContents(
   });
 }
 
-function runAddCommandEff(context: CommandContext): Effect.Effect<CommandOutcome, AppError> {
+export function runAddCommand(context: CommandContext): Effect.Effect<CommandOutcome, AppError> {
   return Effect.gen(function* () {
     const { config } = yield* queryLoadConfiguration(context);
     const source = yield* queryResolveRegistrySource(context, config);
@@ -381,10 +370,7 @@ function runAddCommandEff(context: CommandContext): Effect.Effect<CommandOutcome
       return { kind: "noop", message: "No source provided" } as CommandOutcome;
     }
 
-    const customPlugins = yield* Effect.tryPromise({
-      try: () => loadPlugins(config.plugins || [], context.cwd),
-      catch: (e): AppError => appError("RuntimeError", String(e)),
-    });
+    const customPlugins = yield* loadPlugins(config.plugins || [], context.cwd);
 
     const plugins = [...customPlugins, HttpPlugin(), FilePlugin(), DirectoryPlugin()];
 
@@ -437,14 +423,15 @@ function runAddCommandEff(context: CommandContext): Effect.Effect<CommandOutcome
       ) as import("../core/pipeline.js").Plugin,
     ]);
 
-    yield* Effect.tryPromise({
-      try: () => pipeline.run({ vfs, cwd: context.cwd, runtime: context.runtime }, vfsFiles),
-      catch: (error): AppError => {
+    yield* pipeline.run({ vfs, cwd: context.cwd, runtime: context.runtime }, vfsFiles).pipe(
+      Effect.catchAll((error) => {
         vfs.rollback();
-        Effect.runPromise(context.runtime.prompt.error(`[Failed] Installation aborted: ${error}`));
-        return appError("RuntimeError", String(error));
-      },
-    });
+        return Effect.gen(function* () {
+          yield* context.runtime.prompt.error(`[Failed] Installation aborted: ${error.message}`);
+          return yield* Effect.fail(error);
+        });
+      }),
+    );
 
     yield* context.runtime.prompt.info(
       `Installed ${approved.selectedItems.length} item(s), wrote ${hydratedWrites.length} file(s).`,
@@ -459,11 +446,4 @@ function runAddCommandEff(context: CommandContext): Effect.Effect<CommandOutcome
       },
     } as CommandOutcome;
   });
-}
-
-export async function runAddCommand(
-  context: CommandContext,
-): Promise<Either.Either<CommandOutcome, AppError>> {
-  const result = await Effect.runPromise(Effect.either(runAddCommandEff(context)));
-  return result;
 }

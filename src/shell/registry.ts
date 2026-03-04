@@ -1,4 +1,3 @@
-import { Either } from "effect";
 import { appError, type AppError } from "@/core/errors.js";
 import {
   extractItemReferences,
@@ -7,247 +6,269 @@ import {
 } from "@/domain/registryModel.js";
 import type { RuntimePorts } from "@/shell/runtime/ports.js";
 import type { RegistryFile, RegistryItem, RegistrySourceMeta, RegpickPlugin } from "@/types.js";
+import { Effect, Either } from "effect";
 
-async function normalizeManifest(
+// Helper 1: Resolve and load a single target with exactly 1 compatible plugin.
+function resolveAndLoadWithPlugins(
+  target: string,
+  cwd: string,
+  originalSource: string | undefined,
+  runtime: RuntimePorts,
+  plugins: RegpickPlugin[],
+): Effect.Effect<{ plugin: RegpickPlugin; resolvedId: string; content: unknown }, AppError> {
+  return Effect.gen(function* () {
+    for (const plugin of plugins) {
+      if (!plugin.resolveId || !plugin.load) continue;
+
+      const resolvedId = yield* Effect.tryPromise({
+        try: async () =>
+          plugin.resolveId!(target, originalSource || cwd, {
+            cwd: process.cwd(),
+            runtime,
+          }),
+        catch: (e): AppError => {
+          if (e && typeof e === "object" && "kind" in e) return e as AppError;
+          return appError(
+            "RegistryError",
+            `Failed to resolve ${target}: ${e instanceof Error ? e.message : String(e)}`,
+            e,
+          );
+        },
+      });
+
+      if (!resolvedId) continue;
+
+      const content = yield* Effect.tryPromise({
+        try: async () => plugin.load!(resolvedId, { cwd: process.cwd(), runtime }),
+        catch: (e): AppError => {
+          if (e && typeof e === "object" && "kind" in e) return e as AppError;
+          return appError(
+            "RegistryError",
+            `Failed to load ${resolvedId}: ${e instanceof Error ? e.message : String(e)}`,
+            e,
+          );
+        },
+      });
+
+      if (content == null) continue;
+
+      return { plugin, resolvedId, content };
+    }
+
+    return yield* Effect.fail(
+      appError("RegistryError", `No suitable plugin found to resolve: ${target}`),
+    );
+  });
+}
+
+function resolveItemReference(
+  itemRef: string,
+  sourceMeta: RegistrySourceMeta,
+  runtime: RuntimePorts,
+  plugins: RegpickPlugin[],
+): Effect.Effect<RegistryItem | null, AppError> {
+  return Effect.gen(function* () {
+    const loadOpt = yield* Effect.either(
+      resolveAndLoadWithPlugins(
+        itemRef,
+        process.cwd(),
+        sourceMeta.originalSource,
+        runtime,
+        plugins,
+      ),
+    );
+
+    if (Either.isLeft(loadOpt)) {
+      const e = loadOpt.left;
+      if (e.kind === "RegistryError" && e.message.includes("No suitable plugin")) {
+        return yield* Effect.fail(
+          appError("RegistryError", `Could not resolve reference: ${itemRef}`),
+        );
+      }
+      return yield* Effect.fail(e);
+    }
+
+    const { resolvedId, content } = loadOpt.right;
+
+    let itemData: unknown;
+    if (typeof content === "string") {
+      itemData = yield* Effect.try({
+        try: () => JSON.parse(content),
+        catch: () => appError("RegistryError", `Failed to parse JSON for ${resolvedId}`),
+      });
+    } else {
+      itemData = content;
+    }
+
+    if (itemData && typeof itemData === "object") {
+      return normalizeItem(itemData, sourceMeta);
+    }
+
+    return null;
+  });
+}
+
+function normalizeManifest(
   data: unknown,
   sourceMeta: RegistrySourceMeta,
   runtime: RuntimePorts,
   plugins: RegpickPlugin[],
-): Promise<Either.Either<RegistryItem[], AppError>> {
-  const inlineItemsRes = normalizeManifestInline(data, sourceMeta);
+): Effect.Effect<RegistryItem[], AppError> {
+  return Effect.gen(function* () {
+    const inlineItemsRes = normalizeManifestInline(data, sourceMeta);
 
-  if (!data || typeof data !== "object" || Array.isArray(data)) {
-    return inlineItemsRes;
-  }
+    if (!data || typeof data !== "object" || Array.isArray(data)) {
+      return yield* inlineItemsRes;
+    }
 
-  const references = extractItemReferences(data);
-  if (!references.length) {
-    return inlineItemsRes;
-  }
+    const references = extractItemReferences(data);
+    if (!references.length) {
+      return yield* inlineItemsRes;
+    }
 
-  const inlineItems = Either.isRight(inlineItemsRes) ? inlineItemsRes.right : [];
+    const inlineItems = yield* Effect.catchAll(inlineItemsRes, () => Effect.succeed([]));
 
-  const resolvedItemResults = await Promise.all(
-    references.map(async (itemRef) => {
-      for (const plugin of plugins) {
-        if (!plugin.resolveId || !plugin.load) continue;
+    const resolvedItems = yield* Effect.all(
+      references.map((ref) => resolveItemReference(ref, sourceMeta, runtime, plugins)),
+      { concurrency: "unbounded" },
+    ).pipe(Effect.map((items) => items.filter((item): item is RegistryItem => item !== null)));
 
-        try {
-          const resolvedId = await plugin.resolveId(itemRef, sourceMeta.originalSource, {
-            cwd: process.cwd(),
-            runtime,
-          });
-          if (!resolvedId) continue;
-
-          const loadResult = await plugin.load(resolvedId, {
-            cwd: process.cwd(),
-            runtime,
-          });
-          if (!loadResult) continue;
-
-          let itemData: unknown;
-          if (typeof loadResult === "string") {
-            try {
-              itemData = JSON.parse(loadResult);
-            } catch {
-              return Either.left(
-                appError("RegistryError", `Failed to parse JSON for ${resolvedId}`),
-              );
-            }
-          } else {
-            itemData = loadResult;
-          }
-
-          if (itemData && typeof itemData === "object") {
-            return Either.right(normalizeItem(itemData, sourceMeta));
-          }
-          return Either.right(null);
-        } catch (e) {
-          const errorMsg = e instanceof Error ? e.message : String(e);
-          // If we encounter a critical error like HTTP 500, we should probably fail fully,
-          // rather than silently ignoring it and trying another plugin,
-          // but we follow adapter approach to throw/err where necessary
-          if (e instanceof Error && "kind" in e) {
-            return Either.left(e as AppError);
-          }
-          return Either.left(
-            appError("RegistryError", `Failed to resolve ${itemRef}: ${errorMsg}`, e),
-          );
-        }
-      }
-      return Either.left(appError("RegistryError", `Could not resolve reference: ${itemRef}`));
-    }),
-  );
-
-  const resolvedItems: RegistryItem[] = [];
-  for (const res of resolvedItemResults) {
-    if (Either.isLeft(res)) return Either.left(res.left);
-    if (res.right) resolvedItems.push(res.right);
-  }
-
-  return Either.right([...inlineItems, ...resolvedItems]);
+    return [...inlineItems, ...resolvedItems];
+  });
 }
 
-export async function loadRegistry(
+export function loadRegistry(
   source: string,
   cwd: string,
   runtime: RuntimePorts,
   plugins: RegpickPlugin[],
-): Promise<Either.Either<{ items: RegistryItem[]; source: string }, AppError>> {
-  if (!source) {
-    return Either.left(appError("ValidationError", "Registry source is required."));
-  }
+): Effect.Effect<{ items: RegistryItem[]; source: string }, AppError> {
+  return Effect.gen(function* () {
+    if (!source) {
+      return yield* Effect.fail(appError("ValidationError", "Registry source is required."));
+    }
 
-  for (const plugin of plugins) {
-    if (!plugin.resolveId || !plugin.load) continue;
+    const loadOpt = yield* Effect.either(
+      resolveAndLoadWithPlugins(source, cwd, undefined, runtime, plugins),
+    );
 
-    try {
-      const resolvedId = await plugin.resolveId(source, cwd, {
-        cwd: process.cwd(),
-        runtime,
-      });
-      if (!resolvedId) continue;
-
-      const manifestRes = await plugin.load(resolvedId, {
-        cwd: process.cwd(),
-        runtime,
-      });
-      if (!manifestRes) {
-        continue;
-      }
-      if (
-        manifestRes &&
-        typeof manifestRes === "object" &&
-        "ok" in manifestRes &&
-        manifestRes.ok === false
-      ) {
-        return Either.left((manifestRes as unknown as { error: AppError }).error);
-      }
-
-      const manifest =
-        manifestRes && typeof manifestRes === "object" && "value" in manifestRes
-          ? manifestRes.value
-          : manifestRes;
-
-      let items: RegistryItem[] = [];
-      if (
-        manifest &&
-        typeof manifest === "object" &&
-        "items" in manifest &&
-        Array.isArray(manifest.items)
-      ) {
-        items = manifest.items;
-      } else if (manifest && typeof manifest === "object" && "rawData" in manifest) {
-        const itemsRes = await normalizeManifest(
-          manifest.rawData,
-          (manifest as unknown as { sourceMeta: RegistrySourceMeta }).sourceMeta,
-          runtime,
-          plugins,
+    if (Either.isLeft(loadOpt)) {
+      const e = loadOpt.left;
+      if (e.kind === "RegistryError" && e.message.includes("No suitable plugin found")) {
+        return yield* Effect.fail(
+          appError("RegistryError", `No suitable plugin found for source: ${source}`),
         );
-        if (Either.isLeft(itemsRes)) return Either.left(itemsRes.left);
-        items = itemsRes.right;
-      } else if ((manifest && typeof manifest === "object") || Array.isArray(manifest)) {
-        const itemsRes = await normalizeManifest(
-          manifest,
-          { type: "system", originalSource: resolvedId },
-          runtime,
-          plugins,
-        );
-        if (Either.isLeft(itemsRes)) return Either.left(itemsRes.left);
-        items = itemsRes.right;
       }
+      return yield* Effect.fail(e);
+    }
 
-      const finalSource =
-        (manifest && typeof manifest === "object" && "resolvedSource" in manifest
-          ? (manifest as any).resolvedSource
-          : undefined) || source;
+    const { resolvedId, content: manifestRes } = loadOpt.right;
 
-      const enhancedItems = items.map((item) => ({
-        ...item,
-        sourceMeta: {
-          ...item.sourceMeta,
-          originalSource: finalSource,
-        },
-      }));
+    if (
+      manifestRes &&
+      typeof manifestRes === "object" &&
+      "ok" in manifestRes &&
+      (manifestRes as any).ok === false
+    ) {
+      return yield* Effect.fail((manifestRes as unknown as { error: AppError }).error);
+    }
 
-      return Either.right({
-        items: enhancedItems,
-        source: finalSource,
-      });
-    } catch (e) {
-      const errorMsg = e instanceof Error ? e.message : String(e);
-      if (e && typeof e === "object" && "kind" in e) {
-        return Either.left(e as AppError);
-      }
-      return Either.left(
-        appError("RegistryError", `Failed to load registry from ${source}: ${errorMsg}`, e),
+    const manifest =
+      manifestRes && typeof manifestRes === "object" && "value" in manifestRes
+        ? (manifestRes as any).value
+        : manifestRes;
+
+    let items: RegistryItem[] = [];
+    if (
+      manifest &&
+      typeof manifest === "object" &&
+      "items" in manifest &&
+      Array.isArray(manifest.items)
+    ) {
+      items = manifest.items;
+    } else if (manifest && typeof manifest === "object" && "rawData" in manifest) {
+      items = yield* normalizeManifest(
+        manifest.rawData,
+        (manifest as unknown as { sourceMeta: RegistrySourceMeta }).sourceMeta,
+        runtime,
+        plugins,
+      );
+    } else if ((manifest && typeof manifest === "object") || Array.isArray(manifest)) {
+      items = yield* normalizeManifest(
+        manifest,
+        { type: "system", originalSource: resolvedId },
+        runtime,
+        plugins,
       );
     }
-  }
 
-  return Either.left(appError("RegistryError", `No suitable plugin found for source: ${source}`));
+    const finalSource =
+      (manifest && typeof manifest === "object" && "resolvedSource" in manifest
+        ? (manifest as any).resolvedSource
+        : undefined) || source;
+
+    const enhancedItems = items.map((item) => ({
+      ...item,
+      sourceMeta: {
+        ...item.sourceMeta,
+        originalSource: finalSource,
+      },
+    }));
+
+    return {
+      items: enhancedItems,
+      source: finalSource,
+    };
+  });
 }
 
-export async function resolveFileContent(
+export function resolveFileContent(
   file: RegistryFile,
   item: RegistryItem,
   cwd: string,
   runtime: RuntimePorts,
   plugins: RegpickPlugin[],
-): Promise<Either.Either<string, AppError>> {
-  if (typeof file.content === "string") {
-    return Either.right(file.content);
-  }
+): Effect.Effect<string, AppError> {
+  return Effect.gen(function* () {
+    if (typeof file.content === "string") {
+      return file.content;
+    }
 
-  const targetPathOrUrl = file.url || file.path;
+    const targetPathOrUrl = file.url || file.path;
 
-  if (!targetPathOrUrl) {
-    return Either.left(
-      appError(
-        "ValidationError",
-        `File entry in "${item.name}" is missing both content and path/url.`,
-      ),
-    );
-  }
-
-  for (const plugin of plugins) {
-    if (!plugin.resolveId || !plugin.load) continue;
-
-    try {
-      const originalSource = item.sourceMeta.originalSource || cwd;
-      const resolvedId = await plugin.resolveId(targetPathOrUrl, originalSource, {
-        cwd: process.cwd(),
-        runtime,
-      });
-      if (!resolvedId) continue;
-
-      const content = await plugin.load(resolvedId, {
-        cwd: process.cwd(),
-        runtime,
-      });
-      if (content == null) continue;
-
-      return Either.right(typeof content === "string" ? content : JSON.stringify(content, null, 2));
-    } catch (e) {
-      // Here we catch any thrown appErrors from the plugins and bubble them up
-      if (e && typeof e === "object" && "kind" in e) {
-        return Either.left(e as AppError);
-      }
-      const errorMsg = e instanceof Error ? e.message : String(e);
-      return Either.left(
+    if (!targetPathOrUrl) {
+      return yield* Effect.fail(
         appError(
-          "RegistryError",
-          `Failed to load file content for ${targetPathOrUrl}: ${errorMsg}`,
-          e,
+          "ValidationError",
+          `File entry in "${item.name}" is missing both content and path/url.`,
         ),
       );
     }
-  }
 
-  return Either.left(
-    appError(
-      "RegistryError",
-      `No suitable plugin found to resolve file content for: ${targetPathOrUrl}`,
-    ),
-  );
+    const loadOpt = yield* Effect.either(
+      resolveAndLoadWithPlugins(
+        targetPathOrUrl,
+        process.cwd(),
+        item.sourceMeta.originalSource || cwd,
+        runtime,
+        plugins,
+      ),
+    );
+
+    if (Either.isLeft(loadOpt)) {
+      const e = loadOpt.left;
+      if (e.kind === "RegistryError" && e.message.includes("No suitable plugin found")) {
+        return yield* Effect.fail(
+          appError(
+            "RegistryError",
+            `No suitable plugin found to resolve file content for: ${targetPathOrUrl}`,
+          ),
+        );
+      }
+      return yield* Effect.fail(e);
+    }
+
+    const { content } = loadOpt.right;
+    return typeof content === "string" ? content : JSON.stringify(content, null, 2);
+  });
 }

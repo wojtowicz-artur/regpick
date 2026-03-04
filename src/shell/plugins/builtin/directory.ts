@@ -33,47 +33,42 @@ export function DirectoryPlugin(): RegpickPlugin {
 
     async load(id: string, ctx?: PluginContext) {
       if (!isFileUrl(id)) return null;
-      if (!ctx) return null;
+      if (!ctx?.runtime?.fs) return null;
 
       const fileSystemPath = fileURLToPath(new URL(id));
 
-      if (!ctx.runtime?.fs) return null;
-      let statsRes;
-      try {
-        statsRes = await Effect.runPromise(ctx.runtime.fs.stat(fileSystemPath));
-      } catch {
-        return null;
-      }
+      const program = Effect.gen(function* () {
+        const statsRes = yield* ctx.runtime.fs.stat(fileSystemPath);
+        if (!statsRes.isDirectory()) return null;
 
-      if (!statsRes.isDirectory()) {
-        return null;
-      }
+        const dirRes = yield* ctx.runtime.fs.readdir(fileSystemPath);
+        const jsonFiles = dirRes.filter((file: string) => file.endsWith(".json"));
 
-      const dirRes = await Effect.runPromise(ctx.runtime.fs.readdir(fileSystemPath));
-      const jsonFiles = dirRes.filter((file: string) => file.endsWith(".json"));
+        const parsedItems = yield* Effect.all(
+          jsonFiles.map((fileName) => {
+            const fullPath = path.join(fileSystemPath, fileName);
+            return Effect.gen(function* () {
+              const readRes = yield* ctx.runtime.fs.readFile(fullPath, "utf8");
+              const parsed = JSON.parse(readRes);
+              if (
+                parsed &&
+                typeof parsed === "object" &&
+                "files" in parsed &&
+                Array.isArray(parsed.files)
+              ) {
+                return parsed;
+              }
+              return null;
+            }).pipe(Effect.catchAll(() => Effect.succeed(null)));
+          }),
+          { concurrency: "unbounded" },
+        );
 
-      const items: unknown[] = [];
+        const items = parsedItems.filter((i) => i !== null);
+        return { items, resolvedSource: id };
+      }).pipe(Effect.catchAll(() => Effect.succeed(null)));
 
-      for (const fileName of jsonFiles) {
-        const fullPath = path.join(fileSystemPath, fileName);
-
-        try {
-          const readRes = await Effect.runPromise(ctx.runtime.fs.readFile(fullPath, "utf8"));
-          const parsed = JSON.parse(readRes);
-          if (
-            parsed &&
-            typeof parsed === "object" &&
-            "files" in parsed &&
-            Array.isArray(parsed.files)
-          ) {
-            items.push(parsed);
-          }
-        } catch {
-          // ignore invalid json in directory
-        }
-      }
-
-      return { items, resolvedSource: id };
+      return Effect.runPromise(program);
     },
   };
 }

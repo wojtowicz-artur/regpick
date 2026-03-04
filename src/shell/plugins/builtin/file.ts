@@ -34,28 +34,25 @@ export function FilePlugin(): RegpickPlugin {
 
     async load(id: string, ctx?: PluginContext) {
       if (!isFileUrl(id)) return null;
-      if (!ctx) return null;
+      if (!ctx?.runtime?.fs) return null;
 
       const fileSystemPath = fileURLToPath(new URL(id));
 
-      if (!ctx.runtime?.fs) return null;
-
-      try {
-        const stats = await Effect.runPromise(ctx.runtime.fs.stat(fileSystemPath));
+      const program = Effect.gen(function* () {
+        const stats = yield* ctx.runtime.fs.stat(fileSystemPath);
         if (stats.isDirectory()) {
           return null;
         }
 
-        const readValue = await Effect.runPromise(ctx.runtime.fs.readFile(fileSystemPath, "utf8"));
-
+        const readValue = yield* ctx.runtime.fs.readFile(fileSystemPath, "utf8");
         try {
           return JSON.parse(readValue);
         } catch {
           return readValue;
         }
-      } catch {
-        return null;
-      }
+      }).pipe(Effect.catchAll(() => Effect.succeed(null)));
+
+      return Effect.runPromise(program);
     },
   };
 }

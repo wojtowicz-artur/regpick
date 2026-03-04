@@ -1,4 +1,4 @@
-import { Effect, Either } from "effect";
+import { Effect } from "effect";
 
 import { appError, type AppError } from "@/core/errors.js";
 import { resolveListSourceDecision } from "@/domain/listCore.js";
@@ -18,20 +18,18 @@ type ListSourceState = {
  */
 function queryListSourceState(context: CommandContext): Effect.Effect<ListSourceState, AppError> {
   return Effect.gen(function* () {
-    const res = yield* Effect.tryPromise({
-      try: () => readConfig(context.cwd),
-      catch: (e): AppError => appError("RuntimeError", String(e)),
-    });
+    const res = yield* readConfig(context.cwd).pipe(
+      Effect.mapError((e) => appError("RuntimeError", String(e))),
+    );
 
     const sourceDecision = resolveListSourceDecision(
       context.args.positionals[1],
       res.config.registry?.sources || {},
     );
 
-    const customPlugins = yield* Effect.tryPromise({
-      try: () => loadPlugins(res.config.plugins || [], context.cwd),
-      catch: (e): AppError => appError("RuntimeError", String(e)),
-    });
+    const customPlugins = yield* loadPlugins(res.config.plugins || [], context.cwd).pipe(
+      Effect.mapError((e) => appError("RuntimeError", String(e))),
+    );
 
     const plugins = [...customPlugins, HttpPlugin(), FilePlugin(), DirectoryPlugin()];
 
@@ -79,16 +77,8 @@ function queryRegistryItems(
   plugins: RegpickPlugin[],
 ): Effect.Effect<RegistryItem[], AppError> {
   return Effect.gen(function* () {
-    const registryResult = yield* Effect.tryPromise({
-      try: () => loadRegistry(source, context.cwd, context.runtime, plugins),
-      catch: (e): AppError => appError("RuntimeError", String(e)),
-    });
-
-    if (Either.isLeft(registryResult)) {
-      return yield* Effect.fail(registryResult.left);
-    }
-
-    return registryResult.right.items;
+    const { items } = yield* loadRegistry(source, context.cwd, context.runtime, plugins);
+    return items;
   });
 }
 
@@ -116,7 +106,7 @@ function presentItems(context: CommandContext, items: RegistryItem[]): Effect.Ef
 /**
  * Main controller for the `list` command.
  */
-function runListCommandEff(context: CommandContext): Effect.Effect<CommandOutcome, AppError> {
+export function runListCommand(context: CommandContext): Effect.Effect<CommandOutcome, AppError> {
   return Effect.gen(function* () {
     const state = yield* queryListSourceState(context);
     const source = yield* interactSourcePhase(context, state);
@@ -145,10 +135,4 @@ function runListCommandEff(context: CommandContext): Effect.Effect<CommandOutcom
       message: `Listed ${items.length} item(s).`,
     } as CommandOutcome;
   });
-}
-
-export async function runListCommand(
-  context: CommandContext,
-): Promise<Either.Either<CommandOutcome, AppError>> {
-  return await Effect.runPromise(Effect.either(runListCommandEff(context)));
 }

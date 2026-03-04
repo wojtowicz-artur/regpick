@@ -1,4 +1,4 @@
-import { Either } from "effect";
+import { Effect } from "effect";
 import path from "node:path";
 import { styleText } from "node:util";
 
@@ -24,89 +24,111 @@ Options:
 `);
 }
 
-async function run(): Promise<void> {
-  const abortController = new AbortController();
+function run(): Effect.Effect<void, never> {
+  return Effect.gen(function* () {
+    const abortController = new AbortController();
 
-  // Abort prompts on background errors or process termination
-  const handleTerminate = (err?: Error) => {
-    if (!abortController.signal.aborted) {
-      abortController.abort(err);
-    }
-    if (err instanceof Error) {
-      console.error(styleText("red", `\n[Fatal Error] ${err.message}`));
-    }
-    process.exit(1);
-  };
+    // Abort prompts on background errors or process termination
+    const handleTerminate = (err?: Error) => {
+      if (!abortController.signal.aborted) {
+        abortController.abort(err);
+      }
+      if (err instanceof Error) {
+        console.error(styleText("red", `\n[Fatal Error] ${err.message}`));
+      }
+      process.exit(1);
+    };
 
-  process.on("SIGINT", () => handleTerminate());
-  process.on("SIGTERM", () => handleTerminate());
-  process.on("uncaughtException", handleTerminate);
-  process.on("unhandledRejection", (reason) =>
-    handleTerminate(reason instanceof Error ? reason : new Error(String(reason))),
-  );
+    process.on("SIGINT", () => handleTerminate());
+    process.on("SIGTERM", () => handleTerminate());
+    process.on("uncaughtException", handleTerminate);
+    process.on("unhandledRejection", (reason) =>
+      handleTerminate(reason instanceof Error ? reason : new Error(String(reason))),
+    );
 
-  const parsed = parseCliArgs(process.argv.slice(2));
-  const command = parsed.positionals[0];
+    const parsed = parseCliArgs(process.argv.slice(2));
+    const command = parsed.positionals[0];
 
-  if (!command || parsed.flags.help) {
-    printHelp();
-    return;
-  }
-
-  const { createRuntimePorts } = await import("@/shell/runtime/ports.js");
-  const runtime = createRuntimePorts({ signal: abortController.signal });
-
-  if (!command || parsed.flags.help) {
-    printHelp();
-    return;
-  }
-
-  const context: CommandContext = {
-    cwd: parsed.flags.cwd ? path.resolve(process.cwd(), String(parsed.flags.cwd)) : process.cwd(),
-    args: parsed,
-    runtime,
-  };
-
-  runtime.prompt.intro(styleText("cyan", "regpick"));
-
-  try {
-    let result: Either.Either<CommandOutcome, AppError>;
-    if (command === "init") {
-      result = await import("@/commands/init.js").then((mod) => mod.runInitCommand(context));
-    } else if (command === "list") {
-      result = await import("@/commands/list.js").then((mod) => mod.runListCommand(context));
-    } else if (command === "add") {
-      result = await import("@/commands/add.js").then((mod) => mod.runAddCommand(context));
-    } else if (command === "update") {
-      result = await import("@/commands/update.js").then((mod) => mod.runUpdateCommand(context));
-    } else if (command === "pack") {
-      result = await import("@/commands/pack.js").then((mod) => mod.runPackCommand(context));
-    } else {
-      runtime.prompt.error(`Unknown command: ${command}`);
+    if (!command || parsed.flags.help) {
       printHelp();
-      process.exitCode = 1;
       return;
     }
 
-    if (Either.isLeft(result)) {
-      handleAppError(result.left, runtime.prompt.error);
-      runtime.prompt.outro(styleText("red", "Failed."));
-      process.exitCode = 1;
-      return;
-    }
+    const { createRuntimePorts } = yield* Effect.promise(() => import("@/shell/runtime/ports.js"));
+    const runtime = createRuntimePorts({ signal: abortController.signal });
 
-    if (result.right.kind === "noop") {
-      runtime.prompt.outro(styleText("yellow", result.right.message));
-      return;
-    }
+    const context: CommandContext = {
+      cwd: parsed.flags.cwd ? path.resolve(process.cwd(), String(parsed.flags.cwd)) : process.cwd(),
+      args: parsed,
+      runtime,
+    };
 
-    runtime.prompt.outro(styleText("green", "Done."));
-  } catch (error) {
-    const appErr = toAppError(error);
-    handleAppError(appErr, runtime.prompt.error);
-    runtime.prompt.outro(styleText("red", "Failed."));
-    process.exitCode = 1;
-  }
+    runtime.prompt.intro(styleText("cyan", "regpick"));
+
+    const executeCommand = Effect.gen(function* () {
+      let commandEffect: Effect.Effect<CommandOutcome, AppError>;
+
+      switch (command) {
+        case "init":
+          commandEffect = yield* Effect.promise(() =>
+            import("@/commands/init.js").then((mod) => mod.runInitCommand(context)),
+          );
+          break;
+        case "list":
+          commandEffect = yield* Effect.promise(() =>
+            import("@/commands/list.js").then((mod) => mod.runListCommand(context)),
+          );
+          break;
+        case "add":
+          commandEffect = yield* Effect.promise(() =>
+            import("@/commands/add.js").then((mod) => mod.runAddCommand(context)),
+          );
+          break;
+        case "update":
+          commandEffect = yield* Effect.promise(() =>
+            import("@/commands/update.js").then((mod) => mod.runUpdateCommand(context)),
+          );
+          break;
+        case "pack":
+          commandEffect = yield* Effect.promise(() =>
+            import("@/commands/pack.js").then((mod) => mod.runPackCommand(context)),
+          );
+          break;
+        default:
+          runtime.prompt.error(`Unknown command: ${command}`);
+          printHelp();
+          process.exitCode = 1;
+          return yield* Effect.succeed(undefined as any);
+      }
+
+      const result = yield* commandEffect;
+
+      if (result.kind === "noop") {
+        runtime.prompt.outro(styleText("yellow", result.message));
+        return;
+      }
+
+      runtime.prompt.outro(styleText("green", "Done."));
+    }).pipe(
+      Effect.catchAll((error) =>
+        Effect.sync(() => {
+          handleAppError(error, runtime.prompt.error);
+          runtime.prompt.outro(styleText("red", "Failed."));
+          process.exitCode = 1;
+        }),
+      ),
+      Effect.catchAllDefect((defect) =>
+        Effect.sync(() => {
+          const appErr = toAppError(defect);
+          handleAppError(appErr, runtime.prompt.error);
+          runtime.prompt.outro(styleText("red", "Failed."));
+          process.exitCode = 1;
+        }),
+      ),
+    );
+
+    yield* executeCommand;
+  });
 }
 
 function handleAppError(error: AppError, write: (message: string) => void): void {
@@ -117,4 +139,4 @@ function handleAppError(error: AppError, write: (message: string) => void): void
   write(`[${error.kind}] ${error.message}`);
 }
 
-void run();
+Effect.runPromise(run());

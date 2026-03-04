@@ -41,10 +41,9 @@ function queryLoadState(
   context: CommandContext,
 ): Effect.Effect<{ config: RegpickConfig; lockfile: RegpickLockfile }, AppError> {
   return Effect.gen(function* () {
-    const configRes = yield* Effect.tryPromise({
-      try: () => readConfig(context.cwd),
-      catch: (e): AppError => appError("RuntimeError", String(e)),
-    });
+    const configRes = yield* readConfig(context.cwd).pipe(
+      Effect.mapError((e) => appError("RuntimeError", String(e))),
+    );
 
     const lockfile = yield* Effect.tryPromise({
       try: () => readLockfile(context.cwd, context.runtime),
@@ -76,57 +75,51 @@ function queryAvailableUpdates(
     const availableUpdates: DetectedUpdate[] = [];
 
     for (const [source, itemsToUpdate] of Object.entries(bySource)) {
-      const registryRes = yield* Effect.tryPromise({
-        try: () => loadRegistry(source, context.cwd, context.runtime, plugins),
-        catch: (e): AppError => appError("RuntimeError", String(e)),
-      });
+      const loadOpt = yield* Effect.either(
+        loadRegistry(source, context.cwd, context.runtime, plugins),
+      );
 
-      if (Either.isLeft(registryRes)) {
+      if (Either.isLeft(loadOpt)) {
         yield* context.runtime.prompt.warn(`Failed to load registry ${source}`);
         continue;
       }
 
-      const registryItems = registryRes.right.items;
+      const registryItems = loadOpt.right.items;
 
       for (const itemName of itemsToUpdate) {
         const registryItem = registryItems.find((i) => i.name === itemName);
         if (!registryItem) continue;
 
-        const fileContentResults = yield* Effect.tryPromise({
-          try: () =>
-            Promise.all(
-              registryItem.files.map(async (file) => {
-                const contentRes = await resolveFileContent(
-                  file,
-                  registryItem,
-                  context.cwd,
-                  context.runtime,
-                  plugins,
-                );
-                if (Either.isLeft(contentRes)) return null;
-                return { file, content: contentRes.right };
-              }),
+        const resolvedFiles = yield* Effect.all(
+          registryItem.files.map((file) =>
+            resolveFileContent(file, registryItem, context.cwd, context.runtime, plugins).pipe(
+              Effect.map((content) => ({ file, content })),
+              Effect.catchAll(() => Effect.succeed(null)),
             ),
-          catch: (e): AppError => appError("RuntimeError", String(e)),
-        });
-
-        const resolvedFiles = fileContentResults.filter(
-          (r): r is { file: RegistryFile; content: string } => r !== null,
+          ),
+          { concurrency: "unbounded" },
+        ).pipe(
+          Effect.map((results) =>
+            results.filter((r): r is { file: RegistryFile; content: string } => r !== null),
+          ),
         );
 
         const currentHash = lockfile.components[itemName].hash;
-        const updatePlanRes = buildUpdatePlanForItem(
-          itemName,
-          registryItem,
-          resolvedFiles,
-          currentHash,
-          context.cwd,
-          config,
+        const updatePlanRes = yield* Effect.catchAll(
+          buildUpdatePlanForItem(
+            itemName,
+            registryItem,
+            resolvedFiles,
+            currentHash,
+            context.cwd,
+            config,
+          ),
+          () => Effect.succeed(null),
         );
 
-        if (Either.isLeft(updatePlanRes)) continue;
+        if (!updatePlanRes) continue;
 
-        const updateAction = updatePlanRes.right;
+        const updateAction = updatePlanRes;
 
         if (updateAction.status === "requires-diff-prompt") {
           const filesWithLocal: DetectedUpdateFile[] = [];
@@ -232,7 +225,7 @@ function interactApprovalPhase(
 /**
  * Main controller for the `update` command effect loop.
  */
-function runUpdateCommandEff(context: CommandContext): Effect.Effect<CommandOutcome, AppError> {
+export function runUpdateCommand(context: CommandContext): Effect.Effect<CommandOutcome, AppError> {
   return Effect.gen(function* () {
     const state = yield* queryLoadState(context);
 
@@ -245,10 +238,9 @@ function runUpdateCommandEff(context: CommandContext): Effect.Effect<CommandOutc
       } as CommandOutcome;
     }
 
-    const customPlugins = yield* Effect.tryPromise({
-      try: () => loadPlugins(state.config.plugins || [], context.cwd),
-      catch: (e): AppError => appError("RuntimeError", String(e)),
-    });
+    const customPlugins = yield* loadPlugins(state.config.plugins || [], context.cwd).pipe(
+      Effect.mapError((e) => appError("RuntimeError", String(e))),
+    );
 
     const plugins = [...customPlugins, HttpPlugin(), FilePlugin(), DirectoryPlugin()];
 
@@ -306,24 +298,19 @@ function runUpdateCommandEff(context: CommandContext): Effect.Effect<CommandOutc
       },
     ]);
 
-    yield* Effect.tryPromise({
-      try: () => pipeline.run({ vfs, cwd: context.cwd, runtime: context.runtime }, vfsFiles),
-      catch: (error): AppError => {
+    yield* pipeline.run({ vfs, cwd: context.cwd, runtime: context.runtime }, vfsFiles).pipe(
+      Effect.catchAll((error) => {
         vfs.rollback();
-        Effect.runPromise(context.runtime.prompt.error(`[Failed] Update aborted: ${error}`));
-        return appError("RuntimeError", String(error));
-      },
-    });
+        return Effect.gen(function* () {
+          yield* context.runtime.prompt.error(`[Failed] Update aborted: ${error.message}`);
+          return yield* Effect.fail(error);
+        });
+      }),
+    );
 
     return {
       kind: "success",
       message: `Updated ${approvedCount} components.`,
     } as CommandOutcome;
   });
-}
-
-export async function runUpdateCommand(
-  context: CommandContext,
-): Promise<Either.Either<CommandOutcome, AppError>> {
-  return await Effect.runPromise(Effect.either(runUpdateCommandEff(context)));
 }

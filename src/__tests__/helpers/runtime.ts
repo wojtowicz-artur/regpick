@@ -51,9 +51,9 @@ export function createMockRuntime(initialFiles: Record<string, string> = {}): {
     fs: {
       pathExists: (filePath: string) => Effect.succeed(fileSystem.exists(filePath)),
       ensureDir: () => Effect.succeed(undefined),
-      remove: (filePath: string) => Effect.succeed(undefined),
-      writeFile: (filePath: string, content: string) => Effect.succeed(undefined),
-      readFile: (filePath: string) => Effect.succeed({ isDirectory: () => false } as any),
+      remove: (_filePath: string) => Effect.succeed(undefined),
+      writeFile: (_filePath: string, _content: string) => Effect.succeed(undefined),
+      readFile: (_filePath: string) => Effect.succeed({ isDirectory: () => false } as any),
       readdir: () => Effect.succeed([]),
     } as any,
     http: mockHttp as unknown as Context.Tag.Service<HttpPort>,

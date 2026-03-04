@@ -1,4 +1,4 @@
-import { Either } from "effect";
+import { Effect } from "effect";
 import { appError, type AppError } from "@/core/errors.js";
 import type { CommandContext, RegistryItem } from "@/types.js";
 
@@ -31,22 +31,22 @@ export function filterItemsByQuery(items: RegistryItem[], query: string): Regist
 export function selectItemsFromFlags(
   items: RegistryItem[],
   context: CommandContext,
-): Either.Either<RegistryItem[] | null, AppError> {
+): Effect.Effect<RegistryItem[] | null, AppError> {
   const { flags } = context.args;
   const explicit = parseSelectedNames(flags.select);
   if (flags.all) {
-    return Either.right(items);
+    return Effect.succeed(items);
   }
 
   if (explicit.length) {
     const selected = items.filter((item) => explicit.includes(item.name));
     if (!selected.length) {
-      return Either.left(
+      return Effect.fail(
         appError("ValidationError", `No items matched --select=${String(flags.select)}`),
       );
     }
-    return Either.right(selected);
+    return Effect.succeed(selected);
   }
 
-  return Either.right(null);
+  return Effect.succeed(null);
 }

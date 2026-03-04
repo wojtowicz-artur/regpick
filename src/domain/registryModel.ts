@@ -1,4 +1,4 @@
-import { Either } from "effect";
+import { Effect } from "effect";
 import { appError, type AppError } from "@/core/errors.js";
 import { Schema as S } from "effect";
 
@@ -117,13 +117,13 @@ const SingleItemManifestSchema = S.Struct({
 export function normalizeManifestInline(
   data: unknown,
   sourceMeta: RegistrySourceMeta,
-): Either.Either<RegistryItem[], AppError> {
+): Effect.Effect<RegistryItem[], AppError> {
   try {
     if (Array.isArray(data)) {
       const items = data
         .filter((entry) => Boolean(entry && typeof entry === "object"))
         .map((entry) => normalizeItem(entry, sourceMeta));
-      return Either.right(items);
+      return Effect.succeed(items);
     }
 
     const hasItemsRes = S.decodeUnknownEither(ManifestItemsSchema)(data);
@@ -133,19 +133,19 @@ export function normalizeManifestInline(
           "files" in (entry as Record<string, unknown>) &&
           Array.isArray((entry as Record<string, unknown>).files),
       );
-      return Either.right(entries.map((entry) => normalizeItem(entry, sourceMeta)));
+      return Effect.succeed(entries.map((entry) => normalizeItem(entry, sourceMeta)));
     }
 
     const hasFilesRes = S.decodeUnknownEither(SingleItemManifestSchema)(data);
     if (hasFilesRes._tag === "Right") {
-      return Either.right([normalizeItem(data, sourceMeta)]);
+      return Effect.succeed([normalizeItem(data, sourceMeta)]);
     }
 
-    return Either.left(appError("RegistryError", "Unsupported manifest structure."));
+    return Effect.fail(appError("RegistryError", "Unsupported manifest structure."));
   } catch (e: any) {
     if (e?.name === "ParseError") {
-      return Either.left(appError("ValidationError", `Manifest validation failed: ${e.message}`));
+      return Effect.fail(appError("ValidationError", `Manifest validation failed: ${e.message}`));
     }
-    return Either.left(appError("RegistryError", "Failed to parse manifest"));
+    return Effect.fail(appError("RegistryError", "Failed to parse manifest"));
   }
 }

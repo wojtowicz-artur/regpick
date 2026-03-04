@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 
 import fs from "node:fs/promises";
@@ -10,7 +11,7 @@ describe("readConfig", () => {
   it("returns defaults and null path when no config exists", async () => {
     const tmp = await fs.mkdtemp(path.join(os.tmpdir(), "regpick-"));
     try {
-      const { config, configPath } = await readConfig(tmp);
+      const { config, configPath } = await Effect.runPromise(readConfig(tmp));
       expect(configPath).toBeNull();
       expect(config).toHaveProperty("registry");
       expect(config).toHaveProperty("resolve");
@@ -29,7 +30,7 @@ describe("readConfig", () => {
       };
       await fs.writeFile(path.join(tmp, "regpick.json"), JSON.stringify(custom), "utf8");
 
-      const { config, configPath } = await readConfig(tmp);
+      const { config, configPath } = await Effect.runPromise(readConfig(tmp));
 
       expect(configPath).not.toBeNull();
       expect(configPath?.endsWith("regpick.json")).toBe(true);
@@ -52,7 +53,7 @@ describe("readConfig", () => {
       const nested = path.join(tmp, "a", "b", "c");
       await fs.mkdir(nested, { recursive: true });
 
-      const { config, configPath } = await readConfig(nested);
+      const { config, configPath } = await Effect.runPromise(readConfig(nested));
 
       expect(configPath).not.toBeNull();
       expect(

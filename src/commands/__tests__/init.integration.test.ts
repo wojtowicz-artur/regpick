@@ -39,11 +39,15 @@ describe("init integration", () => {
     await fs.writeFile(path.join(testDir, "package.json"), packageJsonContent);
 
     // 2. Run the command
-    const result = await runInitCommand({
-      cwd: testDir,
-      runtime,
-      args: { flags: { yes: true }, positionals: [] },
-    });
+    const result = await Effect.runPromise(
+      Effect.either(
+        runInitCommand({
+          cwd: testDir,
+          runtime,
+          args: { flags: { yes: true }, positionals: [] },
+        }),
+      ),
+    );
 
     // 3. Assertions
     expect(Either.isRight(result)).toBe(true);
@@ -65,11 +69,15 @@ describe("init integration", () => {
   });
 
   it("should work even if package.json is missing", async () => {
-    const result = await runInitCommand({
-      cwd: testDir,
-      runtime,
-      args: { flags: { yes: true }, positionals: [] },
-    });
+    const result = await Effect.runPromise(
+      Effect.either(
+        runInitCommand({
+          cwd: testDir,
+          runtime,
+          args: { flags: { yes: true }, positionals: [] },
+        }),
+      ),
+    );
 
     expect(Either.isRight(result)).toBe(true);
     const configPath = path.join(testDir, "regpick.config.mjs");
@@ -87,11 +95,15 @@ describe("init integration", () => {
     );
     mockPrompt.select.mockReturnValueOnce(Effect.succeed("cancelled"));
 
-    const result = await runInitCommand({
-      cwd: testDir,
-      runtime,
-      args: { flags: { yes: false }, positionals: [] },
-    });
+    const result = await Effect.runPromise(
+      Effect.either(
+        runInitCommand({
+          cwd: testDir,
+          runtime,
+          args: { flags: { yes: false }, positionals: [] },
+        }),
+      ),
+    );
 
     expect(Either.isRight(result)).toBe(false);
     if (Either.isLeft(result)) {
@@ -115,11 +127,15 @@ describe("init integration", () => {
     mockPrompt.text.mockReturnValueOnce(Effect.succeed("src/custom-ui"));
     mockPrompt.select.mockReturnValueOnce(Effect.succeed("prompt"));
 
-    const result = await runInitCommand({
-      cwd: testDir,
-      runtime,
-      args: { flags: { yes: false }, positionals: [] },
-    });
+    const result = await Effect.runPromise(
+      Effect.either(
+        runInitCommand({
+          cwd: testDir,
+          runtime,
+          args: { flags: { yes: false }, positionals: [] },
+        }),
+      ),
+    );
 
     expect(Either.isRight(result)).toBe(true);
 
@@ -136,11 +152,15 @@ describe("init integration", () => {
     // Restrict write permissions on the directory
     await fs.chmod(testDir, 0o500);
 
-    const result = await runInitCommand({
-      cwd: testDir,
-      runtime,
-      args: { flags: { yes: true }, positionals: [] },
-    });
+    const result = await Effect.runPromise(
+      Effect.either(
+        runInitCommand({
+          cwd: testDir,
+          runtime,
+          args: { flags: { yes: true }, positionals: [] },
+        }),
+      ),
+    );
 
     expect(Either.isRight(result)).toBe(false);
     if (Either.isLeft(result)) {

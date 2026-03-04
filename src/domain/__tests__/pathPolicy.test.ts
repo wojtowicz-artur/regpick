@@ -1,4 +1,4 @@
-import { Either } from "effect";
+import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { resolveOutputPathFromPolicy } from "@/domain/pathPolicy.js";
@@ -44,39 +44,37 @@ const item: RegistryItem = {
 
 describe("path policy core", () => {
   it("prefers manifest target by default", () => {
-    const outputRes = resolveOutputPathFromPolicy(item, item.files[0], "/tmp/project", baseConfig);
-    expect(Either.isRight(outputRes)).toBe(true);
-    if (Either.isRight(outputRes)) {
-      expect(outputRes.right.relativeTarget).toBe("src/custom/check.tsx");
-    }
+    const outputRes = Effect.runSync(
+      resolveOutputPathFromPolicy(item, item.files[0], "/tmp/project", baseConfig),
+    );
+    expect(outputRes.relativeTarget).toBe("src/custom/check.tsx");
   });
 
   it("uses mapped type target when preferManifestTarget is false", () => {
-    const outputRes = resolveOutputPathFromPolicy(item, item.files[0], "/tmp/project", {
-      ...baseConfig,
-      registry: {
-        ...baseConfig.registry,
-        sources: baseConfig.registry?.sources || {},
-        preferManifestTarget: false,
-      },
-    });
-    expect(Either.isRight(outputRes)).toBe(true);
-    if (Either.isRight(outputRes)) {
-      expect(outputRes.right.relativeTarget).toBe("src/components/ui/check.tsx");
-    }
+    const outputRes = Effect.runSync(
+      resolveOutputPathFromPolicy(item, item.files[0], "/tmp/project", {
+        ...baseConfig,
+        registry: {
+          ...baseConfig.registry,
+          sources: baseConfig.registry?.sources || {},
+          preferManifestTarget: false,
+        },
+      }),
+    );
+    expect(outputRes.relativeTarget).toBe("src/components/ui/check.tsx");
   });
 
   it("blocks writes outside project root", () => {
-    const outputRes = resolveOutputPathFromPolicy(
-      item,
-      { ...item.files[0], target: "../outside/check.tsx" },
-      "/tmp/project",
-      baseConfig,
-    );
-    expect(Either.isRight(outputRes)).toBe(false);
-    if (Either.isLeft(outputRes)) {
-      expect(outputRes.left.message).toMatch(/Refusing to write outside project/);
-    }
+    expect(() =>
+      Effect.runSync(
+        resolveOutputPathFromPolicy(
+          item,
+          { ...item.files[0], target: "../outside/check.tsx" },
+          "/tmp/project",
+          baseConfig,
+        ),
+      ),
+    ).toThrowError(/Refusing to write outside project/);
   });
 
   it("applies path resolvers over built-in targets", () => {
@@ -99,16 +97,10 @@ describe("path policy core", () => {
       target: "src/custom/check.test.tsx",
     };
 
-    const outputRes = resolveOutputPathFromPolicy(
-      item,
-      testFile,
-      "/tmp/project",
-      configWithResolvers,
+    const outputRes = Effect.runSync(
+      resolveOutputPathFromPolicy(item, testFile, "/tmp/project", configWithResolvers),
     );
-    expect(Either.isRight(outputRes)).toBe(true);
-    if (Either.isRight(outputRes)) {
-      expect(outputRes.right.relativeTarget).toBe("tests/src/custom/check.test.tsx");
-    }
+    expect(outputRes.relativeTarget).toBe("tests/src/custom/check.test.tsx");
   });
 
   it("applies path resolvers to items without explicit targets", () => {
@@ -130,15 +122,9 @@ describe("path policy core", () => {
       path: "styles/test.css",
     };
 
-    const outputRes = resolveOutputPathFromPolicy(
-      item,
-      cssFile,
-      "/tmp/project",
-      configWithResolvers,
+    const outputRes = Effect.runSync(
+      resolveOutputPathFromPolicy(item, cssFile, "/tmp/project", configWithResolvers),
     );
-    expect(Either.isRight(outputRes)).toBe(true);
-    if (Either.isRight(outputRes)) {
-      expect(outputRes.right.relativeTarget).toBe("styles/theme.css");
-    }
+    expect(outputRes.relativeTarget).toBe("styles/theme.css");
   });
 });
