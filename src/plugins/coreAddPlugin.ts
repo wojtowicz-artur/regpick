@@ -1,8 +1,8 @@
 import { type PersistableVFS, type PipelineContext, type Plugin } from "@/core/pipeline.js";
-import { installDependencies } from "@/shell/services/installer.js";
-import { computeTreeHash, readLockfile, writeLockfile } from "@/shell/services/lockfile.js";
-import { resolvePackageManager } from "@/shell/packageManagers/resolver.js";
 import { type RuntimePorts } from "@/core/ports.js";
+import { resolvePackageManager } from "@/shell/packageManagers/resolver.js";
+import { installDependencies } from "@/shell/services/installer.js";
+import { computeHash, readLockfile, writeLockfile } from "@/shell/services/lockfile.js";
 import { type RegistryFile, type RegistryItem, type RegpickConfig } from "@/types.js";
 import { Effect } from "effect";
 
@@ -55,12 +55,6 @@ export function coreAddPlugin(
 
               const itemWrites = hydratedWrites.filter((w) => w.itemName === item.name);
 
-              const remoteFiles = itemWrites.map((w) => ({
-                path: w.relativeTarget,
-                content: w.originalContent,
-              }));
-              const remoteHash = computeTreeHash(remoteFiles);
-
               const localFiles = [];
               for (const w of itemWrites) {
                 try {
@@ -80,12 +74,18 @@ export function coreAddPlugin(
                   });
                 }
               }
-              const localHash = computeTreeHash(localFiles);
+
+              const files = localFiles.map((file) => ({
+                path: file.path,
+                hash: computeHash(file.content),
+              }));
 
               lockfile.components[item.name] = {
                 source: item.sourceMeta?.originalSource ?? "unknown",
-                remoteHash,
-                localHash,
+                version: "version" in item ? String((item as any).version) : undefined,
+                installedAt: new Date().toISOString(),
+                dependencies: item.dependencies ?? [],
+                files: files.sort((a, b) => a.path.localeCompare(b.path)),
               };
             }
             yield* writeLockfile(ctx.cwd, lockfile, runtime).pipe(

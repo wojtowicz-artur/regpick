@@ -5,7 +5,7 @@ import { resolveListSourceDecision } from "@/domain/listCore.js";
 import { readConfig } from "@/shell/config/index.js";
 import { DirectoryPlugin, FilePlugin, HttpPlugin, loadPlugins } from "@/shell/plugins/index.js";
 import { loadRegistry } from "@/shell/services/registry.js";
-import type { RegistryItem, RegpickPlugin } from "@/types.js";
+import type { RegistryItem, RegpickLockfile, RegpickPlugin } from "@/types.js";
 import { Effect } from "effect";
 
 type ListSourceState = {
@@ -88,12 +88,24 @@ export function queryRegistryItems(
 }
 
 /**
- * Formats a generic registry item node into a presentable string.
+ * Formats a generic registry item node into a presentable string,
+ * taking lockfile install state into account.
  */
-export function formatItemLabel(item: RegistryItem): string {
+export function formatItemLabel(item: RegistryItem, lockfile?: RegpickLockfile): string {
   const type = item.type || "registry:file";
   const fileCount = Array.isArray(item.files) ? item.files.length : 0;
-  return `${item.name} (${type}, files: ${fileCount})`;
+
+  let lockStatus = "";
+  if (lockfile && lockfile.components && lockfile.components[item.name]) {
+    const lInfo = lockfile.components[item.name];
+    const dateStr = lInfo.installedAt
+      ? new Date(lInfo.installedAt).toLocaleString()
+      : "Unknown date";
+    const vStr = lInfo.version ? `v${lInfo.version}, ` : "";
+    lockStatus = ` \x1b[32m[Installed: ${vStr}${dateStr}]\x1b[0m`;
+  }
+
+  return `${item.name} (${type}, files: ${fileCount})${lockStatus}`;
 }
 
 /**
@@ -101,6 +113,7 @@ export function formatItemLabel(item: RegistryItem): string {
  */
 export function presentItems(
   items: RegistryItem[],
+  lockfile?: RegpickLockfile,
 ): Effect.Effect<void, never, Runtime | CommandContextTag> {
   return Effect.gen(function* () {
     const runtime = yield* Runtime;
@@ -109,7 +122,7 @@ export function presentItems(
       items,
       (item) =>
         Effect.sync(() => {
-          console.log(`- ${formatItemLabel(item)}`);
+          console.log(`- ${formatItemLabel(item, lockfile)}`);
         }),
       { concurrency: 1 },
     );

@@ -5,24 +5,30 @@ import path from "node:path";
 
 const LOCKFILE_NAME = "regpick-lock.json";
 
-export const LockfileItemSchema = S.mutable(
-  S.Struct({
-    version: S.optionalWith(S.String, { exact: true }),
-    source: S.optionalWith(S.String, { exact: true }),
-    hash: S.optionalWith(S.String, { exact: true }),
-    remoteHash: S.optionalWith(S.String, { exact: true }),
-    localHash: S.optionalWith(S.String, { exact: true }),
-  }),
-);
-export type LockfileItem = S.Schema.Type<typeof LockfileItemSchema>;
+export const FileLockSchema = S.Struct({
+  path: S.String,
+  hash: S.String,
+});
+export type FileLockItem = S.Schema.Type<typeof FileLockSchema>;
+
+export const ComponentLockSchema = S.Struct({
+  version: S.optional(S.String),
+  installedAt: S.String,
+  source: S.optional(S.String),
+  dependencies: S.optional(S.Array(S.String)),
+  files: S.Array(FileLockSchema),
+});
+export type ComponentLockItem = S.Schema.Type<typeof ComponentLockSchema>;
 
 export const RegpickLockfileSchema = S.mutable(
   S.Struct({
-    components: S.mutable(S.Record({ key: S.String, value: LockfileItemSchema })),
+    lockfileVersion: S.Literal(2),
+    components: S.mutable(S.Record({ key: S.String, value: ComponentLockSchema })),
   }),
 );
 export type RegpickLockfile = {
-  components: Record<string, LockfileItem>;
+  lockfileVersion: 2;
+  components: Record<string, ComponentLockItem>;
 };
 
 export function getLockfilePath(cwd: string): string {
@@ -35,12 +41,12 @@ export function readLockfile(cwd: string, runtime: RuntimePorts) {
   return Effect.gen(function* () {
     const exists = yield* runtime.fs.pathExists(lockfilePath);
     if (!exists) {
-      return { components: {} };
+      return { lockfileVersion: 2, components: {} } as RegpickLockfile;
     }
 
     const readRes = yield* Effect.exit(runtime.fs.readJsonSync<unknown>(lockfilePath));
     if (readRes._tag !== "Success") {
-      return { components: {} };
+      return { lockfileVersion: 2, components: {} } as RegpickLockfile;
     }
 
     const decodeEither = S.decodeUnknownEither(RegpickLockfileSchema);
@@ -48,14 +54,29 @@ export function readLockfile(cwd: string, runtime: RuntimePorts) {
     if (parsed._tag === "Right") {
       return parsed.right;
     } else {
-      return { components: {} };
+      return { lockfileVersion: 2, components: {} } as RegpickLockfile;
     }
   });
 }
 
 export function writeLockfile(cwd: string, lockfile: RegpickLockfile, runtime: RuntimePorts) {
   const lockfilePath = getLockfilePath(cwd);
-  return runtime.fs.writeJson(lockfilePath, lockfile, { spaces: 2 });
+
+  const sortedComponents: Record<string, ComponentLockItem> = {};
+  for (const key of Object.keys(lockfile.components).sort()) {
+    const originalItem = lockfile.components[key] as ComponentLockItem;
+    sortedComponents[key] = {
+      ...originalItem,
+      files: [...originalItem.files].sort((a, b) => a.path.localeCompare(b.path)),
+    };
+  }
+
+  const output: RegpickLockfile = {
+    lockfileVersion: 2,
+    components: sortedComponents,
+  };
+
+  return runtime.fs.writeJson(lockfilePath, output, { spaces: 2 });
 }
 
 export function computeHash(content: string): string {

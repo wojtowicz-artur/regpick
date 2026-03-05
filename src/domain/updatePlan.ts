@@ -1,9 +1,9 @@
 import type { AppError } from "@/core/errors.js";
 import { applyAliases } from "@/domain/aliasCore.js";
 import { resolveOutputPathFromPolicy } from "@/domain/pathPolicy.js";
-import { computeTreeHash } from "@/shell/services/lockfile.js";
+import { computeHash } from "@/shell/services/lockfile.js";
 import type {
-  LockfileItem,
+  ComponentLockItem,
   RegistryFile,
   RegistryItem,
   RegpickConfig,
@@ -19,7 +19,7 @@ export type UpdateFile = {
 export type UpdateAction = {
   itemName: string;
   status: "up-to-date" | "requires-diff-prompt";
-  newHash: string;
+  newFiles: { path: string; hash: string }[];
   files: UpdateFile[];
 };
 
@@ -31,7 +31,7 @@ export type DetectedUpdateFile = {
 
 export type DetectedUpdate = {
   itemName: string;
-  newHash: string;
+  newFiles: { path: string; hash: string }[];
   files: DetectedUpdateFile[];
 };
 
@@ -55,13 +55,13 @@ export const buildUpdatePlanForItem = (
   itemName: string,
   registryItem: RegistryItem,
   resolvedFiles: { file: RegistryFile; content: string }[],
-  lockfileItem: LockfileItem,
+  lockfileItem: ComponentLockItem,
   cwd: string,
   config: RegpickConfig,
 ): Effect.Effect<UpdateAction, AppError> =>
   Effect.gen(function* () {
     const remoteFiles: UpdateFile[] = [];
-    const treeFiles: { path: string; content: string }[] = [];
+    const treeFiles: { path: string; hash: string }[] = [];
 
     for (const { file, content: rawContent } of resolvedFiles) {
       const content = applyAliases(rawContent, config);
@@ -75,23 +75,42 @@ export const buildUpdatePlanForItem = (
 
       treeFiles.push({
         path: outputRes.relativeTarget,
-        content: content,
+        hash: computeHash(content),
       });
     }
 
-    const newRemoteHash = computeTreeHash(treeFiles);
+    // Sort to have deterministic comparison
+    treeFiles.sort((a, b) => a.path.localeCompare(b.path));
 
-    // If the lockfile matches the remote state, no incoming changes exist
-    // If it's a legacy lockfile (hash only and pending), we will prompt to update it
-    const storedHash = lockfileItem.remoteHash || lockfileItem.hash;
-    const isPending = storedHash === "pending";
+    // Sort lock files as well although they should already be sorted
+    const storedFiles = lockfileItem.files
+      ? [...lockfileItem.files].sort((a, b) => a.path.localeCompare(b.path))
+      : [];
+
+    const isPending = storedFiles.length === 0; // Legacy or corrupted
+
+    let isDifferent = false;
+    if (storedFiles.length !== treeFiles.length) {
+      isDifferent = true;
+    } else {
+      for (let i = 0; i < treeFiles.length; i++) {
+        if (
+          treeFiles[i].path !== storedFiles[i].path ||
+          treeFiles[i].hash !== storedFiles[i].hash
+        ) {
+          isDifferent = true;
+          break;
+        }
+      }
+    }
+
     const status: "requires-diff-prompt" | "up-to-date" =
-      isPending || newRemoteHash !== storedHash ? "requires-diff-prompt" : "up-to-date";
+      isPending || isDifferent ? "requires-diff-prompt" : "up-to-date";
 
     return yield* Effect.succeed({
       itemName,
       status,
-      newHash: newRemoteHash,
+      newFiles: treeFiles,
       files: remoteFiles,
     });
   });

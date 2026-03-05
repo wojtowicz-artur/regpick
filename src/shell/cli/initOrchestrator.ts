@@ -73,9 +73,9 @@ export const interactInitPhase = (state: InitQueryState) =>
     const packageManager = assumeYes
       ? "auto"
       : yield* runtime.prompt.select({
-          message: "Jakiego menedżera pakietów używasz?",
+          message: "What package manager do you use?",
           options: [
-            { value: "auto", label: "Auto (wykrywanie)" },
+            { value: "auto", label: "Auto (detection)" },
             { value: "npm", label: "npm" },
             { value: "yarn", label: "yarn" },
             { value: "pnpm", label: "pnpm" },
@@ -90,7 +90,7 @@ export const interactInitPhase = (state: InitQueryState) =>
     const componentsFolder = assumeYes
       ? "src/components/ui"
       : yield* runtime.prompt.text({
-          message: "W jakim folderze trzymasz komponenty UI?",
+          message: "What folder do you keep your UI components in?",
           placeholder: "src/components/ui",
         });
 
@@ -102,11 +102,11 @@ export const interactInitPhase = (state: InitQueryState) =>
     const overwritePolicy = assumeYes
       ? "prompt"
       : yield* runtime.prompt.select({
-          message: "Czy chcesz nadpisywać pliki automatycznie, czy wolisz być pytany?",
+          message: "Do you want to overwrite files automatically, or do you prefer to be asked?",
           options: [
-            { value: "prompt", label: "Pytaj (prompt)" },
-            { value: "overwrite", label: "Zawsze nadpisuj (overwrite)" },
-            { value: "skip", label: "Pomijaj nadpisywanie (skip)" },
+            { value: "prompt", label: "Ask (prompt)" },
+            { value: "overwrite", label: "Always overwrite (overwrite)" },
+            { value: "skip", label: "Skip overwriting (skip)" },
           ],
         });
 

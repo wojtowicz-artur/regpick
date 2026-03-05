@@ -2,8 +2,8 @@ import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { buildUpdatePlanForItem } from "@/domain/updatePlan.js";
-import { computeTreeHash } from "@/shell/services/lockfile.js";
-import type { LockfileItem, RegistryItem, RegpickConfig } from "@/types.js";
+import { computeHash } from "@/shell/services/lockfile.js";
+import type { ComponentLockItem, RegistryItem, RegpickConfig } from "@/types.js";
 
 const config: RegpickConfig = {
   resolve: {
@@ -38,10 +38,10 @@ const mockItem: RegistryItem = {
 };
 
 describe("update plan core", () => {
-  it("detects updates properly comparing remoteHash", async () => {
-    const lockfileItem: LockfileItem = {
-      hash: "pending",
-      remoteHash: "old-hash-string",
+  it("detects updates properly comparing file hashes", async () => {
+    const lockfileItem: ComponentLockItem = {
+      installedAt: "2024-01-01T00:00:00Z",
+      files: [{ path: "ui/button.tsx", hash: "old-hash" }],
     };
 
     const resolvedFiles = [
@@ -67,14 +67,15 @@ describe("update plan core", () => {
     );
 
     expect(planRes.status).toBe("requires-diff-prompt");
-    expect(planRes.newHash).not.toBe("old-hash-string");
+    expect(planRes.newFiles[0].hash).toBe(computeHash(resolvedFiles[0].content));
     expect(planRes.files).toHaveLength(1);
     expect(planRes.files[0].content).toBe(resolvedFiles[0].content);
   });
 
   it("handles pending hash by forcing update prompt", async () => {
-    const lockfileItem: LockfileItem = {
-      hash: "pending",
+    const lockfileItem: ComponentLockItem = {
+      installedAt: "2024-01-01T00:00:00Z",
+      files: [],
     };
 
     const resolvedFiles = [
@@ -102,7 +103,7 @@ describe("update plan core", () => {
     expect(planRes.status).toBe("requires-diff-prompt");
   });
 
-  it("identifies as up-to-date when remoteHash matches the computed source tree hash", async () => {
+  it("identifies as up-to-date when lockfile hashes match the computed source tree hash", async () => {
     const resolvedFiles = [
       {
         file: {
@@ -122,22 +123,20 @@ describe("update plan core", () => {
       },
     ];
 
-    // Compute the expected hash that the CAS system will generate
     const configPathPolicyResolvedFiles = [
       {
         path: "src/components/ui/button.tsx",
-        content: "export const Button = () => <button>Click me</button>;",
+        hash: computeHash("export const Button = () => <button>Click me</button>;"),
       },
       {
         path: "src/components/ui/utils.ts",
-        content: "export const cn = () => {};",
+        hash: computeHash("export const cn = () => {};"),
       },
     ];
-    const expectedHash = computeTreeHash(configPathPolicyResolvedFiles);
 
-    const lockfileItem: LockfileItem = {
-      hash: "local-hash-ignored",
-      remoteHash: expectedHash,
+    const lockfileItem: ComponentLockItem = {
+      installedAt: "2024-01-01T00:00:00Z",
+      files: configPathPolicyResolvedFiles,
     };
 
     const planRes = Effect.runSync(
@@ -152,46 +151,6 @@ describe("update plan core", () => {
     );
 
     expect(planRes.status).toBe("up-to-date");
-    expect(planRes.newHash).toBe(expectedHash);
-  });
-
-  it("identifies as up-to-date when legacy lockfile hash matches the computed source tree hash", async () => {
-    const resolvedFiles = [
-      {
-        file: {
-          type: "registry:file",
-          path: "button.tsx",
-          target: "ui/button.tsx",
-        },
-        content: "export const Button = () => <button>Click me</button>;",
-      },
-    ];
-
-    // Compute the expected hash for a single file
-    const expectedHash = computeTreeHash([
-      {
-        path: "src/components/ui/button.tsx",
-        content: "export const Button = () => <button>Click me</button>;",
-      },
-    ]);
-
-    // Legacy lockfile representation: no remoteHash/localHash split, just 'hash'
-    const lockfileItem: LockfileItem = {
-      hash: expectedHash,
-    };
-
-    const planRes = Effect.runSync(
-      buildUpdatePlanForItem(
-        "button",
-        mockItem,
-        resolvedFiles,
-        lockfileItem,
-        "/tmp/project",
-        config,
-      ),
-    );
-
-    expect(planRes.status).toBe("up-to-date");
-    expect(planRes.newHash).toBe(expectedHash);
+    expect(planRes.newFiles.length).toBe(2);
   });
 });

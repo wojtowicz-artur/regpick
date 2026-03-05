@@ -116,7 +116,7 @@ export function queryAvailableUpdates(
 
                   return {
                     itemName,
-                    newHash: updateAction.newHash,
+                    newFiles: updateAction.newFiles,
                     files: filesWithLocal,
                   };
                 }

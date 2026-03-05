@@ -11,7 +11,7 @@ import {
   queryUserUpdateApproval,
 } from "@/shell/cli/updateOrchestrator.js";
 import { DirectoryPlugin, FilePlugin, HttpPlugin, loadPlugins } from "@/shell/plugins/index.js";
-import { computeTreeHash, writeLockfile } from "@/shell/services/lockfile.js";
+import { computeHash, writeLockfile } from "@/shell/services/lockfile.js";
 import type { CommandOutcome } from "@/types.js";
 import { Effect } from "effect";
 import crypto from "node:crypto";
@@ -85,7 +85,7 @@ export function runUpdateCommand(): Effect.Effect<
                 code: file.remoteContent,
               });
             });
-            updatedLockfile.components[update.itemName].remoteHash = update.newHash;
+            updatedLockfile.components[update.itemName].installedAt = new Date().toISOString();
           }),
         { concurrency: "unbounded" },
       );
@@ -119,7 +119,12 @@ export function runUpdateCommand(): Effect.Effect<
                   });
                 }
               }
-              updatedLockfile.components[update.itemName].localHash = computeTreeHash(localFiles);
+              updatedLockfile.components[update.itemName].files = localFiles
+                .map((file) => ({
+                  path: file.path,
+                  hash: computeHash(file.content),
+                }))
+                .sort((a, b) => a.path.localeCompare(b.path));
             }
 
             await Effect.runPromise(writeLockfile(ctx.cwd, updatedLockfile, runtime));

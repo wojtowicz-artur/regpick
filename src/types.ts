@@ -1,14 +1,14 @@
+import type { RuntimePorts } from "@/core/ports.js";
+import type { RegpickConfig as ValibotRegpickConfig } from "@/domain/configModel.js";
 import type {
   RegistryFile as ValibotRegistryFile,
   RegistryItem as ValibotRegistryItem,
   RegistrySourceMeta as ValibotRegistrySourceMeta,
 } from "@/domain/registryModel.js";
-import type { RegpickConfig as ValibotRegpickConfig } from "@/domain/configModel.js";
 import type {
-  LockfileItem as ValibotLockfileItem,
+  ComponentLockItem as ValibotComponentLockItem,
   RegpickLockfile as ValibotRegpickLockfile,
 } from "@/shell/services/lockfile.js";
-import type { RuntimePorts } from "@/core/ports.js";
 
 export interface PluginContext {
   cwd: string;
@@ -99,7 +99,7 @@ export type InstallPlan = {
   conflicts: PlannedWrite[];
 };
 
-export type LockfileItem = ValibotLockfileItem;
+export type ComponentLockItem = ValibotComponentLockItem;
 export type RegpickLockfile = ValibotRegpickLockfile;
 
 export type JournalEntry = {

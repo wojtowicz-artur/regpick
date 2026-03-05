@@ -7,6 +7,7 @@ import {
   queryListSourceState,
   queryRegistryItems,
 } from "@/shell/cli/listOrchestrator.js";
+import { readLockfile } from "@/shell/services/lockfile.js";
 import type { CommandOutcome } from "@/types.js";
 import { Effect } from "effect";
 
@@ -40,7 +41,10 @@ export function runListCommand(): Effect.Effect<
       } as CommandOutcome;
     }
 
-    yield* presentItems(items);
+    const context = yield* CommandContextTag;
+    const lockfile = yield* readLockfile(context.cwd, runtime);
+
+    yield* presentItems(items, lockfile);
 
     return {
       kind: "success",

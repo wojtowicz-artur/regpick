@@ -33,7 +33,7 @@ describe("regpick e2e (journal rollback)", () => {
         command: "add",
         status: "pending",
         plannedFiles: [mockComponentPath],
-        lockfileBackup: { components: {} }, // Simulate lockfile rollback
+        lockfileBackup: { lockfileVersion: 2, components: {} }, // Simulate lockfile rollback
       };
 
       await fs.writeFile(path.join(journalDir, "journal.json"), JSON.stringify(mockEntry, null, 2));
