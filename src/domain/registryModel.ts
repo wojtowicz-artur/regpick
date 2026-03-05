@@ -55,24 +55,33 @@ export type RegistryItem = S.Schema.Type<typeof RegistryItemSchema> & {
   sourceMeta: RegistrySourceMeta;
 };
 
-export function normalizeItem(rawItem: unknown, sourceMeta: RegistrySourceMeta): RegistryItem {
-  const parsed = S.decodeUnknownSync(RegistryItemSchema)(rawItem);
+export function normalizeItem(
+  rawItem: unknown,
+  sourceMeta: RegistrySourceMeta,
+): Effect.Effect<RegistryItem, AppError> {
+  return Effect.gen(function* () {
+    const parsed = yield* S.decodeUnknown(RegistryItemSchema)(rawItem).pipe(
+      Effect.mapError((e) =>
+        appError("ValidationError", `Manifest validation failed: ${e.message}`),
+      ),
+    );
 
-  const name = parsed.name === "unnamed-item" && parsed.title ? parsed.title : parsed.name;
-  const title = parsed.title ?? name;
-  const files = parsed.files.map((file) => ({
-    ...file,
-    type:
-      file.type === "registry:file" && parsed.type !== "registry:file" ? parsed.type : file.type,
-  }));
+    const name = parsed.name === "unnamed-item" && parsed.title ? parsed.title : parsed.name;
+    const title = parsed.title ?? name;
+    const files = parsed.files.map((file) => ({
+      ...file,
+      type:
+        file.type === "registry:file" && parsed.type !== "registry:file" ? parsed.type : file.type,
+    }));
 
-  return {
-    ...parsed,
-    name,
-    title,
-    files,
-    sourceMeta,
-  };
+    return {
+      ...parsed,
+      name,
+      title,
+      files,
+      sourceMeta,
+    };
+  });
 }
 
 const ReferenceItemSchema = S.Struct({
@@ -117,39 +126,28 @@ export function normalizeManifestInline(
   data: unknown,
   sourceMeta: RegistrySourceMeta,
 ): Effect.Effect<RegistryItem[], AppError> {
-  return Effect.try({
-    try: () => {
-      if (Array.isArray(data)) {
-        return data
-          .filter((entry) => Boolean(entry && typeof entry === "object"))
-          .map((entry) => normalizeItem(entry, sourceMeta));
-      }
+  return Effect.gen(function* () {
+    if (Array.isArray(data)) {
+      const entries = data.filter((entry) => Boolean(entry && typeof entry === "object"));
+      return yield* Effect.all(entries.map((entry) => normalizeItem(entry, sourceMeta)));
+    }
 
-      const hasItemsRes = S.decodeUnknownEither(ManifestItemsSchema)(data);
-      if (hasItemsRes._tag === "Right") {
-        const entries = hasItemsRes.right.items.filter(
-          (entry) =>
-            "files" in (entry as Record<string, unknown>) &&
-            Array.isArray((entry as Record<string, unknown>).files),
-        );
-        return entries.map((entry) => normalizeItem(entry, sourceMeta));
-      }
+    const hasItemsRes = S.decodeUnknownEither(ManifestItemsSchema)(data);
+    if (hasItemsRes._tag === "Right") {
+      const entries = hasItemsRes.right.items.filter(
+        (entry) =>
+          "files" in (entry as Record<string, unknown>) &&
+          Array.isArray((entry as Record<string, unknown>).files),
+      );
+      return yield* Effect.all(entries.map((entry) => normalizeItem(entry, sourceMeta)));
+    }
 
-      const hasFilesRes = S.decodeUnknownEither(SingleItemManifestSchema)(data);
-      if (hasFilesRes._tag === "Right") {
-        return [normalizeItem(data, sourceMeta)];
-      }
+    const hasFilesRes = S.decodeUnknownEither(SingleItemManifestSchema)(data);
+    if (hasFilesRes._tag === "Right") {
+      const item = yield* normalizeItem(data, sourceMeta);
+      return [item];
+    }
 
-      throw new Error("Unsupported manifest structure.");
-    },
-    catch: (e: any) => {
-      if (e?.name === "ParseError") {
-        return appError("ValidationError", `Manifest validation failed: ${e.message}`);
-      }
-      if (e?.message === "Unsupported manifest structure.") {
-        return appError("RegistryError", e.message);
-      }
-      return appError("RegistryError", "Failed to parse manifest");
-    },
+    return yield* appError("RegistryError", "Unsupported manifest structure.");
   });
 }

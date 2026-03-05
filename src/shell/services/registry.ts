@@ -96,11 +96,11 @@ function resolveItemReference(
     }
 
     if (itemData && typeof itemData === "object") {
-      return yield* Effect.try({
-        try: () => normalizeItem(itemData, sourceMeta),
-        catch: (e: any) =>
+      return yield* normalizeItem(itemData, sourceMeta).pipe(
+        Effect.mapError((e) =>
           appError("ValidationError", `Validation failed for item: ${e.message}`, e),
-      });
+        ),
+      );
     }
 
     return null;
@@ -168,14 +168,14 @@ export function loadRegistry(
       manifestRes &&
       typeof manifestRes === "object" &&
       "ok" in manifestRes &&
-      (manifestRes as any).ok === false
+      (manifestRes as { ok: boolean }).ok === false
     ) {
       return yield* Effect.fail((manifestRes as unknown as { error: AppError }).error);
     }
 
     const manifest =
       manifestRes && typeof manifestRes === "object" && "value" in manifestRes
-        ? (manifestRes as any).value
+        ? (manifestRes as { value: unknown }).value
         : manifestRes;
 
     let items: RegistryItem[] = [];
@@ -204,9 +204,12 @@ export function loadRegistry(
       );
     }
 
-    const finalSource =
-      (manifest && typeof manifest === "object" && "resolvedSource" in manifest
-        ? (manifest as any).resolvedSource
+    const finalSource: string =
+      (manifest &&
+      typeof manifest === "object" &&
+      "resolvedSource" in manifest &&
+      typeof (manifest as { resolvedSource: string }).resolvedSource === "string"
+        ? (manifest as { resolvedSource: string }).resolvedSource
         : undefined) || source;
 
     const enhancedItems = items.map((item) => ({

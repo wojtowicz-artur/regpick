@@ -42,27 +42,30 @@ const BaseRegpickConfigSchema = S.Struct({
     S.Struct({
       targets: S.optionalWith(S.Record({ key: S.String, value: S.String }), {
         exact: true,
-        default: () => ({}) as any,
+        default: () => ({}),
       }),
       aliases: S.optionalWith(S.Record({ key: S.String, value: S.String }), {
         exact: true,
-        default: () => ({}) as any,
+        default: () => ({}),
       }),
     }),
-    { exact: true, default: () => ({}) as any },
+    { exact: true, default: () => ({ targets: {}, aliases: {} }) },
   ),
   registry: S.optionalWith(
     S.Struct({
       sources: S.optionalWith(S.Record({ key: S.String, value: S.String }), {
         exact: true,
-        default: () => ({}) as any,
+        default: () => ({}),
       }),
       preferManifestTarget: S.optionalWith(S.Boolean, {
         exact: true,
         default: () => true,
       }),
     }),
-    { exact: true, default: () => ({}) as any },
+    {
+      exact: true,
+      default: () => ({ sources: {}, preferManifestTarget: true }),
+    },
   ),
   install: S.optionalWith(
     S.Struct({
@@ -79,7 +82,14 @@ const BaseRegpickConfigSchema = S.Struct({
         default: () => false,
       }),
     }),
-    { exact: true, default: () => ({}) as any },
+    {
+      exact: true,
+      default: () => ({
+        packageManager: "auto" as const,
+        overwritePolicy: "prompt" as const,
+        allowOutsideProject: false,
+      }),
+    },
   ),
   plugins: S.optionalWith(S.Array(S.Union(S.Any, S.String)), {
     exact: true,

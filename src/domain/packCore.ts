@@ -69,5 +69,9 @@ export function buildRegistryItemFromFile(file: {
         type: "registry:component",
       },
     ],
-  } as any;
+    sourceMeta: {
+      type: "directory",
+      originalSource: file.targetDir,
+    },
+  };
 }

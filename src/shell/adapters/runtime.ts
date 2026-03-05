@@ -158,16 +158,18 @@ export const createPromptLive = () =>
     multiselect: (options) =>
       Effect.promise(async () => {
         const { multiselect } = await import("@clack/prompts");
-        return multiselect(options) as any;
+        return multiselect(options) as unknown as Promise<string[] | symbol>;
       }),
     autocompleteMultiselect: (options) =>
       Effect.promise(async () => {
         // Fallback to autocomplete-multiselect when available, else regular multiselect
         const prompts = await import("@clack/prompts");
-        if ((prompts as any).autocompleteMultiselect) {
-          return (prompts as any).autocompleteMultiselect(options);
+        if ((prompts as { autocompleteMultiselect?: Function }).autocompleteMultiselect) {
+          return (prompts as { autocompleteMultiselect: Function }).autocompleteMultiselect(
+            options,
+          ) as Promise<string[] | symbol>;
         }
-        return prompts.multiselect(options) as any;
+        return prompts.multiselect(options) as unknown as Promise<string[] | symbol>;
       }),
   });
 
