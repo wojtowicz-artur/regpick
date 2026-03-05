@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.20.1](https://github.com/wojtowicz-artur/regpick/compare/v0.20.0...v0.20.1) (2026-03-05)
+
+### Chores
+
+* remove @effect/schema dependency from package.json ([6b36af6](https://github.com/wojtowicz-artur/regpick/commit/6b36af63f1ff874f0c84bd059bd74f6812a4f89f))
+
+### Code Refactoring
+
+* segregate monolithic Runtime into granular Context Tags ([daf8ed0](https://github.com/wojtowicz-artur/regpick/commit/daf8ed06db0387601cfce9f2b01a7fd8fc332716))
+
 ## [0.20.0](https://github.com/wojtowicz-artur/regpick/compare/v0.19.1...v0.20.0) (2026-03-05)
 
 ### Features
