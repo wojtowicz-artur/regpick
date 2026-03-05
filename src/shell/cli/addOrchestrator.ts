@@ -185,7 +185,7 @@ export function querySelectedItems(
       return yield* Effect.fail(appError("ValidationError", "No items selected."));
     }
 
-    const { resolvedItems, missingDependencies: regDeps } = resolveRegistryDependencies(
+    const { resolvedItems, missingDependencies: regDeps } = yield* resolveRegistryDependencies(
       selectedItems,
       items,
     );

@@ -1,4 +1,4 @@
-import type { AppError } from "@/core/errors.js";
+import { RegistryError, type AppError } from "@/core/errors.js";
 import { resolveOutputPathFromPolicy } from "@/domain/pathPolicy.js";
 import type { InstallPlan, PlannedWrite, RegistryItem, RegpickConfig } from "@/types.js";
 import { Array, Effect } from "effect";
@@ -14,37 +14,58 @@ function buildDependencyPlan(selectedItems: RegistryItem[]): InstallPlan["depend
   };
 }
 
-export function resolveRegistryDependencies(
+export const resolveRegistryDependencies = (
   selectedItems: RegistryItem[],
   allItems: RegistryItem[],
-): { resolvedItems: RegistryItem[]; missingDependencies: string[] } {
-  const allResolvedItems = new Map<string, RegistryItem>();
-  const toResolve = [...selectedItems];
-  const missingDependencies: string[] = [];
+): Effect.Effect<{ resolvedItems: RegistryItem[]; missingDependencies: string[] }, RegistryError> =>
+  Effect.gen(function* () {
+    const allResolvedItems = new Map<string, RegistryItem>();
+    const missingDependencies: string[] = [];
+    const visiting = new Set<string>();
 
-  while (toResolve.length > 0) {
-    const current = toResolve.shift()!;
-    if (allResolvedItems.has(current.name)) continue;
-    allResolvedItems.set(current.name, current);
+    const resolveItem = (
+      current: RegistryItem,
+      path: string[],
+    ): Effect.Effect<void, RegistryError> =>
+      Effect.gen(function* () {
+        if (allResolvedItems.has(current.name)) return;
 
-    if (current.registryDependencies && current.registryDependencies.length > 0) {
-      for (const depName of current.registryDependencies) {
-        if (allResolvedItems.has(depName)) continue;
-        const found = allItems.find((i) => i.name === depName);
-        if (found) {
-          toResolve.push(found);
-        } else {
-          missingDependencies.push(depName);
+        if (visiting.has(current.name)) {
+          const cyclePath = [...path, current.name].join(" -> ");
+          return yield* new RegistryError({
+            message: `Cyclic registry dependency detected: ${cyclePath}`,
+          });
         }
-      }
-    }
-  }
 
-  return {
-    resolvedItems: Array.fromIterable(allResolvedItems.values()),
-    missingDependencies: Array.dedupe(missingDependencies.filter(Boolean)),
-  };
-}
+        visiting.add(current.name);
+        path.push(current.name);
+
+        if (current.registryDependencies && current.registryDependencies.length > 0) {
+          for (const depName of current.registryDependencies) {
+            if (allResolvedItems.has(depName)) continue;
+            const found = allItems.find((i) => i.name === depName);
+            if (found) {
+              yield* resolveItem(found, path);
+            } else {
+              missingDependencies.push(depName);
+            }
+          }
+        }
+
+        path.pop();
+        visiting.delete(current.name);
+        allResolvedItems.set(current.name, current);
+      });
+
+    for (const item of selectedItems) {
+      yield* resolveItem(item, []);
+    }
+
+    return {
+      resolvedItems: Array.fromIterable(allResolvedItems.values()),
+      missingDependencies: Array.dedupe(missingDependencies.filter(Boolean)),
+    };
+  });
 
 export const buildInstallPlan = (
   selectedItems: RegistryItem[],

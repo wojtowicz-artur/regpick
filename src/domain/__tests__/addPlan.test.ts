@@ -67,7 +67,7 @@ describe("add plan core", () => {
   });
 
   describe("resolveRegistryDependencies", () => {
-    it("resolves all registry dependencies", () => {
+    it("resolves all registry dependencies", async () => {
       const itemWithDeps: RegistryItem = {
         name: "button",
         title: "Button",
@@ -94,9 +94,8 @@ describe("add plan core", () => {
       };
 
       const allItems = [itemWithDeps, iconItem, utilsItem];
-      const { resolvedItems, missingDependencies } = resolveRegistryDependencies(
-        [itemWithDeps],
-        allItems,
+      const { resolvedItems, missingDependencies } = await Effect.runPromise(
+        resolveRegistryDependencies([itemWithDeps], allItems),
       );
 
       expect(missingDependencies).toHaveLength(0);
@@ -106,7 +105,7 @@ describe("add plan core", () => {
       );
     });
 
-    it("returns missing dependencies", () => {
+    it("returns missing dependencies", async () => {
       const itemWithDeps: RegistryItem = {
         name: "button",
         title: "Button",
@@ -123,15 +122,111 @@ describe("add plan core", () => {
       };
 
       const allItems = [itemWithDeps];
-      const { resolvedItems, missingDependencies } = resolveRegistryDependencies(
-        [itemWithDeps],
-        allItems,
+      const { resolvedItems, missingDependencies } = await Effect.runPromise(
+        resolveRegistryDependencies([itemWithDeps], allItems),
       );
 
       expect(missingDependencies).toHaveLength(2);
       expect(missingDependencies).toEqual(expect.arrayContaining(["icon", "utils"]));
       expect(resolvedItems).toHaveLength(1);
       expect(resolvedItems[0].name).toBe("button");
+    });
+
+    it("handles diamond dependencies efficiently (no false cycles)", async () => {
+      // D is the base component
+      const itemD: RegistryItem = {
+        name: "D",
+        title: "D",
+        description: "",
+        type: "registry:component",
+        dependencies: [],
+        devDependencies: [],
+        registryDependencies: [],
+        files: [],
+        sourceMeta: {
+          type: "directory",
+          pluginState: { baseDir: "/registry" },
+        },
+      };
+
+      // B and C both depend on D
+      const itemB: RegistryItem = {
+        ...itemD,
+        name: "B",
+        registryDependencies: ["D"],
+      };
+      const itemC: RegistryItem = {
+        ...itemD,
+        name: "C",
+        registryDependencies: ["D"],
+      };
+
+      // A depends on both B and C
+      const itemA: RegistryItem = {
+        ...itemD,
+        name: "A",
+        registryDependencies: ["B", "C"],
+      };
+
+      const allItems = [itemA, itemB, itemC, itemD];
+
+      const { resolvedItems, missingDependencies } = await Effect.runPromise(
+        resolveRegistryDependencies([itemA], allItems),
+      );
+
+      expect(missingDependencies).toHaveLength(0);
+      expect(resolvedItems).toHaveLength(4);
+      expect(resolvedItems.map((i) => i.name)).toEqual(
+        expect.arrayContaining(["A", "B", "C", "D"]),
+      );
+    });
+
+    it("handles deep/wide trees simulating larger loads without overflowing", async () => {
+      const allItems: RegistryItem[] = [];
+      const dependencies: string[] = [];
+
+      // Create 100 middle components, all depending on a single base component
+      const baseItem: RegistryItem = {
+        name: "base",
+        title: "Base",
+        description: "",
+        type: "registry:component",
+        dependencies: [],
+        devDependencies: [],
+        registryDependencies: [],
+        files: [],
+        sourceMeta: {
+          type: "directory",
+          pluginState: { baseDir: "/registry" },
+        },
+      };
+      allItems.push(baseItem);
+
+      for (let i = 0; i < 100; i++) {
+        const name = `mid-${i}`;
+        dependencies.push(name);
+        allItems.push({
+          ...baseItem,
+          name,
+          registryDependencies: ["base"],
+        });
+      }
+
+      // Root component depending on all 100 middle components
+      const rootItem: RegistryItem = {
+        ...baseItem,
+        name: "root",
+        registryDependencies: dependencies,
+      };
+      allItems.push(rootItem);
+
+      // Effect runner shouldn't crash or take overly long
+      const { resolvedItems, missingDependencies } = await Effect.runPromise(
+        resolveRegistryDependencies([rootItem], allItems),
+      );
+
+      expect(missingDependencies).toHaveLength(0);
+      expect(resolvedItems).toHaveLength(102); // 1 root + 100 mid + 1 base
     });
   });
 });
