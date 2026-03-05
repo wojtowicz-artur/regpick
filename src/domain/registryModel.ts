@@ -148,6 +148,6 @@ export function normalizeManifestInline(
       return [item];
     }
 
-    return yield* appError("RegistryError", "Unsupported manifest structure.");
+    return yield* Effect.fail(appError("RegistryError", "Unsupported manifest structure."));
   });
 }
