@@ -58,7 +58,6 @@
   },
   "dependencies": {
     "@clack/prompts": "^1.0.1",
-    "@effect/schema": "^0.75.5",
     "diff": "^8.0.3",
     "effect": "^3.19.19",
     "memfs": "^4.56.10",
