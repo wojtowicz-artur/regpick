@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.20.2](https://github.com/wojtowicz-artur/regpick/compare/v0.20.1...v0.20.2) (2026-03-05)
+
+### Bug Fixes
+
+* update package.json to include types and exports for package.json ([9a2aee4](https://github.com/wojtowicz-artur/regpick/commit/9a2aee454055a266502d8e559afef09c12f35faf))
+
+### Chores
+
+* update dependencies to latest versions in package.json and package-lock.json ([f8f45fd](https://github.com/wojtowicz-artur/regpick/commit/f8f45fdd28bbc9dc23398f0adad64b79ca60f7cf))
+
 ## [0.20.1](https://github.com/wojtowicz-artur/regpick/compare/v0.20.0...v0.20.1) (2026-03-05)
 
 ### Chores
