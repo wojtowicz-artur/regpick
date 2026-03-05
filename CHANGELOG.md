@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.21.0](https://github.com/wojtowicz-artur/regpick/compare/v0.20.5...v0.21.0) (2026-03-05)
+
+### Features
+
+* migrate plugin system to Effect TS with Promise adapters ([1f798e0](https://github.com/wojtowicz-artur/regpick/commit/1f798e07afc1e08198d7ef7198ccab16eeb89471))
+
+### Bug Fixes
+
+* add log method to prompt and update related implementations for improved logging ([46fc424](https://github.com/wojtowicz-artur/regpick/commit/46fc42440bfda00553189e62576cf29665b3277d))
+* add type property to plugins and update related schemas for pipeline integration ([999102a](https://github.com/wojtowicz-artur/regpick/commit/999102adf070ff18d0b39b64d8a4f73718942a00))
+* enhance error handling and validation in registry and manifest processing ([1d33fdc](https://github.com/wojtowicz-artur/regpick/commit/1d33fdca31aeb968be5a6d5af305e1d94b4f65bb))
+* enhance error handling and validation in various functions for improved reliability ([c36e0f9](https://github.com/wojtowicz-artur/regpick/commit/c36e0f94396995b2b441090c382745402dfd4a2b))
+* improve error handling in normalizeManifestInline function for unsupported manifest structures ([196175e](https://github.com/wojtowicz-artur/regpick/commit/196175ec3f6c5470f92ca7edbc417be5e79cee7a))
+* refactor add and update commands for improved lockfile handling and plugin integration ([f2cd71e](https://github.com/wojtowicz-artur/regpick/commit/f2cd71e45d6790d441e4364e95f7fda61dea15b4))
+* refactor getPositionalArgs function for improved argument handling in query functions ([a470552](https://github.com/wojtowicz-artur/regpick/commit/a470552989e0a069ac031879d1bdbfcefd6a9934))
+* simplify config access by removing optional chaining in various files ([e9d283e](https://github.com/wojtowicz-artur/regpick/commit/e9d283e2a73dbd132dadecdd21efa8bf4bb00e19))
+* streamline type imports in types.ts for improved clarity and maintainability ([80ae6b9](https://github.com/wojtowicz-artur/regpick/commit/80ae6b996ff1def0ba3de912befb8858db1396ac))
+* update FileSystemPort methods to support both string and Uint8Array types for file operations ([271dd3d](https://github.com/wojtowicz-artur/regpick/commit/271dd3d838ac794d77ee6c6154e6fbfd67daea86))
+* update plugins handling in loadPlugins ([75714d8](https://github.com/wojtowicz-artur/regpick/commit/75714d8fde7045ae70f3eebc4ccbf8bcd99911c5))
+* update types to use ResolvedRegpickConfig across multiple modules for consistency ([b290e7a](https://github.com/wojtowicz-artur/regpick/commit/b290e7aad5395228e584fc3a2eb7a0626725673e))
+
 ## [0.20.5](https://github.com/wojtowicz-artur/regpick/compare/v0.20.4...v0.20.5) (2026-03-05)
 
 ### Bug Fixes
