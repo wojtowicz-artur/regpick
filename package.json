@@ -1,6 +1,6 @@
 {
   "name": "regpick",
-  "version": "0.20.4",
+  "version": "0.20.5",
   "description": "Lightweight CLI for selecting and installing registry entries.",
   "keywords": [
     "cli",

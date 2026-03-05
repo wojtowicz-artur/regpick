@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.20.5](https://github.com/wojtowicz-artur/regpick/compare/v0.20.4...v0.20.5) (2026-03-05)
+
+### Bug Fixes
+
+* update resolveRegistryDependencies to handle cyclic dependencies and improve error reporting ([85eabc8](https://github.com/wojtowicz-artur/regpick/commit/85eabc8cbc99d3dfcfc15ab056272b6eae919845))
+
 ## [0.20.4](https://github.com/wojtowicz-artur/regpick/compare/v0.20.3...v0.20.4) (2026-03-05)
 
 ### Bug Fixes
