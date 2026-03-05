@@ -76,7 +76,7 @@ export const runPipeline = (
               try: () => plugin.start!(ctx),
               catch: (e) =>
                 appError(
-                  "RuntimeError",
+                  "PluginError",
                   `[${plugin.name}] Failed during start hook: ${e instanceof Error ? e.message : String(e)}`,
                 ),
             });
@@ -97,7 +97,7 @@ export const runPipeline = (
                 try: () => plugin.resolveId!(currentId, undefined, ctx),
                 catch: (e) =>
                   appError(
-                    "RuntimeError",
+                    "PluginError",
                     `[${plugin.name}] Failed to resolveId for '${currentId}': ${e instanceof Error ? e.message : String(e)}`,
                   ),
               });
@@ -134,7 +134,7 @@ export const runPipeline = (
                   try: () => plugin.load!(currentId, ctx),
                   catch: (e) =>
                     appError(
-                      "RuntimeError",
+                      "PluginError",
                       `[${plugin.name}] Failed to load '${currentId}': ${e instanceof Error ? e.message : String(e)}`,
                     ),
                 });
@@ -154,7 +154,7 @@ export const runPipeline = (
                       try: () => plugin.transform!(currentCode as string, currentId, ctx),
                       catch: (e) =>
                         appError(
-                          "RuntimeError",
+                          "PluginError",
                           `[${plugin.name}] Failed to transform '${currentId}': ${e instanceof Error ? e.message : String(e)}`,
                         ),
                     });
@@ -168,7 +168,7 @@ export const runPipeline = (
                 try: () => ctx.vfs.writeFile(currentId, currentCode!),
                 catch: (e) =>
                   appError(
-                    "RuntimeError",
+                    "VfsError",
                     `Failed to write ${currentId}: ${e instanceof Error ? e.message : String(e)}`,
                   ),
               });
@@ -188,7 +188,7 @@ export const runPipeline = (
               try: () => plugin.finish!(ctx),
               catch: (e) =>
                 appError(
-                  "RuntimeError",
+                  "PluginError",
                   `[${plugin.name}] Failed during finish hook: ${e instanceof Error ? e.message : String(e)}`,
                 ),
             });

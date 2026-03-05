@@ -1,7 +1,8 @@
 import { CommandContextTag } from "@/core/context.js";
+import { appError } from "@/core/errors.js";
 import { JournalService } from "@/core/journal.js";
-import { JournalServiceImpl } from "@/shell/adapters/journal.js";
 import { Runtime } from "@/core/ports.js";
+import { JournalServiceImpl } from "@/shell/adapters/journal.js";
 import { Layer } from "effect";
 
 import mockRegistry from "@/__tests__/fixtures/shadcn-registry.json" with { type: "json" };
@@ -282,10 +283,7 @@ describe("add integration with shadcn compatibility", () => {
     );
 
     mockHttp.getText.mockReturnValueOnce(
-      Effect.fail({
-        kind: "RuntimeError",
-        message: "HTTP error! status: 500 when fetching JSON",
-      } as any),
+      Effect.fail(appError("NetworkError", "HTTP error! status: 500 when fetching JSON")),
     );
 
     const result = await Effect.runPromise(
@@ -356,7 +354,7 @@ describe("add integration with shadcn compatibility", () => {
 
     expect(Either.isRight(result)).toBe(false);
     if (Either.isLeft(result)) {
-      expect(result.left._tag).toBe("RuntimeError");
+      expect(result.left._tag).toBe("PluginError");
     }
 
     // Restore permissions so cleanup works

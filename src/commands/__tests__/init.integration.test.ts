@@ -1,5 +1,5 @@
-import { Runtime } from "@/core/ports.js";
 import { CommandContextTag } from "@/core/context.js";
+import { Runtime } from "@/core/ports.js";
 import { Layer } from "effect";
 
 import { createMockPrompt } from "@/__tests__/helpers/integration.js";
@@ -173,7 +173,7 @@ describe("init integration", () => {
     expect(configContent).toContain('"registry:component": "src/custom-ui"');
   });
 
-  it("should fail with a RuntimeError when lacking filesystem permissions", async () => {
+  it("should fail with a FileSystemError when lacking filesystem permissions", async () => {
     // Restrict write permissions on the directory
     await fs.chmod(testDir, 0o500);
 
@@ -194,7 +194,7 @@ describe("init integration", () => {
 
     expect(Either.isRight(result)).toBe(false);
     if (Either.isLeft(result)) {
-      expect(result.left).toMatchObject({ _tag: "RuntimeError" });
+      expect(result.left).toMatchObject({ _tag: "FileSystemError" });
       expect(result.left.message).toContain("Failed to write file");
     }
 

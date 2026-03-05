@@ -30,13 +30,43 @@ export class RuntimeError extends Data.TaggedError("RuntimeError")<{
   readonly cause?: unknown;
 }> {}
 
+export class FileSystemError extends Data.TaggedError("FileSystemError")<{
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
+export class JsonError extends Data.TaggedError("JsonError")<{
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
+export class NetworkError extends Data.TaggedError("NetworkError")<{
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
+export class PluginError extends Data.TaggedError("PluginError")<{
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
+export class VfsError extends Data.TaggedError("VfsError")<{
+  readonly message: string;
+  readonly cause?: unknown;
+}> {}
+
 export type AppError =
   | ConfigError
   | RegistryError
   | InstallError
   | UserCancelled
   | ValidationError
-  | RuntimeError;
+  | RuntimeError
+  | FileSystemError
+  | JsonError
+  | NetworkError
+  | PluginError
+  | VfsError;
 
 export type AppErrorKind = AppError["_tag"];
 
@@ -54,6 +84,16 @@ export function appError(kind: AppErrorKind, message: string, cause?: unknown): 
       return new ValidationError({ message, cause });
     case "RuntimeError":
       return new RuntimeError({ message, cause });
+    case "FileSystemError":
+      return new FileSystemError({ message, cause });
+    case "JsonError":
+      return new JsonError({ message, cause });
+    case "NetworkError":
+      return new NetworkError({ message, cause });
+    case "PluginError":
+      return new PluginError({ message, cause });
+    case "VfsError":
+      return new VfsError({ message, cause });
   }
 }
 
@@ -66,7 +106,12 @@ export function toAppError(error: unknown, fallbackKind: AppErrorKind = "Runtime
       e._tag === "InstallError" ||
       e._tag === "UserCancelled" ||
       e._tag === "ValidationError" ||
-      e._tag === "RuntimeError"
+      e._tag === "RuntimeError" ||
+      e._tag === "FileSystemError" ||
+      e._tag === "JsonError" ||
+      e._tag === "NetworkError" ||
+      e._tag === "PluginError" ||
+      e._tag === "VfsError"
     ) {
       return e as AppError;
     }

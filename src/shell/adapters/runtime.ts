@@ -1,9 +1,9 @@
 import { appError } from "@/core/errors.js";
+import { RuntimePorts } from "@/core/ports.js";
 import { Effect } from "effect";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import fsPromises from "node:fs/promises";
-import { RuntimePorts } from "@/core/ports.js";
 
 export const createRuntimePorts = (options?: { signal?: AbortSignal }): RuntimePorts => ({
   fs: {
@@ -20,22 +20,22 @@ export const createRuntimePorts = (options?: { signal?: AbortSignal }): RuntimeP
     remove: (path) =>
       Effect.tryPromise({
         try: () => fsPromises.rm(path, { recursive: true, force: true }),
-        catch: (cause) => appError("RuntimeError", `Failed to remove ${path}`, cause),
+        catch: (cause) => appError("FileSystemError", `Failed to remove ${path}`, cause),
       }),
     ensureDir: (path) =>
       Effect.tryPromise({
         try: () => fsPromises.mkdir(path, { recursive: true }),
-        catch: (cause) => appError("RuntimeError", `Failed to ensure directory: ${path}`, cause),
+        catch: (cause) => appError("FileSystemError", `Failed to ensure directory: ${path}`, cause),
       }),
     writeFile: (path, content, encoding) =>
       Effect.tryPromise({
         try: () => fsPromises.writeFile(path, content, encoding),
-        catch: (cause) => appError("RuntimeError", `Failed to write file: ${path}`, cause),
+        catch: (cause) => appError("FileSystemError", `Failed to write file: ${path}`, cause),
       }),
     readFile: (path, encoding) =>
       Effect.tryPromise({
         try: () => fsPromises.readFile(path, encoding).then((b) => b.toString()),
-        catch: (cause) => appError("RuntimeError", `Failed to read file: ${path}`, cause),
+        catch: (cause) => appError("FileSystemError", `Failed to read file: ${path}`, cause),
       }),
     readJsonSync: <T = unknown>(path: string) =>
       Effect.try({
@@ -43,7 +43,7 @@ export const createRuntimePorts = (options?: { signal?: AbortSignal }): RuntimeP
           const content = fs.readFileSync(path, "utf8");
           return JSON.parse(content) as T;
         },
-        catch: (cause) => appError("RuntimeError", `Failed to read JSON: ${path}`, cause),
+        catch: (cause) => appError("JsonError", `Failed to read JSON: ${path}`, cause),
       }),
     writeJson: (path, value, opts) =>
       Effect.tryPromise({
@@ -51,17 +51,17 @@ export const createRuntimePorts = (options?: { signal?: AbortSignal }): RuntimeP
           const content = JSON.stringify(value, null, opts?.spaces ?? 2);
           return fsPromises.writeFile(path, content, "utf8");
         },
-        catch: (cause) => appError("RuntimeError", `Failed to write JSON: ${path}`, cause),
+        catch: (cause) => appError("JsonError", `Failed to write JSON: ${path}`, cause),
       }),
     stat: (path) =>
       Effect.tryPromise({
         try: () => fsPromises.stat(path),
-        catch: (cause) => appError("RuntimeError", `Failed to stat path: ${path}`, cause),
+        catch: (cause) => appError("FileSystemError", `Failed to stat path: ${path}`, cause),
       }),
     readdir: (path) =>
       Effect.tryPromise({
         try: () => fsPromises.readdir(path),
-        catch: (cause) => appError("RuntimeError", `Failed to read directory: ${path}`, cause),
+        catch: (cause) => appError("FileSystemError", `Failed to read directory: ${path}`, cause),
       }),
   },
   http: {
@@ -78,7 +78,7 @@ export const createRuntimePorts = (options?: { signal?: AbortSignal }): RuntimeP
           }
           return (await response.json()) as T;
         },
-        catch: (cause) => appError("RuntimeError", `Failed to fetch JSON from: ${url}`, cause),
+        catch: (cause) => appError("NetworkError", `Failed to fetch JSON from: ${url}`, cause),
       }),
     getText: (url: string, timeoutMs = 15000) =>
       Effect.tryPromise({
@@ -93,7 +93,7 @@ export const createRuntimePorts = (options?: { signal?: AbortSignal }): RuntimeP
           }
           return await response.text();
         },
-        catch: (cause) => appError("RuntimeError", `Failed to fetch text from: ${url}`, cause),
+        catch: (cause) => appError("NetworkError", `Failed to fetch text from: ${url}`, cause),
       }),
   },
   prompt: {
@@ -169,7 +169,11 @@ export const createRuntimePorts = (options?: { signal?: AbortSignal }): RuntimeP
   },
   process: {
     run: (command, args, cwd) => {
-      const result = spawnSync(command, args, { stdio: "inherit", cwd, shell: true });
+      const result = spawnSync(command, args, {
+        stdio: "inherit",
+        cwd,
+        shell: true,
+      });
       return { status: result.status };
     },
   },
