@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.19.0](https://github.com/wojtowicz-artur/regpick/compare/v0.18.0...v0.19.0) (2026-03-05)
+
+### Features
+
+* drop v1 compatibility and enhance list command UI -m ([4aae582](https://github.com/wojtowicz-artur/regpick/commit/4aae582a236ffc6caccdd0a8f0c1b3c27da1e95e))
+
+### Code Refactoring
+
+* add command and orchestrator for improved modularity and readability ([f7916e2](https://github.com/wojtowicz-artur/regpick/commit/f7916e2a146cce5784266bcc4ea9896f33a92a66))
+* extract orchestrators for init, list, and pack commands to improve modularity ([7ff3f90](https://github.com/wojtowicz-artur/regpick/commit/7ff3f900c55f453106c4c22b9517d4ebcf918d99))
+* reorganize update command logic and introduce update orchestrator ([633b1f9](https://github.com/wojtowicz-artur/regpick/commit/633b1f9574640668f0da41d517d1c924208d9024))
+* simplify code by consolidating imports and streamlining function logic ([3ca3a2f](https://github.com/wojtowicz-artur/regpick/commit/3ca3a2fc6af11b9733b1f47ded13283bf31bac09))
+* streamline test setup and improve code readability across multiple files ([4c5aeec](https://github.com/wojtowicz-artur/regpick/commit/4c5aeecacca57275d324eee32bf402b1056f97f9))
+
 ## [0.18.0](https://github.com/wojtowicz-artur/regpick/compare/v0.17.0...v0.18.0) (2026-03-04)
 
 ### Features
