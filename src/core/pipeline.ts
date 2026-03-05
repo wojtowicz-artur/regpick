@@ -82,7 +82,7 @@ export const runPipeline = (
             });
           }
         }),
-      { concurrency: 1 },
+      { concurrency: 1, discard: true },
     );
 
     // 2. Resolve Phase
@@ -175,7 +175,7 @@ export const runPipeline = (
             }
           }
         }),
-      { concurrency: "unbounded" },
+      { concurrency: "unbounded", discard: true },
     );
 
     // 3. Finish Phase
@@ -194,7 +194,7 @@ export const runPipeline = (
             });
           }
         }),
-      { concurrency: 1 },
+      { concurrency: 1, discard: true },
     );
   }).pipe(
     Effect.catchAll((err) =>
@@ -206,14 +206,14 @@ export const runPipeline = (
               if (plugin.onError) {
                 yield* Effect.tryPromise({
                   try: () => plugin.onError!(err as Error, ctx),
-                  catch: () => {}, // Ignore nested errors during cleanup
+                  catch: (e) => appError("PluginError", "Cleanup error ignored", e),
                 }).pipe(Effect.ignore);
               }
             }),
-          { concurrency: 1 },
+          { concurrency: 1, discard: true },
         );
         return yield* Effect.fail(err);
       }),
     ),
-  ) as unknown as Effect.Effect<void, AppError>;
+  );
 };
