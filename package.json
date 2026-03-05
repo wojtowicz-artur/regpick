@@ -32,9 +32,10 @@
     "regpick.config.schema.json"
   ],
   "type": "module",
-  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
   "exports": {
-    ".": "./dist/index.mjs"
+    ".": "./dist/index.mjs",
+    "./package.json": "./package.json"
   },
   "scripts": {
     "docs:dev": "npm run dev --prefix website",
