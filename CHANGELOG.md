@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.20.4](https://github.com/wojtowicz-artur/regpick/compare/v0.20.3...v0.20.4) (2026-03-05)
+
+### Bug Fixes
+
+* refactor error handling in various functions to use Effect.try for improved error management ([93bf1c3](https://github.com/wojtowicz-artur/regpick/commit/93bf1c39f9e0b2ace14ba801fcdf38dfed7800a7))
+
 ## [0.20.3](https://github.com/wojtowicz-artur/regpick/compare/v0.20.2...v0.20.3) (2026-03-05)
 
 ### Bug Fixes
