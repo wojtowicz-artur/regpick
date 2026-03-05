@@ -1,4 +1,4 @@
-import { Runtime } from "@/core/ports.js";
+import { FileSystemPort, HttpPort, ProcessPort, PromptPort } from "@/core/ports.js";
 import { interactInitPhase, queryInitState } from "@/shell/cli/initOrchestrator.js";
 import { generateConfigCode } from "@/shell/config/index.js";
 import type { CommandOutcome } from "@/types.js";
@@ -7,7 +7,11 @@ import path from "node:path";
 
 export const runInitCommand = () =>
   Effect.gen(function* () {
-    const runtime = yield* Runtime;
+    const fs = yield* FileSystemPort;
+    const http = yield* HttpPort;
+    const process = yield* ProcessPort;
+    const prompt = yield* PromptPort;
+    const runtime = { fs, http, process, prompt };
     const state = yield* queryInitState();
     const plan = yield* interactInitPhase(state);
 

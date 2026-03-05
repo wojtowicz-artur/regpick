@@ -1,6 +1,6 @@
 import { CommandContextTag } from "@/core/context.js";
 import { type AppError } from "@/core/errors.js";
-import { Runtime } from "@/core/ports.js";
+import { FileSystemPort, HttpPort, ProcessPort, PromptPort } from "@/core/ports.js";
 import { generateRegistryItems, queryPackState } from "@/shell/cli/packOrchestrator.js";
 import type { CommandOutcome } from "@/types.js";
 import { Effect } from "effect";
@@ -14,10 +14,14 @@ import { Effect } from "effect";
 export function runPackCommand(): Effect.Effect<
   CommandOutcome,
   AppError,
-  Runtime | CommandContextTag
+  FileSystemPort | HttpPort | ProcessPort | PromptPort | CommandContextTag
 > {
   return Effect.gen(function* () {
-    const runtime = yield* Runtime;
+    const fs = yield* FileSystemPort;
+    const http = yield* HttpPort;
+    const process = yield* ProcessPort;
+    const prompt = yield* PromptPort;
+    const runtime = { fs, http, process, prompt };
     const state = yield* queryPackState();
 
     if (state.files.length === 0) {

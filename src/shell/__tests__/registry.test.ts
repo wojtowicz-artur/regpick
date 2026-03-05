@@ -1,3 +1,4 @@
+import { createMockRuntime } from "@/__tests__/helpers/runtime.js";
 import { Effect, Either } from "effect";
 import { pathToFileURL } from "node:url";
 
@@ -8,26 +9,25 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DirectoryPlugin } from "@/shell/plugins/builtin/directory.js";
 import { FilePlugin } from "@/shell/plugins/builtin/file.js";
-import { createRuntimePorts } from "@/shell/adapters/runtime.js";
 import { HttpPlugin } from "@/shell/plugins/builtin/http.js";
 
 describe("registry loader", () => {
-  let mockRuntime: ReturnType<typeof createRuntimePorts>;
+  let mockRuntime: ReturnType<typeof createMockRuntime>;
   const mockPlugins = [HttpPlugin(), FilePlugin(), DirectoryPlugin()];
 
   beforeEach(() => {
-    mockRuntime = createRuntimePorts();
+    mockRuntime = createMockRuntime();
 
     // Setup basic mock implementations
-    mockRuntime.http.getJson = vi.fn();
-    mockRuntime.http.getText = vi.fn();
-    mockRuntime.fs.stat = vi.fn();
-    mockRuntime.fs.readFile = vi.fn();
-    mockRuntime.fs.readdir = vi.fn();
+    mockRuntime.runtime.http.getJson = vi.fn();
+    mockRuntime.runtime.http.getText = vi.fn();
+    mockRuntime.runtime.fs.stat = vi.fn();
+    mockRuntime.runtime.fs.readFile = vi.fn();
+    mockRuntime.runtime.fs.readdir = vi.fn();
   });
 
   it("should normalize GitHub blob/tree URLs to raw.githubusercontent.com", async () => {
-    vi.mocked(mockRuntime.http.getText).mockReturnValue(
+    vi.mocked(mockRuntime.runtime.http.getText).mockReturnValue(
       Effect.succeed(
         JSON.stringify({
           name: "gh-registry",
@@ -41,23 +41,23 @@ describe("registry loader", () => {
         loadRegistry(
           "https://github.com/user/repo/blob/main/registry.json",
           "/test",
-          mockRuntime,
+          mockRuntime.runtime,
           mockPlugins,
         ),
       ),
     );
 
-    expect(mockRuntime.http.getText).toHaveBeenCalledWith(
+    expect(mockRuntime.runtime.http.getText).toHaveBeenCalledWith(
       "https://raw.githubusercontent.com/user/repo/main/registry.json",
     );
     expect(Either.isRight(result)).toBe(true);
   });
 
   it("should load a registry from a local json file", async () => {
-    vi.mocked(mockRuntime.fs.stat).mockReturnValue(
+    vi.mocked(mockRuntime.runtime.fs.stat).mockReturnValue(
       Effect.succeed({ isDirectory: () => false } as any),
     );
-    vi.mocked(mockRuntime.fs.readFile).mockReturnValue(
+    vi.mocked(mockRuntime.runtime.fs.readFile).mockReturnValue(
       Effect.succeed(
         JSON.stringify({
           items: [
@@ -72,7 +72,9 @@ describe("registry loader", () => {
     );
 
     const result = await Effect.runPromise(
-      Effect.either(loadRegistry("/abs/path/local.json", "/test", mockRuntime, mockPlugins)),
+      Effect.either(
+        loadRegistry("/abs/path/local.json", "/test", mockRuntime.runtime, mockPlugins),
+      ),
     );
     expect(Either.isRight(result)).toBe(true);
     if (Either.isRight(result)) {
@@ -81,14 +83,14 @@ describe("registry loader", () => {
   });
 
   it("should resolve a directory registry containing multiple json files", async () => {
-    vi.mocked(mockRuntime.fs.stat).mockReturnValue(
+    vi.mocked(mockRuntime.runtime.fs.stat).mockReturnValue(
       Effect.succeed({ isDirectory: () => true } as any),
     );
-    vi.mocked(mockRuntime.fs.readdir).mockReturnValue(
+    vi.mocked(mockRuntime.runtime.fs.readdir).mockReturnValue(
       Effect.succeed(["button.json", "input.json", "not.txt"]),
     );
 
-    vi.mocked(mockRuntime.fs.readFile).mockImplementation((filePath: string) => {
+    vi.mocked(mockRuntime.runtime.fs.readFile).mockImplementation((filePath: string) => {
       if (filePath.endsWith("button.json")) {
         return Effect.succeed(
           JSON.stringify({
@@ -106,7 +108,7 @@ describe("registry loader", () => {
     });
 
     const result = await Effect.runPromise(
-      Effect.either(loadRegistry("/abs/dir", "/test", mockRuntime, mockPlugins)),
+      Effect.either(loadRegistry("/abs/dir", "/test", mockRuntime.runtime, mockPlugins)),
     );
 
     expect(Either.isRight(result)).toBe(true);
@@ -118,7 +120,7 @@ describe("registry loader", () => {
   });
 
   it("should fetch related file content over HTTP using baseUrl", async () => {
-    vi.mocked(mockRuntime.http.getText).mockReturnValue(Effect.succeed("remote-content"));
+    vi.mocked(mockRuntime.runtime.http.getText).mockReturnValue(Effect.succeed("remote-content"));
 
     const item = {
       name: "net-comp",
@@ -135,12 +137,14 @@ describe("registry loader", () => {
 
     const result = await Effect.runPromise(
       Effect.either(
-        resolveFileContent(file as any, item as any, "/test", mockRuntime, mockPlugins),
+        resolveFileContent(file as any, item as any, "/test", mockRuntime.runtime, mockPlugins),
       ),
     );
     expect(Either.isRight(result)).toBe(true);
     if (Either.isRight(result)) expect(result.right).toBe("remote-content");
 
-    expect(mockRuntime.http.getText).toHaveBeenCalledWith("https://example.com/registry/utils.ts");
+    expect(mockRuntime.runtime.http.getText).toHaveBeenCalledWith(
+      "https://example.com/registry/utils.ts",
+    );
   });
 });

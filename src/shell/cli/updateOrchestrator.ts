@@ -3,7 +3,7 @@ import { styleText } from "node:util";
 
 import { CommandContextTag, ConfigTag } from "@/core/context.js";
 import { appError, toAppError, type AppError } from "@/core/errors.js";
-import { Runtime } from "@/core/ports.js";
+import { FileSystemPort, HttpPort, ProcessPort, PromptPort } from "@/core/ports.js";
 import {
   buildUpdatePlanForItem,
   groupBySource,
@@ -18,10 +18,14 @@ import type { RegistryFile, RegpickConfig, RegpickLockfile, RegpickPlugin } from
 export function queryUpdateState(): Effect.Effect<
   { config: RegpickConfig; lockfile: RegpickLockfile },
   AppError,
-  Runtime | CommandContextTag
+  FileSystemPort | HttpPort | ProcessPort | PromptPort | CommandContextTag
 > {
   return Effect.gen(function* () {
-    const runtime = yield* Runtime;
+    const fs = yield* FileSystemPort;
+    const http = yield* HttpPort;
+    const process = yield* ProcessPort;
+    const prompt = yield* PromptPort;
+    const runtime = { fs, http, process, prompt };
     const context = yield* CommandContextTag;
     const configRes = yield* readConfig(context.cwd).pipe(Effect.mapError(toAppError));
     const lockfile = yield* readLockfile(context.cwd, runtime).pipe(Effect.mapError(toAppError));
@@ -38,10 +42,18 @@ export function queryUpdateState(): Effect.Effect<
 export function queryAvailableUpdates(
   lockfile: RegpickLockfile,
   plugins: RegpickPlugin[],
-): Effect.Effect<DetectedUpdate[], AppError, Runtime | CommandContextTag | ConfigTag> {
+): Effect.Effect<
+  DetectedUpdate[],
+  AppError,
+  FileSystemPort | HttpPort | ProcessPort | PromptPort | CommandContextTag | ConfigTag
+> {
   return Effect.gen(function* () {
     const config = yield* ConfigTag;
-    const runtime = yield* Runtime;
+    const fs = yield* FileSystemPort;
+    const http = yield* HttpPort;
+    const process = yield* ProcessPort;
+    const prompt = yield* PromptPort;
+    const runtime = { fs, http, process, prompt };
     const context = yield* CommandContextTag;
     const bySource = groupBySource(lockfile);
 
@@ -159,9 +171,17 @@ function printDiff(oldContent: string, newContent: string): Effect.Effect<void, 
 
 export function queryUserUpdateApproval(
   availableUpdates: DetectedUpdate[],
-): Effect.Effect<ApprovedUpdatePlan, AppError, Runtime | CommandContextTag | ConfigTag> {
+): Effect.Effect<
+  ApprovedUpdatePlan,
+  AppError,
+  FileSystemPort | HttpPort | ProcessPort | PromptPort | CommandContextTag | ConfigTag
+> {
   return Effect.gen(function* () {
-    const runtime = yield* Runtime;
+    const fs = yield* FileSystemPort;
+    const http = yield* HttpPort;
+    const process = yield* ProcessPort;
+    const prompt = yield* PromptPort;
+    const runtime = { fs, http, process, prompt };
 
     const approvedUpdatesOpt = yield* Effect.forEach(
       availableUpdates,

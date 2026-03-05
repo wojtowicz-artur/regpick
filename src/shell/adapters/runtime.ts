@@ -1,12 +1,12 @@
 import { appError } from "@/core/errors.js";
-import { RuntimePorts } from "@/core/ports.js";
-import { Effect } from "effect";
+import { FileSystemPort, HttpPort, ProcessPort, PromptPort } from "@/core/ports.js";
+import { Effect, Layer } from "effect";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import fsPromises from "node:fs/promises";
 
-export const createRuntimePorts = (options?: { signal?: AbortSignal }): RuntimePorts => ({
-  fs: {
+export const createFileSystemLive = () =>
+  Layer.succeed(FileSystemPort, {
     existsSync: (path) => fs.existsSync(path),
     pathExists: (path) =>
       Effect.promise(async () => {
@@ -63,8 +63,10 @@ export const createRuntimePorts = (options?: { signal?: AbortSignal }): RuntimeP
         try: () => fsPromises.readdir(path),
         catch: (cause) => appError("FileSystemError", `Failed to read directory: ${path}`, cause),
       }),
-  },
-  http: {
+  });
+
+export const createHttpLive = (options?: { signal?: AbortSignal }) =>
+  Layer.succeed(HttpPort, {
     getJson: <T>(url: string, timeoutMs = 15000) =>
       Effect.tryPromise({
         try: async () => {
@@ -95,8 +97,10 @@ export const createRuntimePorts = (options?: { signal?: AbortSignal }): RuntimeP
         },
         catch: (cause) => appError("NetworkError", `Failed to fetch text from: ${url}`, cause),
       }),
-  },
-  prompt: {
+  });
+
+export const createPromptLive = () =>
+  Layer.succeed(PromptPort, {
     intro: (message) =>
       Effect.promise(async () => {
         const { intro } = await import("@clack/prompts");
@@ -166,8 +170,10 @@ export const createRuntimePorts = (options?: { signal?: AbortSignal }): RuntimeP
         }
         return prompts.multiselect(options) as any;
       }),
-  },
-  process: {
+  });
+
+export const createProcessLive = () =>
+  Layer.succeed(ProcessPort, {
     run: (command, args, cwd) => {
       const result = spawnSync(command, args, {
         stdio: "inherit",
@@ -176,5 +182,12 @@ export const createRuntimePorts = (options?: { signal?: AbortSignal }): RuntimeP
       });
       return { status: result.status };
     },
-  },
-});
+  });
+
+export const createRuntimeLive = (options?: { signal?: AbortSignal }) =>
+  Layer.mergeAll(
+    createFileSystemLive(),
+    createHttpLive(options),
+    createPromptLive(),
+    createProcessLive(),
+  );

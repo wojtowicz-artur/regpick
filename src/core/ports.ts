@@ -1,5 +1,5 @@
-import { type AppError } from "./errors.js";
 import { Context, Effect } from "effect";
+import { type AppError } from "./errors.js";
 
 export class FileSystemPort extends Context.Tag("FileSystemPort")<
   FileSystemPort,
@@ -87,5 +87,3 @@ export type RuntimePorts = {
   prompt: Context.Tag.Service<PromptPort>;
   process: Context.Tag.Service<ProcessPort>;
 };
-
-export class Runtime extends Context.Tag("RuntimePorts")<Runtime, RuntimePorts>() {}

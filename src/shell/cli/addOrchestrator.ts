@@ -1,6 +1,6 @@
 import { CommandContextTag, ConfigTag } from "@/core/context.js";
 import { appError, toAppError, type AppError } from "@/core/errors.js";
-import { Runtime } from "@/core/ports.js";
+import { FileSystemPort, HttpPort, ProcessPort, PromptPort } from "@/core/ports.js";
 import {
   buildInstallPlan,
   computeFinalWrites,
@@ -41,10 +41,14 @@ export interface CustomQueryItemsResult {
 export function queryConfiguration(): Effect.Effect<
   { config: RegpickConfig; configPath: string },
   AppError,
-  Runtime | CommandContextTag
+  FileSystemPort | HttpPort | ProcessPort | PromptPort | CommandContextTag
 > {
   return Effect.gen(function* () {
-    const runtime = yield* Runtime;
+    const fs = yield* FileSystemPort;
+    const http = yield* HttpPort;
+    const process = yield* ProcessPort;
+    const prompt = yield* PromptPort;
+    const runtime = { fs, http, process, prompt };
     const context = yield* CommandContextTag;
     const res = yield* readConfig(context.cwd).pipe(Effect.mapError(toAppError));
 
@@ -60,11 +64,15 @@ export function queryConfiguration(): Effect.Effect<
 export function queryRegistrySource(): Effect.Effect<
   string | null,
   AppError,
-  Runtime | CommandContextTag | ConfigTag
+  FileSystemPort | HttpPort | ProcessPort | PromptPort | CommandContextTag | ConfigTag
 > {
   return Effect.gen(function* () {
     const config = yield* ConfigTag;
-    const runtime = yield* Runtime;
+    const fs = yield* FileSystemPort;
+    const http = yield* HttpPort;
+    const process = yield* ProcessPort;
+    const prompt = yield* PromptPort;
+    const runtime = { fs, http, process, prompt };
     const context = yield* CommandContextTag;
     const sourcePosIdx = context.args.positionals[0] === "add" ? 1 : 0;
     const argValue = context.args.positionals[sourcePosIdx];
@@ -117,9 +125,17 @@ export function queryRegistrySource(): Effect.Effect<
 export function querySelectedItems(
   source: string,
   plugins: RegpickPlugin[],
-): Effect.Effect<CustomQueryItemsResult, AppError, Runtime | CommandContextTag | ConfigTag> {
+): Effect.Effect<
+  CustomQueryItemsResult,
+  AppError,
+  FileSystemPort | HttpPort | ProcessPort | PromptPort | CommandContextTag | ConfigTag
+> {
   return Effect.gen(function* () {
-    const runtime = yield* Runtime;
+    const fs = yield* FileSystemPort;
+    const http = yield* HttpPort;
+    const process = yield* ProcessPort;
+    const prompt = yield* PromptPort;
+    const runtime = { fs, http, process, prompt };
     const context = yield* CommandContextTag;
     const sourcePosIdx = context.args.positionals[0] === "add" ? 1 : 0;
     const itemPosIdx = sourcePosIdx + 1;
@@ -180,10 +196,18 @@ export function querySelectedItems(
 
 export function queryInstallationState(
   selectedItems: RegistryItem[],
-): Effect.Effect<InteractiveAddState, AppError, Runtime | CommandContextTag | ConfigTag> {
+): Effect.Effect<
+  InteractiveAddState,
+  AppError,
+  FileSystemPort | HttpPort | ProcessPort | PromptPort | CommandContextTag | ConfigTag
+> {
   return Effect.gen(function* () {
     const config = yield* ConfigTag;
-    const runtime = yield* Runtime;
+    const fs = yield* FileSystemPort;
+    const http = yield* HttpPort;
+    const process = yield* ProcessPort;
+    const prompt = yield* PromptPort;
+    const runtime = { fs, http, process, prompt };
     const context = yield* CommandContextTag;
     const probeRes = yield* buildInstallPlan(selectedItems, context.cwd, config);
 
@@ -214,10 +238,18 @@ export function queryInstallationState(
 
 export function queryUserApproval(
   state: InteractiveAddState,
-): Effect.Effect<ApprovedAddPlan, AppError, Runtime | CommandContextTag | ConfigTag> {
+): Effect.Effect<
+  ApprovedAddPlan,
+  AppError,
+  FileSystemPort | HttpPort | ProcessPort | PromptPort | CommandContextTag | ConfigTag
+> {
   return Effect.gen(function* () {
     const config = yield* ConfigTag;
-    const runtime = yield* Runtime;
+    const fs = yield* FileSystemPort;
+    const http = yield* HttpPort;
+    const process = yield* ProcessPort;
+    const prompt = yield* PromptPort;
+    const runtime = { fs, http, process, prompt };
     const context = yield* CommandContextTag;
     const assumeYes = Boolean(context.args.flags.yes);
 
@@ -321,10 +353,18 @@ export function queryFileContents(
   finalWrites: PlannedWrite[],
   selectedItems: RegistryItem[],
   plugins: RegpickPlugin[],
-): Effect.Effect<HydratedWrite[], AppError, Runtime | CommandContextTag | ConfigTag> {
+): Effect.Effect<
+  HydratedWrite[],
+  AppError,
+  FileSystemPort | HttpPort | ProcessPort | PromptPort | CommandContextTag | ConfigTag
+> {
   return Effect.gen(function* () {
     const config = yield* ConfigTag;
-    const runtime = yield* Runtime;
+    const fs = yield* FileSystemPort;
+    const http = yield* HttpPort;
+    const process = yield* ProcessPort;
+    const prompt = yield* PromptPort;
+    const runtime = { fs, http, process, prompt };
     const context = yield* CommandContextTag;
     const writes: HydratedWrite[] = [];
 

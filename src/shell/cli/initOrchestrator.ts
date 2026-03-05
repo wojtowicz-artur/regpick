@@ -1,6 +1,6 @@
 import { CommandContextTag } from "@/core/context.js";
 import { appError, toAppError } from "@/core/errors.js";
-import { Runtime } from "@/core/ports.js";
+import { FileSystemPort, HttpPort, ProcessPort, PromptPort } from "@/core/ports.js";
 import { decideInitAfterOverwritePrompt } from "@/domain/initCore.js";
 import { readConfig, RegpickConfigSchema, resolveTargetConfigPath } from "@/shell/config/index.js";
 import type { RegpickConfig } from "@/types.js";
@@ -20,7 +20,11 @@ export type ApprovedInitPlan = {
 
 export const queryInitState = () =>
   Effect.gen(function* () {
-    const runtime = yield* Runtime;
+    const fs = yield* FileSystemPort;
+    const http = yield* HttpPort;
+    const process = yield* ProcessPort;
+    const prompt = yield* PromptPort;
+    const runtime = { fs, http, process, prompt };
     const context = yield* CommandContextTag;
     const configPath = yield* resolveTargetConfigPath(context.cwd).pipe(
       Effect.mapError(toAppError),
@@ -42,7 +46,11 @@ export const queryInitState = () =>
 
 export const interactInitPhase = (state: InitQueryState) =>
   Effect.gen(function* () {
-    const runtime = yield* Runtime;
+    const fs = yield* FileSystemPort;
+    const http = yield* HttpPort;
+    const process = yield* ProcessPort;
+    const prompt = yield* PromptPort;
+    const runtime = { fs, http, process, prompt };
     const context = yield* CommandContextTag;
 
     if (state.exists) {

@@ -1,5 +1,5 @@
 import { JournalService } from "@/core/journal.js";
-import { Runtime } from "@/core/ports.js";
+import { FileSystemPort, HttpPort, PromptPort, ProcessPort } from "@/core/ports.js";
 import { writeLockfile } from "@/shell/services/lockfile.js";
 import type { JournalEntry } from "@/types.js";
 import { Effect } from "effect";
@@ -12,7 +12,11 @@ function getJournalPath(cwd: string): string {
 export const JournalServiceImpl = JournalService.of({
   writeIntent: (entry: JournalEntry, cwd: string) =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime;
+      const fs = yield* FileSystemPort;
+      const http = yield* HttpPort;
+      const process = yield* ProcessPort;
+      const prompt = yield* PromptPort;
+      const runtime = { fs, http, process, prompt };
       const journalPath = getJournalPath(cwd);
 
       yield* runtime.fs.ensureDir(path.dirname(journalPath));
@@ -21,7 +25,11 @@ export const JournalServiceImpl = JournalService.of({
 
   clearIntent: (cwd: string) =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime;
+      const fs = yield* FileSystemPort;
+      const http = yield* HttpPort;
+      const process = yield* ProcessPort;
+      const prompt = yield* PromptPort;
+      const runtime = { fs, http, process, prompt };
       const journalPath = getJournalPath(cwd);
 
       yield* runtime.fs.remove(journalPath).pipe(Effect.ignore);
@@ -29,7 +37,11 @@ export const JournalServiceImpl = JournalService.of({
 
   rollbackIntent: (cwd: string) =>
     Effect.gen(function* () {
-      const runtime = yield* Runtime;
+      const fs = yield* FileSystemPort;
+      const http = yield* HttpPort;
+      const process = yield* ProcessPort;
+      const prompt = yield* PromptPort;
+      const runtime = { fs, http, process, prompt };
       const journalPath = getJournalPath(cwd);
 
       const exists = yield* runtime.fs.pathExists(journalPath);

@@ -2,7 +2,7 @@ import { CommandContextTag, ConfigTag } from "@/core/context.js";
 import { toAppError, type AppError } from "@/core/errors.js";
 import { JournalService } from "@/core/journal.js";
 import { runPipeline, type PersistableVFS } from "@/core/pipeline.js";
-import { Runtime } from "@/core/ports.js";
+import { FileSystemPort, HttpPort, ProcessPort, PromptPort } from "@/core/ports.js";
 import type { ApprovedUpdatePlan } from "@/domain/updatePlan.js";
 import { MemoryVFS } from "@/shell/adapters/vfs.js";
 import {
@@ -23,13 +23,17 @@ import path from "node:path";
 export function runUpdateCommand(): Effect.Effect<
   CommandOutcome,
   AppError,
-  Runtime | CommandContextTag | JournalService
+  FileSystemPort | HttpPort | ProcessPort | PromptPort | CommandContextTag | JournalService
 > {
   return Effect.gen(function* () {
     const state = yield* queryUpdateState();
 
     const logic = Effect.gen(function* () {
-      const runtime = yield* Runtime;
+      const fs = yield* FileSystemPort;
+      const http = yield* HttpPort;
+      const process = yield* ProcessPort;
+      const prompt = yield* PromptPort;
+      const runtime = { fs, http, process, prompt };
       const context = yield* CommandContextTag;
 
       const componentNames = Object.keys(state.lockfile.components);

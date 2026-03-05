@@ -1,6 +1,6 @@
 import { CommandContextTag } from "@/core/context.js";
 import { appError, toAppError, type AppError } from "@/core/errors.js";
-import { Runtime } from "@/core/ports.js";
+import { FileSystemPort, HttpPort, ProcessPort, PromptPort } from "@/core/ports.js";
 import { resolveListSourceDecision } from "@/domain/listCore.js";
 import { readConfig } from "@/shell/config/index.js";
 import { DirectoryPlugin, FilePlugin, HttpPlugin, loadPlugins } from "@/shell/plugins/index.js";
@@ -50,9 +50,17 @@ export function queryListSourceState(): Effect.Effect<
  */
 export function interactSourcePhase(
   state: ListSourceState,
-): Effect.Effect<string | null, AppError, Runtime | CommandContextTag> {
+): Effect.Effect<
+  string | null,
+  AppError,
+  FileSystemPort | HttpPort | ProcessPort | PromptPort | CommandContextTag
+> {
   return Effect.gen(function* () {
-    const runtime = yield* Runtime;
+    const fs = yield* FileSystemPort;
+    const http = yield* HttpPort;
+    const process = yield* ProcessPort;
+    const prompt = yield* PromptPort;
+    const runtime = { fs, http, process, prompt };
     if (!state.requiresPrompt) {
       return state.source;
     }
@@ -78,9 +86,17 @@ export function interactSourcePhase(
 export function queryRegistryItems(
   source: string,
   plugins: RegpickPlugin[],
-): Effect.Effect<RegistryItem[], AppError, Runtime | CommandContextTag> {
+): Effect.Effect<
+  RegistryItem[],
+  AppError,
+  FileSystemPort | HttpPort | ProcessPort | PromptPort | CommandContextTag
+> {
   return Effect.gen(function* () {
-    const runtime = yield* Runtime;
+    const fs = yield* FileSystemPort;
+    const http = yield* HttpPort;
+    const process = yield* ProcessPort;
+    const prompt = yield* PromptPort;
+    const runtime = { fs, http, process, prompt };
     const context = yield* CommandContextTag;
     const { items } = yield* loadRegistry(source, context.cwd, runtime, plugins);
     return items;
@@ -114,9 +130,17 @@ export function formatItemLabel(item: RegistryItem, lockfile?: RegpickLockfile):
 export function presentItems(
   items: RegistryItem[],
   lockfile?: RegpickLockfile,
-): Effect.Effect<void, never, Runtime | CommandContextTag> {
+): Effect.Effect<
+  void,
+  never,
+  FileSystemPort | HttpPort | ProcessPort | PromptPort | CommandContextTag
+> {
   return Effect.gen(function* () {
-    const runtime = yield* Runtime;
+    const fs = yield* FileSystemPort;
+    const http = yield* HttpPort;
+    const process = yield* ProcessPort;
+    const prompt = yield* PromptPort;
+    const runtime = { fs, http, process, prompt };
     yield* runtime.prompt.info(`Found ${items.length} items.`);
     yield* Effect.forEach(
       items,

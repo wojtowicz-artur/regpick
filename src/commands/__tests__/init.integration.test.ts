@@ -1,11 +1,11 @@
 import { CommandContextTag } from "@/core/context.js";
-import { Runtime } from "@/core/ports.js";
+import { HttpPort, PromptPort } from "@/core/ports.js";
 import { Layer } from "effect";
 
-import { createMockPrompt } from "@/__tests__/helpers/integration.js";
+import { createMockHttp, createMockPrompt } from "@/__tests__/helpers/integration.js";
 import { runInitCommand } from "@/commands/init.js";
-import { type RuntimePorts } from "@/core/ports.js";
-import { createRuntimePorts } from "@/shell/adapters/runtime.js";
+
+import { createRuntimeLive } from "@/shell/adapters/runtime.js";
 import { Effect, Either } from "effect";
 import * as fs from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -14,7 +14,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 describe("init integration", () => {
   let testDir: string;
-  let runtime: RuntimePorts;
+
+  let mockHttp: ReturnType<typeof createMockHttp>;
   let mockPrompt: ReturnType<typeof createMockPrompt>;
 
   beforeEach(async () => {
@@ -25,12 +26,9 @@ describe("init integration", () => {
     await fs.mkdir(testDir, { recursive: true });
 
     // Use real FS but mock prompt to avoid hanging in tests
-    const baseRuntime = createRuntimePorts();
+
+    mockHttp = createMockHttp();
     mockPrompt = createMockPrompt();
-    runtime = {
-      ...baseRuntime,
-      prompt: mockPrompt,
-    };
   });
 
   afterEach(async () => {
@@ -53,7 +51,11 @@ describe("init integration", () => {
               cwd: testDir,
               args: { flags: { yes: true }, positionals: [] },
             }),
-            Layer.succeed(Runtime, runtime),
+            Layer.mergeAll(
+              createRuntimeLive(),
+              Layer.succeed(HttpPort, mockHttp as any),
+              Layer.succeed(PromptPort, mockPrompt as any),
+            ),
           ),
         ),
       ),
@@ -88,7 +90,11 @@ describe("init integration", () => {
               cwd: testDir,
               args: { flags: { yes: true }, positionals: [] },
             }),
-            Layer.succeed(Runtime, runtime),
+            Layer.mergeAll(
+              createRuntimeLive(),
+              Layer.succeed(HttpPort, mockHttp as any),
+              Layer.succeed(PromptPort, mockPrompt as any),
+            ),
           ),
         ),
       ),
@@ -119,7 +125,11 @@ describe("init integration", () => {
               cwd: testDir,
               args: { flags: { yes: false }, positionals: [] },
             }),
-            Layer.succeed(Runtime, runtime),
+            Layer.mergeAll(
+              createRuntimeLive(),
+              Layer.succeed(HttpPort, mockHttp as any),
+              Layer.succeed(PromptPort, mockPrompt as any),
+            ),
           ),
         ),
       ),
@@ -156,7 +166,11 @@ describe("init integration", () => {
               cwd: testDir,
               args: { flags: { yes: false }, positionals: [] },
             }),
-            Layer.succeed(Runtime, runtime),
+            Layer.mergeAll(
+              createRuntimeLive(),
+              Layer.succeed(HttpPort, mockHttp as any),
+              Layer.succeed(PromptPort, mockPrompt as any),
+            ),
           ),
         ),
       ),
@@ -186,7 +200,11 @@ describe("init integration", () => {
               cwd: testDir,
               args: { flags: { yes: true }, positionals: [] },
             }),
-            Layer.succeed(Runtime, runtime),
+            Layer.mergeAll(
+              createRuntimeLive(),
+              Layer.succeed(HttpPort, mockHttp as any),
+              Layer.succeed(PromptPort, mockPrompt as any),
+            ),
           ),
         ),
       ),

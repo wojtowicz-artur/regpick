@@ -1,6 +1,6 @@
 import { CommandContextTag } from "@/core/context.js";
 import { type AppError } from "@/core/errors.js";
-import { Runtime } from "@/core/ports.js";
+import { FileSystemPort, HttpPort, ProcessPort, PromptPort } from "@/core/ports.js";
 import {
   interactSourcePhase,
   presentItems,
@@ -17,10 +17,14 @@ import { Effect } from "effect";
 export function runListCommand(): Effect.Effect<
   CommandOutcome,
   AppError,
-  Runtime | CommandContextTag
+  FileSystemPort | HttpPort | ProcessPort | PromptPort | CommandContextTag
 > {
   return Effect.gen(function* () {
-    const runtime = yield* Runtime;
+    const fs = yield* FileSystemPort;
+    const http = yield* HttpPort;
+    const process = yield* ProcessPort;
+    const prompt = yield* PromptPort;
+    const runtime = { fs, http, process, prompt };
     const state = yield* queryListSourceState();
     const source = yield* interactSourcePhase(state);
 

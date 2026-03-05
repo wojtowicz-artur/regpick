@@ -1,6 +1,6 @@
 import { CommandContextTag } from "@/core/context.js";
 import { appError, type AppError } from "@/core/errors.js";
-import { Runtime } from "@/core/ports.js";
+import { FileSystemPort, HttpPort, ProcessPort, PromptPort } from "@/core/ports.js";
 import { buildRegistryItemFromFile } from "@/domain/packCore.js";
 import type { RegistryItem } from "@/types.js";
 import { Effect } from "effect";
@@ -25,9 +25,17 @@ export type PackGeneratedRegistry = {
  */
 export const getFilesRecursive = (
   dir: string,
-): Effect.Effect<string[], AppError, Runtime | CommandContextTag> =>
+): Effect.Effect<
+  string[],
+  AppError,
+  FileSystemPort | HttpPort | ProcessPort | PromptPort | CommandContextTag
+> =>
   Effect.gen(function* () {
-    const runtime = yield* Runtime;
+    const fs = yield* FileSystemPort;
+    const http = yield* HttpPort;
+    const process = yield* ProcessPort;
+    const prompt = yield* PromptPort;
+    const runtime = { fs, http, process, prompt };
     const result: string[] = [];
 
     const scan = (currentDir: string): Effect.Effect<void, AppError> =>
@@ -62,10 +70,14 @@ export const getFilesRecursive = (
 export const queryPackState = (): Effect.Effect<
   PackQueryState,
   AppError,
-  Runtime | CommandContextTag
+  FileSystemPort | HttpPort | ProcessPort | PromptPort | CommandContextTag
 > =>
   Effect.gen(function* () {
-    const runtime = yield* Runtime;
+    const fs = yield* FileSystemPort;
+    const http = yield* HttpPort;
+    const process = yield* ProcessPort;
+    const prompt = yield* PromptPort;
+    const runtime = { fs, http, process, prompt };
     const context = yield* CommandContextTag;
     const targetDirArg = context.args.positionals[1] || ".";
     const targetDir = path.resolve(context.cwd, targetDirArg);
@@ -93,9 +105,17 @@ export const queryPackState = (): Effect.Effect<
  */
 export const generateRegistryItems = (
   state: PackQueryState,
-): Effect.Effect<PackGeneratedRegistry, AppError, Runtime | CommandContextTag> =>
+): Effect.Effect<
+  PackGeneratedRegistry,
+  AppError,
+  FileSystemPort | HttpPort | ProcessPort | PromptPort | CommandContextTag
+> =>
   Effect.gen(function* () {
-    const runtime = yield* Runtime;
+    const fs = yield* FileSystemPort;
+    const http = yield* HttpPort;
+    const process = yield* ProcessPort;
+    const prompt = yield* PromptPort;
+    const runtime = { fs, http, process, prompt };
     const context = yield* CommandContextTag;
     const items = yield* Effect.forEach(
       state.files,

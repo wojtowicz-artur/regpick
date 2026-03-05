@@ -5,8 +5,8 @@ import { styleText } from "node:util";
 import { CommandContextTag } from "@/core/context.js";
 import { type AppError, toAppError } from "@/core/errors.js";
 import { JournalService } from "@/core/journal.js";
+import { PromptPort } from "@/core/ports.js";
 import { JournalServiceImpl } from "@/shell/adapters/journal.js";
-import { createRuntimePorts } from "@/shell/adapters/runtime.js";
 import { parseCliArgs } from "@/shell/cli/args.js";
 import type { CommandContext, CommandOutcome } from "@/types.js";
 
@@ -58,21 +58,19 @@ function run(): Effect.Effect<void, never> {
       return;
     }
 
-    const { Runtime } = yield* Effect.promise(() => import("@/core/ports.js"));
-    const runtime = createRuntimePorts({ signal: abortController.signal });
-
     const context: CommandContext = {
       cwd: parsed.flags.cwd ? path.resolve(process.cwd(), String(parsed.flags.cwd)) : process.cwd(),
       args: parsed,
     };
 
-    runtime.prompt.intro(styleText("cyan", "regpick"));
+    console.log(styleText("cyan", "regpick"));
 
     const executeCommand = Effect.gen(function* () {
       const journal = yield* JournalService;
+      const prompt = yield* PromptPort;
       const rolledBack = yield* journal.rollbackIntent(context.cwd);
       if (rolledBack) {
-        yield* runtime.prompt.error(
+        yield* prompt.error(
           styleText("yellow", "Previous incomplete operation detected and rolled back."),
         );
       }
@@ -80,7 +78,12 @@ function run(): Effect.Effect<void, never> {
       let commandEffect: Effect.Effect<
         CommandOutcome,
         AppError,
-        import("@/core/ports.js").Runtime | CommandContextTag | JournalService
+        | CommandContextTag
+        | JournalService
+        | import("@/core/ports.js").FileSystemPort
+        | import("@/core/ports.js").ProcessPort
+        | import("@/core/ports.js").HttpPort
+        | import("@/core/ports.js").PromptPort
       >;
 
       switch (command) {
@@ -110,7 +113,7 @@ function run(): Effect.Effect<void, never> {
           );
           break;
         default:
-          runtime.prompt.error(`Unknown command: ${command}`);
+          yield* prompt.error(`Unknown command: ${command}`);
           printHelp();
           process.exitCode = 1;
           return yield* Effect.succeed(undefined as any);
@@ -119,31 +122,39 @@ function run(): Effect.Effect<void, never> {
       const result = yield* commandEffect;
 
       if (result.kind === "noop") {
-        runtime.prompt.outro(styleText("yellow", result.message));
+        prompt.outro(styleText("yellow", result.message));
         return;
       }
 
-      runtime.prompt.outro(styleText("green", "Done."));
+      prompt.outro(styleText("green", "Done."));
     }).pipe(
       Effect.catchAll((error) =>
-        Effect.sync(() => {
-          handleAppError(error, runtime.prompt.error);
-          runtime.prompt.outro(styleText("red", "Failed."));
+        Effect.gen(function* () {
+          const prompt = yield* PromptPort;
+          handleAppError(error, console.error);
+          prompt.outro(styleText("red", "Failed."));
           process.exitCode = 1;
         }),
       ),
       Effect.catchAllDefect((defect) =>
-        Effect.sync(() => {
+        Effect.gen(function* () {
+          const prompt = yield* PromptPort;
           const appErr = toAppError(defect);
-          handleAppError(appErr, runtime.prompt.error);
-          runtime.prompt.outro(styleText("red", "Failed."));
+          handleAppError(appErr, console.error);
+          prompt.outro(styleText("red", "Failed."));
           process.exitCode = 1;
         }),
       ),
     );
 
+    const RuntimeLive = yield* Effect.promise(() =>
+      import("@/shell/adapters/runtime.js").then((m) =>
+        m.createRuntimeLive({ signal: abortController.signal }),
+      ),
+    );
+
     const layer = Layer.mergeAll(
-      Layer.succeed(Runtime, runtime),
+      RuntimeLive,
       Layer.succeed(CommandContextTag, context),
       Layer.succeed(JournalService, JournalServiceImpl),
     );
