@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.19.1](https://github.com/wojtowicz-artur/regpick/compare/v0.19.0...v0.19.1) (2026-03-05)
+
+### Bug Fixes
+
+* invalid usage on process.cwd ([d2fc9a7](https://github.com/wojtowicz-artur/regpick/commit/d2fc9a71cd2db700186554e46afee41841bbdc41))
+
 ## [0.19.0](https://github.com/wojtowicz-artur/regpick/compare/v0.18.0...v0.19.0) (2026-03-05)
 
 ### Features
