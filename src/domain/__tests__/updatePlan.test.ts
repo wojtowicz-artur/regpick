@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 
 import { buildUpdatePlanForItem } from "@/domain/updatePlan.js";
 import { computeHash } from "@/shell/services/lockfile.js";
-import type { ComponentLockItem, RegistryItem, RegpickConfig } from "@/types.js";
+import type { ComponentLockItem, RegistryItem, ResolvedRegpickConfig } from "@/types.js";
 
-const config: RegpickConfig = {
+const config: ResolvedRegpickConfig = {
   resolve: {
     aliases: {},
     targets: {

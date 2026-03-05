@@ -2,9 +2,9 @@ import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { buildInstallPlan, resolveRegistryDependencies } from "@/domain/addPlan.js";
-import type { RegistryItem, RegpickConfig } from "@/types.js";
+import type { RegistryItem, ResolvedRegpickConfig } from "@/types.js";
 
-const config: RegpickConfig = {
+const config: ResolvedRegpickConfig = {
   resolve: {
     aliases: {},
     targets: {

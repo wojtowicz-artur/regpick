@@ -1,5 +1,4 @@
 import type { RuntimePorts } from "@/core/ports.js";
-import type { RegpickConfig } from "@/domain/configModel.js";
 import type { RegistryFile, RegistryItem } from "@/domain/registryModel.js";
 import type { RegpickLockfile } from "@/shell/services/lockfile.js";
 
@@ -73,11 +72,11 @@ export interface PathResolverPlugin {
     file: RegistryFile,
     item: RegistryItem,
     defaultPath: string,
-    config: RegpickConfig,
+    config: import("@/domain/configModel.js").ResolvedRegpickConfig,
   ) => string | undefined | null;
 }
 
-export type { RegpickConfig } from "@/domain/configModel.js";
+export type { RegpickConfig, ResolvedRegpickConfig } from "@/domain/configModel.js";
 export type { RegistryFile, RegistryItem, RegistrySourceMeta } from "@/domain/registryModel.js";
 
 export type PlannedWrite = {

@@ -1,7 +1,7 @@
 import { CommandContextTag, ConfigTag } from "@/core/context.js";
 import { type AppError } from "@/core/errors.js";
 import { JournalService } from "@/core/journal.js";
-import { runPipeline } from "@/core/pipeline.js";
+import { runPipeline, type Plugin as PipelinePluginDef } from "@/core/pipeline.js";
 import { FileSystemPort, HttpPort, ProcessPort, PromptPort } from "@/core/ports.js";
 import { coreAddPlugin } from "@/plugins/coreAddPlugin.js";
 import { MemoryVFS } from "@/shell/adapters/vfs.js";
@@ -15,7 +15,7 @@ import {
 } from "@/shell/cli/addOrchestrator.js";
 import { DirectoryPlugin, FilePlugin, HttpPlugin, loadPlugins } from "@/shell/plugins/index.js";
 import { readLockfile } from "@/shell/services/lockfile.js";
-import { type CommandOutcome, type RegistryItem } from "@/types.js";
+import type { CommandOutcome, RegistryItem, ResolvedRegpickConfig } from "@/types.js";
 import { Effect } from "effect";
 import crypto from "node:crypto";
 
@@ -26,6 +26,12 @@ export function runAddCommand(): Effect.Effect<
 > {
   return Effect.gen(function* () {
     const { config } = yield* queryConfiguration();
+    const context = yield* CommandContextTag;
+    const resolvedPlugins = yield* loadPlugins(config.plugins || [], context.cwd);
+    const hydratedConfig: ResolvedRegpickConfig = {
+      ...config,
+      plugins: resolvedPlugins,
+    };
 
     const logic = Effect.gen(function* () {
       const fs = yield* FileSystemPort;
@@ -33,7 +39,6 @@ export function runAddCommand(): Effect.Effect<
       const process = yield* ProcessPort;
       const prompt = yield* PromptPort;
       const runtime = { fs, http, process, prompt };
-      const context = yield* CommandContextTag;
       const source = yield* queryRegistrySource();
 
       if (!source) {
@@ -43,7 +48,7 @@ export function runAddCommand(): Effect.Effect<
         } as CommandOutcome;
       }
 
-      const customPlugins = yield* loadPlugins((yield* ConfigTag).plugins || [], context.cwd);
+      const customPlugins = (yield* ConfigTag).plugins || [];
       const plugins = [...customPlugins, HttpPlugin(), FilePlugin(), DirectoryPlugin()];
       const itemsToProc = yield* querySelectedItems(source, plugins);
 
@@ -73,9 +78,7 @@ export function runAddCommand(): Effect.Effect<
         }
       }
 
-      const userPlugins = (config.plugins || []).filter(
-        (p) => typeof p === "object",
-      ) as import("../core/pipeline.js").Plugin[];
+      const userPlugins = customPlugins.filter((p) => p.type === "pipeline");
 
       const depPlan = approved.shouldInstallDeps
         ? approved.dependencyPlan
@@ -85,8 +88,8 @@ export function runAddCommand(): Effect.Effect<
         Effect.catchAll(() => Effect.succeed(undefined)),
       );
 
-      const pipelinePlugins: import("../core/pipeline.js").Plugin[] = [
-        ...userPlugins,
+      const pipelinePlugins: PipelinePluginDef[] = [
+        ...(userPlugins as PipelinePluginDef[]),
         coreAddPlugin(
           depPlan,
           yield* ConfigTag,
@@ -94,7 +97,7 @@ export function runAddCommand(): Effect.Effect<
           installedItemsInfo,
           hydratedWrites,
           lockfileBackup,
-        ) as import("../core/pipeline.js").Plugin,
+        ) as PipelinePluginDef,
       ];
 
       const journal = yield* JournalService;
@@ -129,7 +132,7 @@ export function runAddCommand(): Effect.Effect<
         kind: "success",
         plan: approved,
       } as CommandOutcome;
-    }).pipe(Effect.provideService(ConfigTag, config));
+    }).pipe(Effect.provideService(ConfigTag, hydratedConfig));
 
     return yield* logic;
   });

@@ -1,5 +1,6 @@
 import { Schema as S } from "effect";
 import path from "node:path";
+import type { RegpickPlugin } from "../types.js";
 
 export const OverwritePolicySchema = S.Union(
   S.Literal("prompt"),
@@ -128,7 +129,11 @@ export const RegpickConfigSchema = BaseRegpickConfigSchema.pipe(
 
 type BaseRegpickConfig = S.Schema.Type<typeof RegpickConfigSchema>;
 export type RegpickConfig = Omit<BaseRegpickConfig, "plugins"> & {
-  plugins?: (string | import("../types.js").RegpickPlugin)[];
+  plugins?: (string | RegpickPlugin)[];
+};
+
+export type ResolvedRegpickConfig = Omit<BaseRegpickConfig, "plugins"> & {
+  plugins?: RegpickPlugin[];
 };
 
 export type ResolutionConfig = Pick<RegpickConfig, "resolve" | "registry">;

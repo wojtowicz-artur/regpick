@@ -2,9 +2,9 @@ import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { resolveOutputPathFromPolicy } from "@/domain/pathPolicy.js";
-import type { RegistryItem, RegpickConfig } from "@/types.js";
+import type { RegistryItem, ResolvedRegpickConfig } from "@/types.js";
 
-const baseConfig: RegpickConfig = {
+const baseConfig: ResolvedRegpickConfig = {
   registry: {
     sources: {},
     preferManifestTarget: true,
@@ -78,7 +78,7 @@ describe("path policy core", () => {
   });
 
   it("applies path resolvers over built-in targets", () => {
-    const configWithResolvers: RegpickConfig = {
+    const configWithResolvers: ResolvedRegpickConfig = {
       ...baseConfig,
       plugins: [
         {
@@ -105,7 +105,7 @@ describe("path policy core", () => {
   });
 
   it("applies path resolvers to items without explicit targets", () => {
-    const configWithResolvers: RegpickConfig = {
+    const configWithResolvers: ResolvedRegpickConfig = {
       ...baseConfig,
       plugins: [
         {

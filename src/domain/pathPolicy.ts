@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 import path from "node:path";
 
-import type { RegistryFile, RegistryItem, RegpickConfig } from "@/types.js";
+import type { RegistryFile, RegistryItem, ResolvedRegpickConfig } from "@/types.js";
 
 import { appError, type AppError } from "@/core/errors.js";
 
@@ -34,7 +34,7 @@ export const resolveOutputPathFromPolicy = (
   item: RegistryItem,
   file: RegistryFile,
   cwd: string,
-  config: RegpickConfig,
+  config: ResolvedRegpickConfig,
 ): Effect.Effect<{ absoluteTarget: string; relativeTarget: string }, AppError> =>
   Effect.gen(function* () {
     const typeKey = file.type || item.type || "registry:file";
@@ -56,16 +56,13 @@ export const resolveOutputPathFromPolicy = (
     // Allow custom path resolvers to override the fallback logic
     if (config.plugins && config.plugins.length > 0) {
       for (const resolver of config.plugins) {
-        if (typeof resolver === "object" && resolver !== null) {
-          // Check for discriminated union
-          if (resolver.type === "path-resolver") {
-            const func = (resolver as import("../types.js").PathResolverPlugin).resolve;
-            if (typeof func === "function") {
-              const resolved = func(file, item, relativeTarget, config);
-              if (resolved) {
-                relativeTarget = resolved;
-                break;
-              }
+        if (resolver.type === "path-resolver") {
+          const func = resolver.resolve;
+          if (typeof func === "function") {
+            const resolved = func(file, item, relativeTarget, config);
+            if (resolved) {
+              relativeTarget = resolved;
+              break;
             }
           }
         }

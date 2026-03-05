@@ -6,8 +6,8 @@ import type {
   ComponentLockItem,
   RegistryFile,
   RegistryItem,
-  RegpickConfig,
   RegpickLockfile,
+  ResolvedRegpickConfig,
 } from "@/types.js";
 import { Effect } from "effect";
 
@@ -57,7 +57,7 @@ export const buildUpdatePlanForItem = (
   resolvedFiles: { file: RegistryFile; content: string }[],
   lockfileItem: ComponentLockItem,
   cwd: string,
-  config: RegpickConfig,
+  config: ResolvedRegpickConfig,
 ): Effect.Effect<UpdateAction, AppError> =>
   Effect.gen(function* () {
     const remoteFiles: UpdateFile[] = [];

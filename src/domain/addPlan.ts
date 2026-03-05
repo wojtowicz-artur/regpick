@@ -1,6 +1,6 @@
 import { RegistryError, type AppError } from "@/core/errors.js";
 import { resolveOutputPathFromPolicy } from "@/domain/pathPolicy.js";
-import type { InstallPlan, PlannedWrite, RegistryItem, RegpickConfig } from "@/types.js";
+import type { InstallPlan, PlannedWrite, RegistryItem, ResolvedRegpickConfig } from "@/types.js";
 import { Array, Effect } from "effect";
 
 function buildDependencyPlan(selectedItems: RegistryItem[]): InstallPlan["dependencyPlan"] {
@@ -70,7 +70,7 @@ export const resolveRegistryDependencies = (
 export const buildInstallPlan = (
   selectedItems: RegistryItem[],
   cwd: string,
-  config: RegpickConfig,
+  config: ResolvedRegpickConfig,
   existingTargets: Set<string> = new Set(),
 ): Effect.Effect<InstallPlan, AppError> =>
   Effect.gen(function* () {

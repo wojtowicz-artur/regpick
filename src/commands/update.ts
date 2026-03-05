@@ -1,7 +1,7 @@
 import { CommandContextTag, ConfigTag } from "@/core/context.js";
 import { toAppError, type AppError } from "@/core/errors.js";
 import { JournalService } from "@/core/journal.js";
-import { runPipeline } from "@/core/pipeline.js";
+import { runPipeline, type Plugin as PipelinePluginDef } from "@/core/pipeline.js";
 import { FileSystemPort, HttpPort, ProcessPort, PromptPort } from "@/core/ports.js";
 import type { ApprovedUpdatePlan } from "@/domain/updatePlan.js";
 import { coreUpdatePlugin } from "@/plugins/coreUpdatePlugin.js";
@@ -12,7 +12,7 @@ import {
   queryUserUpdateApproval,
 } from "@/shell/cli/updateOrchestrator.js";
 import { DirectoryPlugin, FilePlugin, HttpPlugin, loadPlugins } from "@/shell/plugins/index.js";
-import type { CommandOutcome } from "@/types.js";
+import type { CommandOutcome, ResolvedRegpickConfig } from "@/types.js";
 import { Effect } from "effect";
 import crypto from "node:crypto";
 
@@ -26,6 +26,14 @@ export function runUpdateCommand(): Effect.Effect<
 > {
   return Effect.gen(function* () {
     const state = yield* queryUpdateState();
+    const context = yield* CommandContextTag;
+    const resolvedPlugins = yield* loadPlugins(state.config.plugins || [], context.cwd).pipe(
+      Effect.mapError(toAppError),
+    );
+    const hydratedConfig: ResolvedRegpickConfig = {
+      ...state.config,
+      plugins: resolvedPlugins,
+    };
 
     const logic = Effect.gen(function* () {
       const fs = yield* FileSystemPort;
@@ -33,7 +41,6 @@ export function runUpdateCommand(): Effect.Effect<
       const process = yield* ProcessPort;
       const prompt = yield* PromptPort;
       const runtime = { fs, http, process, prompt };
-      const context = yield* CommandContextTag;
 
       const componentNames = Object.keys(state.lockfile.components);
       if (componentNames.length === 0) {
@@ -44,9 +51,7 @@ export function runUpdateCommand(): Effect.Effect<
         } as CommandOutcome;
       }
 
-      const customPlugins = yield* loadPlugins((yield* ConfigTag).plugins || [], context.cwd).pipe(
-        Effect.mapError(toAppError),
-      );
+      const customPlugins = (yield* ConfigTag).plugins || [];
 
       const plugins = [...customPlugins, HttpPlugin(), FilePlugin(), DirectoryPlugin()];
 
@@ -93,12 +98,16 @@ export function runUpdateCommand(): Effect.Effect<
         { concurrency: "unbounded" },
       );
 
-      const userPlugins = (yield* ConfigTag).plugins?.filter((p) => typeof p === "object") || [];
+      const userPlugins = customPlugins.filter((p) => p.type === "pipeline");
       const vfs = new MemoryVFS();
 
-      const pipelinePlugins: import("../core/pipeline.js").Plugin[] = [
-        ...(userPlugins as import("../core/pipeline.js").Plugin[]),
-        coreUpdatePlugin(approvedPlan.approvedUpdates, updatedLockfile, runtime),
+      const pipelinePlugins: PipelinePluginDef[] = [
+        ...(userPlugins as PipelinePluginDef[]),
+        coreUpdatePlugin(
+          approvedPlan.approvedUpdates,
+          updatedLockfile,
+          runtime,
+        ) as PipelinePluginDef,
       ];
 
       const journal = yield* JournalService;
@@ -134,6 +143,6 @@ export function runUpdateCommand(): Effect.Effect<
       } as CommandOutcome;
     });
 
-    return yield* Effect.provideService(logic, ConfigTag, state.config);
+    return yield* Effect.provideService(logic, ConfigTag, hydratedConfig);
   });
 }

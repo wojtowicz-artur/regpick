@@ -1,4 +1,4 @@
-import type { CommandContext, RegpickConfig } from "@/types.js";
+import type { CommandContext, ResolvedRegpickConfig } from "@/types.js";
 import { Context } from "effect";
 
 export class CommandContextTag extends Context.Tag("CommandContext")<
@@ -6,4 +6,4 @@ export class CommandContextTag extends Context.Tag("CommandContext")<
   CommandContext
 >() {}
 
-export class ConfigTag extends Context.Tag("RegpickConfig")<ConfigTag, RegpickConfig>() {}
+export class ConfigTag extends Context.Tag("RegpickConfig")<ConfigTag, ResolvedRegpickConfig>() {}
