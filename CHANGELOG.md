@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.20.0](https://github.com/wojtowicz-artur/regpick/compare/v0.19.1...v0.20.0) (2026-03-05)
+
+### Features
+
+* enhance error handling by introducing specific error types and updating related tests ([8c88f99](https://github.com/wojtowicz-artur/regpick/commit/8c88f99b4975a44588f62e828d0fc751225b9068))
+
 ## [0.19.1](https://github.com/wojtowicz-artur/regpick/compare/v0.19.0...v0.19.1) (2026-03-05)
 
 ### Bug Fixes
