@@ -9,6 +9,7 @@ function isFileUrl(value: string): boolean {
 
 export function DirectoryPlugin(): RegpickPlugin {
   return {
+    type: "pipeline",
     name: "directory",
     async resolveId(source: string, importer?: string, ctx?: PluginContext) {
       if (isFileUrl(source)) return source;

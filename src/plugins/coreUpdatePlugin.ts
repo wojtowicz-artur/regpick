@@ -19,6 +19,7 @@ export function coreUpdatePlugin(
   runtime: RuntimePorts,
 ): Plugin {
   return {
+    type: "pipeline",
     name: "regpick:core-update",
     async finish(ctx: PipelineContext) {
       if ("flushToDisk" in ctx.vfs) {

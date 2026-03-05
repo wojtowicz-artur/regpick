@@ -9,7 +9,7 @@ export interface PluginContext {
 }
 
 export interface PipelinePlugin {
-  type?: "pipeline";
+  type: "pipeline";
   name: string;
   start?(ctx: PluginContext): void | Promise<void>;
   resolveId?(

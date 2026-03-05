@@ -1,7 +1,8 @@
 import type { InstallCommand, PackageManagerPlugin, RegpickConfig } from "@/types.js";
 import path from "node:path";
 
-export const npmPlugin: PackageManagerPlugin = {
+export const npmPlugin: PackageManagerPlugin & { type: "package-manager" } = {
+  type: "package-manager",
   name: "npm",
   lockfiles: ["package-lock.json"],
   detect: (cwd, runtime) => runtime.fs.existsSync(path.join(cwd, "package-lock.json")),
@@ -20,7 +21,8 @@ export const npmPlugin: PackageManagerPlugin = {
   },
 };
 
-export const yarnPlugin: PackageManagerPlugin = {
+export const yarnPlugin: PackageManagerPlugin & { type: "package-manager" } = {
+  type: "package-manager",
   name: "yarn",
   lockfiles: ["yarn.lock"],
   detect: (cwd, runtime) => runtime.fs.existsSync(path.join(cwd, "yarn.lock")),
@@ -39,7 +41,8 @@ export const yarnPlugin: PackageManagerPlugin = {
   },
 };
 
-export const pnpmPlugin: PackageManagerPlugin = {
+export const pnpmPlugin: PackageManagerPlugin & { type: "package-manager" } = {
+  type: "package-manager",
   name: "pnpm",
   lockfiles: ["pnpm-lock.yaml"],
   detect: (cwd, runtime) => runtime.fs.existsSync(path.join(cwd, "pnpm-lock.yaml")),
@@ -58,7 +61,8 @@ export const pnpmPlugin: PackageManagerPlugin = {
   },
 };
 
-export const bunPlugin: PackageManagerPlugin = {
+export const bunPlugin: PackageManagerPlugin & { type: "package-manager" } = {
+  type: "package-manager",
   name: "bun",
   lockfiles: ["bun.lockb", "bun.lock"],
   detect: (cwd, runtime) =>
@@ -79,7 +83,7 @@ export const bunPlugin: PackageManagerPlugin = {
   },
 };
 
-const defaultPluginRegistry: Record<string, PackageManagerPlugin> = {
+const defaultPluginRegistry: Record<string, PackageManagerPlugin & { type: "package-manager" }> = {
   npm: npmPlugin,
   yarn: yarnPlugin,
   pnpm: pnpmPlugin,
@@ -91,16 +95,20 @@ export function getPackageManagerPlugin(
   config?: RegpickConfig,
 ): PackageManagerPlugin | undefined {
   const userPlugin = config?.plugins?.find(
-    (p): p is PackageManagerPlugin =>
-      typeof p === "object" && p !== null && "name" in p && (p as any).name === name,
+    (p): p is PackageManagerPlugin & { type: "package-manager" } =>
+      typeof p === "object" &&
+      p !== null &&
+      "type" in p &&
+      p.type === "package-manager" &&
+      p.name === name,
   );
   return userPlugin ?? defaultPluginRegistry[name];
 }
 
 export function getAllPackageManagerPlugins(config?: RegpickConfig): PackageManagerPlugin[] {
   const userPlugins = (config?.plugins || []).filter(
-    (p): p is PackageManagerPlugin =>
-      typeof p === "object" && p !== null && "buildInstallCommands" in p,
+    (p): p is PackageManagerPlugin & { type: "package-manager" } =>
+      typeof p === "object" && p !== null && "type" in p && p.type === "package-manager",
   );
 
   const builtIns = Object.values(defaultPluginRegistry).filter(

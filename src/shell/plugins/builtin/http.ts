@@ -3,6 +3,7 @@ import { Effect } from "effect";
 
 export function HttpPlugin(): RegpickPlugin {
   return {
+    type: "pipeline",
     name: "http",
     async resolveId(source: string, importer?: string, _ctx?: PluginContext) {
       if (source.includes("github.com") && source.includes("/blob/")) {

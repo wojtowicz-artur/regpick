@@ -57,8 +57,8 @@ export const resolveOutputPathFromPolicy = (
     if (config.plugins && config.plugins.length > 0) {
       for (const resolver of config.plugins) {
         if (typeof resolver === "object" && resolver !== null) {
-          // Check for discriminated union or duck-typing
-          if (resolver.type === "path-resolver" || "resolve" in resolver) {
+          // Check for discriminated union
+          if (resolver.type === "path-resolver") {
             const func = (resolver as import("../types.js").PathResolverPlugin).resolve;
             if (typeof func === "function") {
               const resolved = func(file, item, relativeTarget, config);
@@ -66,15 +66,6 @@ export const resolveOutputPathFromPolicy = (
                 relativeTarget = resolved;
                 break;
               }
-            }
-          } else if (
-            "resolvePath" in resolver &&
-            typeof (resolver as any).resolvePath === "function"
-          ) {
-            const resolved = (resolver as any).resolvePath(file, item, relativeTarget, config);
-            if (resolved) {
-              relativeTarget = resolved;
-              break;
             }
           }
         }

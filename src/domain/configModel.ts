@@ -16,6 +16,7 @@ const FunctionType = S.declare(isFunction, {
 export const FunctionSchema = FunctionType;
 
 export const PluginSchema = S.Struct({
+  type: S.Literal("pipeline"),
   name: S.String,
   start: S.optionalWith(FunctionSchema, { exact: true }),
   resolveId: S.optionalWith(FunctionSchema, { exact: true }),
@@ -26,6 +27,7 @@ export const PluginSchema = S.Struct({
 }).pipe(S.typeSchema);
 
 export const PackageManagerPluginSchema = S.Struct({
+  type: S.Literal("package-manager"),
   name: S.String,
   lockfiles: S.Array(S.String),
   detect: FunctionSchema,
@@ -33,9 +35,16 @@ export const PackageManagerPluginSchema = S.Struct({
 }).pipe(S.typeSchema);
 
 export const PathResolverPluginSchema = S.Struct({
+  type: S.Literal("path-resolver"),
   name: S.String,
-  resolvePath: FunctionSchema,
+  resolve: FunctionSchema,
 }).pipe(S.typeSchema);
+
+export const RegpickPluginSchema = S.Union(
+  PluginSchema,
+  PackageManagerPluginSchema,
+  PathResolverPluginSchema,
+);
 
 const BaseRegpickConfigSchema = S.Struct({
   resolve: S.optionalWith(

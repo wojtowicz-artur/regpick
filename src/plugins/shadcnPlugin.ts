@@ -7,6 +7,7 @@ import { type Plugin } from "@/core/pipeline.js";
  */
 export function shadcnPlugin(): Plugin {
   return {
+    type: "pipeline",
     name: "regpick:shadcn-compatibility",
 
     async transform(code: string, id: string) {

@@ -1,13 +1,13 @@
 import type { RegpickPlugin } from "@/types.js";
 import { Effect, Option, Schema as S } from "effect";
 import path from "node:path";
-import { PluginSchema } from "../config/index.js";
+import { RegpickPluginSchema } from "../config/index.js";
 
 export function loadPlugins(
   configuredPlugins: (string | unknown)[],
   cwd: string,
 ): Effect.Effect<RegpickPlugin[], never> {
-  const decodePlugin = S.decodeUnknownOption(PluginSchema);
+  const decodePlugin = S.decodeUnknownOption(RegpickPluginSchema);
 
   return Effect.all(
     configuredPlugins.map((plugin) => {

@@ -31,6 +31,7 @@ export function coreAddPlugin(
   initialLockfile?: import("@/types.js").RegpickLockfile,
 ): Plugin {
   return {
+    type: "pipeline",
     name: "regpick:core-add",
 
     async finish(ctx: PipelineContext) {

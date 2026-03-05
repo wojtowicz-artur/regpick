@@ -26,6 +26,7 @@ export default {
   },
   plugins: [
     {
+      type: "pipeline",
       name: "mock-proto",
       resolveId: async (source, importer) => {
         if (source.startsWith("mock-proto://")) return source;
@@ -114,6 +115,7 @@ export default {
       // create custom adapter module
       const adapterContent = `
 export default {
+  type: "pipeline",
   name: "external-proto",
   resolveId: async (source, importer) => {
       if (source.startsWith("external-proto://") || source === 'card.ts') return source;

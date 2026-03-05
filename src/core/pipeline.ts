@@ -57,6 +57,7 @@ export interface PluginHooks {
 }
 
 export interface Plugin extends PluginHooks {
+  type: "pipeline";
   name: string;
 }
 
