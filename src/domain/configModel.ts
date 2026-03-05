@@ -160,7 +160,7 @@ export function resolveRegistrySource(
     return null;
   }
 
-  if (config.registry?.sources?.[input]) {
+  if (config.registry.sources[input]) {
     return String(config.registry.sources[input]);
   }
 

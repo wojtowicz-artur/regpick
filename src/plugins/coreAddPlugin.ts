@@ -101,7 +101,7 @@ export function coreAddPlugin(
           if (depsToInstall.length > 0) {
             const pmName = yield* resolvePackageManager(
               ctx.cwd,
-              config.install?.packageManager || "auto",
+              config.install.packageManager,
               runtime,
               config,
             );

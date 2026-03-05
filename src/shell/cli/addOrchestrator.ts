@@ -81,7 +81,7 @@ export function queryRegistrySource(): Effect.Effect<
       return resolveRegistrySource(argValue, config);
     }
 
-    const aliases = Object.entries(config.registry?.sources || {}).map(([alias, value]) => ({
+    const aliases = Object.entries(config.registry.sources).map(([alias, value]) => ({
       label: `${alias} -> ${value}`,
       value: alias,
     }));
@@ -268,7 +268,7 @@ export function queryUserApproval(
       }
     }
 
-    const overwritePolicy = config.install?.overwritePolicy || "prompt";
+    const overwritePolicy = config.install.overwritePolicy;
     const resolutions = new Map<string, OverwriteResolution>();
 
     if (!assumeYes && overwritePolicy === "prompt") {
@@ -307,11 +307,7 @@ export function queryUserApproval(
       if (assumeYes) {
         shouldInstallDeps = true;
       } else {
-        const pm = resolvePackageManager(
-          context.cwd,
-          config.install?.packageManager || "auto",
-          runtime,
-        );
+        const pm = resolvePackageManager(context.cwd, config.install.packageManager, runtime);
         const msgParts: string[] = [];
         if (state.missingDependencies.length)
           msgParts.push(`dependencies: ${state.missingDependencies.join(", ")}`);

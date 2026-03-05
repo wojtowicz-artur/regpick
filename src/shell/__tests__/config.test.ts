@@ -15,7 +15,7 @@ describe("readConfig", () => {
       expect(configPath).toBeNull();
       expect(config).toHaveProperty("registry");
       expect(config).toHaveProperty("resolve");
-      expect(config.registry?.preferManifestTarget ?? true).toBe(true);
+      expect(config.registry.preferManifestTarget).toBe(true);
     } finally {
       await fs.rm(tmp, { recursive: true, force: true });
     }
@@ -34,9 +34,9 @@ describe("readConfig", () => {
 
       expect(configPath).not.toBeNull();
       expect(configPath?.endsWith("regpick.json")).toBe(true);
-      expect((config.registry?.sources || {}).testreg).toBe("./r");
-      expect(config.install?.overwritePolicy || "prompt").toBe("overwrite");
-      expect(config.resolve?.targets || {}).toBeDefined();
+      expect(config.registry.sources.testreg).toBe("./r");
+      expect(config.install.overwritePolicy).toBe("overwrite");
+      expect(config.resolve.targets).toBeDefined();
     } finally {
       await fs.rm(tmp, { recursive: true, force: true });
     }
@@ -60,7 +60,7 @@ describe("readConfig", () => {
         configPath?.endsWith(path.join(path.basename(tmp), "regpick.json")) ||
           configPath?.endsWith("regpick.json"),
       ).toBe(true);
-      expect((config.registry?.sources || {}).parentreg).toBe("./pr");
+      expect(config.registry.sources.parentreg).toBe("./pr");
     } finally {
       await fs.rm(tmp, { recursive: true, force: true });
     }

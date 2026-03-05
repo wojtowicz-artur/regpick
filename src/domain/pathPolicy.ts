@@ -38,8 +38,8 @@ export const resolveOutputPathFromPolicy = (
 ): Effect.Effect<{ absoluteTarget: string; relativeTarget: string }, AppError> =>
   Effect.gen(function* () {
     const typeKey = file.type || item.type || "registry:file";
-    const mappedBase = (config.resolve?.targets || {})?.[typeKey];
-    const preferManifestTarget = (config.registry?.preferManifestTarget ?? true) !== false;
+    const mappedBase = config.resolve.targets[typeKey];
+    const preferManifestTarget = config.registry.preferManifestTarget;
     const fallbackFileName = path.basename(file.path || `${item.name}.txt`);
 
     let relativeTarget: string;
@@ -72,11 +72,7 @@ export const resolveOutputPathFromPolicy = (
     }
 
     const absoluteTarget = path.resolve(cwd, relativeTarget);
-    yield* assertInsideProject(
-      cwd,
-      absoluteTarget,
-      Boolean(config.install?.allowOutsideProject || false),
-    );
+    yield* assertInsideProject(cwd, absoluteTarget, config.install.allowOutsideProject);
 
     return yield* Effect.succeed({
       absoluteTarget,

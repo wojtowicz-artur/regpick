@@ -105,7 +105,12 @@ export class MemoryVFS implements PersistableVFS {
 
     if (failures.length > 0) {
       const errorMessages = failures
-        .map((f) => (f as any).left?.message || String((f as any).left))
+        .map((f) => {
+          const leftError = (f as { left: { message?: string } | unknown }).left;
+          return leftError && typeof leftError === "object" && "message" in leftError
+            ? String(leftError.message)
+            : String(leftError);
+        })
         .join("\n");
       throw new Error(`flushToDisk failed with ${failures.length} errors:\n${errorMessages}`);
     }

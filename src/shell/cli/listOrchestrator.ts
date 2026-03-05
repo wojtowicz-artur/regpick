@@ -28,7 +28,7 @@ export function queryListSourceState(): Effect.Effect<
 
     const sourceDecision = resolveListSourceDecision(
       context.args.positionals[1],
-      res.config.registry?.sources || {},
+      res.config.registry.sources,
     );
 
     const customPlugins = yield* loadPlugins(res.config.plugins || [], context.cwd).pipe(

@@ -72,8 +72,9 @@ export function runAddCommand(): Effect.Effect<
         }
       }
 
-      const userPlugins = (config.plugins?.filter((p) => typeof p === "object") ||
-        []) as import("../core/pipeline.js").Plugin[];
+      const userPlugins = (config.plugins || []).filter(
+        (p) => typeof p === "object",
+      ) as import("../core/pipeline.js").Plugin[];
 
       const depPlan = approved.shouldInstallDeps
         ? approved.dependencyPlan
