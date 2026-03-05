@@ -97,24 +97,29 @@ export function appError(kind: AppErrorKind, message: string, cause?: unknown): 
   }
 }
 
+const appErrorTags = new Set<AppErrorKind>([
+  "ConfigError",
+  "RegistryError",
+  "InstallError",
+  "UserCancelled",
+  "ValidationError",
+  "RuntimeError",
+  "FileSystemError",
+  "JsonError",
+  "NetworkError",
+  "PluginError",
+  "VfsError",
+]);
+
 export function toAppError(error: unknown, fallbackKind: AppErrorKind = "RuntimeError"): AppError {
-  if (error !== null && typeof error === "object" && "_tag" in error) {
-    const e = error as any;
-    if (
-      e._tag === "ConfigError" ||
-      e._tag === "RegistryError" ||
-      e._tag === "InstallError" ||
-      e._tag === "UserCancelled" ||
-      e._tag === "ValidationError" ||
-      e._tag === "RuntimeError" ||
-      e._tag === "FileSystemError" ||
-      e._tag === "JsonError" ||
-      e._tag === "NetworkError" ||
-      e._tag === "PluginError" ||
-      e._tag === "VfsError"
-    ) {
-      return e as AppError;
-    }
+  if (
+    error !== null &&
+    typeof error === "object" &&
+    "_tag" in error &&
+    typeof error._tag === "string" &&
+    appErrorTags.has(error._tag as AppErrorKind)
+  ) {
+    return error as AppError;
   }
 
   if (error instanceof Error) {

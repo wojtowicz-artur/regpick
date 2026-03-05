@@ -4,9 +4,10 @@ import {
   extractItemReferences,
   normalizeItem,
   normalizeManifestInline,
+  PluginRawDataWrapperSchema,
 } from "@/domain/registryModel.js";
 import type { RegistryFile, RegistryItem, RegistrySourceMeta, RegpickPlugin } from "@/types.js";
-import { Effect, Either } from "effect";
+import { Effect, Either, Schema as S } from "effect";
 
 // Helper 1: Resolve and load a single target with exactly 1 compatible plugin.
 function resolveAndLoadWithPlugins(
@@ -166,41 +167,32 @@ export function loadRegistry(
       return yield* Effect.fail(e);
     }
 
-    const { resolvedId, content: manifestRes } = loadOpt.right;
+    const { resolvedId, content: rawContent } = loadOpt.right;
 
-    if (
-      manifestRes &&
-      typeof manifestRes === "object" &&
-      "ok" in manifestRes &&
-      (manifestRes as { ok: boolean }).ok === false
-    ) {
-      return yield* Effect.fail((manifestRes as unknown as { error: AppError }).error);
+    let manifestData = rawContent;
+    if (typeof rawContent === "string") {
+      manifestData = yield* Effect.try({
+        try: () => JSON.parse(rawContent),
+        catch: () =>
+          appError("RegistryError", `Failed to parse registry manifest JSON from ${source}`),
+      });
     }
 
-    const manifest =
-      manifestRes && typeof manifestRes === "object" && "value" in manifestRes
-        ? (manifestRes as { value: unknown }).value
-        : manifestRes;
-
     let items: RegistryItem[] = [];
-    if (
-      manifest &&
-      typeof manifest === "object" &&
-      "items" in manifest &&
-      Array.isArray(manifest.items)
-    ) {
-      items = manifest.items;
-    } else if (manifest && typeof manifest === "object" && "rawData" in manifest) {
+
+    const isRawWrapperRes = S.decodeUnknownEither(PluginRawDataWrapperSchema)(manifestData);
+
+    if (isRawWrapperRes._tag === "Right") {
       items = yield* normalizeManifest(
-        manifest.rawData,
+        isRawWrapperRes.right.rawData,
         cwd,
-        (manifest as unknown as { sourceMeta: RegistrySourceMeta }).sourceMeta,
+        isRawWrapperRes.right.sourceMeta,
         runtime,
         plugins,
       );
-    } else if ((manifest && typeof manifest === "object") || Array.isArray(manifest)) {
+    } else {
       items = yield* normalizeManifest(
-        manifest,
+        manifestData,
         cwd,
         { type: "system", originalSource: resolvedId },
         runtime,
@@ -208,12 +200,12 @@ export function loadRegistry(
       );
     }
 
-    const finalSource: string =
-      (manifest &&
-      typeof manifest === "object" &&
-      "resolvedSource" in manifest &&
-      typeof (manifest as { resolvedSource: string }).resolvedSource === "string"
-        ? (manifest as { resolvedSource: string }).resolvedSource
+    let finalSource: string =
+      (manifestData &&
+      typeof manifestData === "object" &&
+      "resolvedSource" in manifestData &&
+      typeof (manifestData as any).resolvedSource === "string"
+        ? (manifestData as any).resolvedSource
         : undefined) || source;
 
     const enhancedItems = items.map((item) => ({

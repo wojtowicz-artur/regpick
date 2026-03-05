@@ -88,7 +88,6 @@ const ReferenceItemSchema = S.Struct({
   url: S.optionalWith(S.String, { exact: true }),
   href: S.optionalWith(S.String, { exact: true }),
   path: S.optionalWith(S.String, { exact: true }),
-  files: S.optionalWith(S.Unknown, { exact: true }),
 });
 
 const ManifestItemsSchema = S.Struct({
@@ -103,10 +102,10 @@ export function extractItemReferences(payload: unknown): string[] {
 
   return result.right.items
     .map((entry) => {
-      const safeEntry = entry as Record<string, unknown>;
-      if ("files" in safeEntry && Array.isArray(safeEntry.files)) {
-        return null; // inline item, not a reference
+      if (entry && typeof entry === "object" && "files" in entry) {
+        return null;
       }
+      const safeEntry = entry as Record<string, unknown>;
       return typeof safeEntry.url === "string"
         ? safeEntry.url
         : typeof safeEntry.href === "string"
@@ -118,8 +117,20 @@ export function extractItemReferences(payload: unknown): string[] {
     .filter((value): value is string => Boolean(value));
 }
 
-const SingleItemManifestSchema = S.Struct({
+export const ArrayManifestSchema = S.Array(S.Unknown);
+
+export const ObjectWithItemsManifestSchema = S.Struct({
+  items: S.Array(S.Unknown),
+});
+
+export const SingleItemManifestSchema = S.Struct({
+  name: S.optionalWith(S.String, { exact: true }),
   files: S.Array(S.Unknown),
+});
+
+export const PluginRawDataWrapperSchema = S.Struct({
+  rawData: S.Unknown,
+  sourceMeta: RegistrySourceMetaSchema,
 });
 
 export function normalizeManifestInline(
@@ -127,27 +138,37 @@ export function normalizeManifestInline(
   sourceMeta: RegistrySourceMeta,
 ): Effect.Effect<RegistryItem[], AppError> {
   return Effect.gen(function* () {
-    if (Array.isArray(data)) {
-      const entries = data.filter((entry) => Boolean(entry && typeof entry === "object"));
+    const isArrayRes = S.decodeUnknownEither(ArrayManifestSchema)(data);
+    if (isArrayRes._tag === "Right") {
+      const entries = isArrayRes.right.filter((entry) =>
+        Boolean(entry && typeof entry === "object"),
+      );
       return yield* Effect.all(entries.map((entry) => normalizeItem(entry, sourceMeta)));
     }
 
-    const hasItemsRes = S.decodeUnknownEither(ManifestItemsSchema)(data);
-    if (hasItemsRes._tag === "Right") {
-      const entries = hasItemsRes.right.items.filter(
+    const isObjectRes = S.decodeUnknownEither(ObjectWithItemsManifestSchema)(data);
+    if (isObjectRes._tag === "Right") {
+      const entries = isObjectRes.right.items.filter(
         (entry) =>
-          "files" in (entry as Record<string, unknown>) &&
+          entry &&
+          typeof entry === "object" &&
+          "files" in entry &&
           Array.isArray((entry as Record<string, unknown>).files),
       );
       return yield* Effect.all(entries.map((entry) => normalizeItem(entry, sourceMeta)));
     }
 
-    const hasFilesRes = S.decodeUnknownEither(SingleItemManifestSchema)(data);
-    if (hasFilesRes._tag === "Right") {
+    const isSingleRes = S.decodeUnknownEither(SingleItemManifestSchema)(data);
+    if (isSingleRes._tag === "Right") {
       const item = yield* normalizeItem(data, sourceMeta);
       return [item];
     }
 
-    return yield* Effect.fail(appError("RegistryError", "Unsupported manifest structure."));
+    return yield* Effect.fail(
+      appError(
+        "RegistryError",
+        "Unsupported manifest structure. Allowed formats: Array of items, { items: array }, or { files: array }",
+      ),
+    );
   });
 }
