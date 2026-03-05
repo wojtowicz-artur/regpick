@@ -9,14 +9,13 @@ export const createFileSystemLive = () =>
   Layer.succeed(FileSystemPort, {
     existsSync: (path) => fs.existsSync(path),
     pathExists: (path) =>
-      Effect.promise(async () => {
-        try {
-          await fsPromises.access(path);
-          return true;
-        } catch {
-          return false;
-        }
-      }),
+      Effect.tryPromise({
+        try: () => fsPromises.access(path),
+        catch: () => false,
+      }).pipe(
+        Effect.map(() => true),
+        Effect.catchAll(() => Effect.succeed(false)),
+      ),
     remove: (path) =>
       Effect.tryPromise({
         try: () => fsPromises.rm(path, { recursive: true, force: true }),

@@ -57,17 +57,17 @@ export function coreAddPlugin(
 
               const localFiles = [];
               for (const w of itemWrites) {
-                try {
-                  // Re-read file synchronously locally using Effect approach (in actual Effect context readFileSync)
-                  // But since vfs.readFile is async, we yield.
-                  const localBuffer = yield* Effect.promise(() =>
-                    ctx.vfs.readFile(w.absoluteTarget, "utf-8"),
-                  );
+                const readResult = yield* Effect.tryPromise({
+                  try: () => ctx.vfs.readFile(w.absoluteTarget, "utf-8"),
+                  catch: () => false,
+                }).pipe(Effect.catchAll(() => Effect.succeed(null)));
+
+                if (readResult !== null) {
                   localFiles.push({
                     path: w.relativeTarget,
-                    content: localBuffer.toString(),
+                    content: readResult.toString(),
                   });
-                } catch {
+                } else {
                   localFiles.push({
                     path: w.relativeTarget,
                     content: w.originalContent,

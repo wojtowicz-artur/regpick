@@ -16,7 +16,11 @@ export function resolvePackageManager(
 
     const plugins = getAllPackageManagerPlugins(config);
     for (const plugin of plugins) {
-      const isDetected = yield* Effect.promise(() => Promise.resolve(plugin.detect(cwd, runtime)));
+      const isDetected = yield* Effect.tryPromise({
+        try: () => Promise.resolve(plugin.detect(cwd, runtime)),
+        catch: () => false,
+      }).pipe(Effect.catchAll(() => Effect.succeed(false)));
+
       if (isDetected) {
         return plugin.name;
       }

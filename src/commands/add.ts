@@ -91,17 +91,15 @@ export function runAddCommand(): Effect.Effect<
       ];
 
       const journal = yield* JournalService;
-      let lockfileBackup: any;
-      try {
-        const { readLockfile } = yield* Effect.promise(
-          () => import("@/shell/services/lockfile.js"),
-        );
-        lockfileBackup = yield* readLockfile(context.cwd, runtime).pipe(
-          Effect.catchAll(() => Effect.succeed(undefined)),
-        );
-      } catch {
-        // Ignored
-      }
+      let lockfileBackup: any = yield* Effect.tryPromise({
+        try: () => import("@/shell/services/lockfile.js"),
+        catch: () => undefined,
+      }).pipe(
+        Effect.andThen((m) =>
+          m ? m.readLockfile(context.cwd, runtime) : Effect.succeed(undefined),
+        ),
+        Effect.catchAll(() => Effect.succeed(undefined)),
+      );
 
       const entry = {
         id: crypto.randomUUID(),

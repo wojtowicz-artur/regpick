@@ -139,7 +139,11 @@ export const interactInitPhase = (state: InitQueryState) =>
       },
     };
 
-    const newConfig = S.decodeUnknownSync(RegpickConfigSchema)(newConfigRaw);
+    const newConfig = yield* Effect.try({
+      try: () => S.decodeUnknownSync(RegpickConfigSchema)(newConfigRaw),
+      catch: (e: any) =>
+        appError("ConfigError", `Internal error while generating new config: ${e.message}`, e),
+    });
 
     return {
       newConfig: newConfig as import("@/types.js").RegpickConfig,

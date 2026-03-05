@@ -84,9 +84,10 @@ export function readConfig(
       }),
     );
 
-    const validConfig = yield* Effect.try(() =>
-      S.decodeUnknownSync(RegpickConfigSchema)(loadedConfig),
-    );
+    const validConfig = yield* Effect.try({
+      try: () => S.decodeUnknownSync(RegpickConfigSchema)(loadedConfig),
+      catch: (e: any) => new Error(`Config validation failed: ${e.message}`),
+    });
 
     return {
       config: validConfig as RegpickConfig,

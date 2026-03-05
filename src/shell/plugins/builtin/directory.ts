@@ -49,7 +49,10 @@ export function DirectoryPlugin(): RegpickPlugin {
             const fullPath = path.join(fileSystemPath, fileName);
             return Effect.gen(function* () {
               const readRes = yield* ctx.runtime.fs.readFile(fullPath, "utf8");
-              const parsed = JSON.parse(readRes);
+              const parsed = yield* Effect.try({
+                try: () => JSON.parse(readRes),
+                catch: () => null,
+              });
               if (
                 parsed &&
                 typeof parsed === "object" &&

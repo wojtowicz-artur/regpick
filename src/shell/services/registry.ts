@@ -96,7 +96,11 @@ function resolveItemReference(
     }
 
     if (itemData && typeof itemData === "object") {
-      return normalizeItem(itemData, sourceMeta);
+      return yield* Effect.try({
+        try: () => normalizeItem(itemData, sourceMeta),
+        catch: (e: any) =>
+          appError("ValidationError", `Validation failed for item: ${e.message}`, e),
+      });
     }
 
     return null;

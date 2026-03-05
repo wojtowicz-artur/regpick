@@ -1,6 +1,5 @@
-import { Effect } from "effect";
 import { appError, type AppError } from "@/core/errors.js";
-import { Schema as S } from "effect";
+import { Effect, Schema as S } from "effect";
 
 export const RegistryFileSchema = S.Struct({
   path: S.optionalWith(S.String, { exact: true }),
@@ -118,34 +117,39 @@ export function normalizeManifestInline(
   data: unknown,
   sourceMeta: RegistrySourceMeta,
 ): Effect.Effect<RegistryItem[], AppError> {
-  try {
-    if (Array.isArray(data)) {
-      const items = data
-        .filter((entry) => Boolean(entry && typeof entry === "object"))
-        .map((entry) => normalizeItem(entry, sourceMeta));
-      return Effect.succeed(items);
-    }
+  return Effect.try({
+    try: () => {
+      if (Array.isArray(data)) {
+        return data
+          .filter((entry) => Boolean(entry && typeof entry === "object"))
+          .map((entry) => normalizeItem(entry, sourceMeta));
+      }
 
-    const hasItemsRes = S.decodeUnknownEither(ManifestItemsSchema)(data);
-    if (hasItemsRes._tag === "Right") {
-      const entries = hasItemsRes.right.items.filter(
-        (entry) =>
-          "files" in (entry as Record<string, unknown>) &&
-          Array.isArray((entry as Record<string, unknown>).files),
-      );
-      return Effect.succeed(entries.map((entry) => normalizeItem(entry, sourceMeta)));
-    }
+      const hasItemsRes = S.decodeUnknownEither(ManifestItemsSchema)(data);
+      if (hasItemsRes._tag === "Right") {
+        const entries = hasItemsRes.right.items.filter(
+          (entry) =>
+            "files" in (entry as Record<string, unknown>) &&
+            Array.isArray((entry as Record<string, unknown>).files),
+        );
+        return entries.map((entry) => normalizeItem(entry, sourceMeta));
+      }
 
-    const hasFilesRes = S.decodeUnknownEither(SingleItemManifestSchema)(data);
-    if (hasFilesRes._tag === "Right") {
-      return Effect.succeed([normalizeItem(data, sourceMeta)]);
-    }
+      const hasFilesRes = S.decodeUnknownEither(SingleItemManifestSchema)(data);
+      if (hasFilesRes._tag === "Right") {
+        return [normalizeItem(data, sourceMeta)];
+      }
 
-    return Effect.fail(appError("RegistryError", "Unsupported manifest structure."));
-  } catch (e: any) {
-    if (e?.name === "ParseError") {
-      return Effect.fail(appError("ValidationError", `Manifest validation failed: ${e.message}`));
-    }
-    return Effect.fail(appError("RegistryError", "Failed to parse manifest"));
-  }
+      throw new Error("Unsupported manifest structure.");
+    },
+    catch: (e: any) => {
+      if (e?.name === "ParseError") {
+        return appError("ValidationError", `Manifest validation failed: ${e.message}`);
+      }
+      if (e?.message === "Unsupported manifest structure.") {
+        return appError("RegistryError", e.message);
+      }
+      return appError("RegistryError", "Failed to parse manifest");
+    },
+  });
 }
