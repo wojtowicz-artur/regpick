@@ -1,14 +1,7 @@
 import type { RuntimePorts } from "@/core/ports.js";
-import type { RegpickConfig as ValibotRegpickConfig } from "@/domain/configModel.js";
-import type {
-  RegistryFile as ValibotRegistryFile,
-  RegistryItem as ValibotRegistryItem,
-  RegistrySourceMeta as ValibotRegistrySourceMeta,
-} from "@/domain/registryModel.js";
-import type {
-  ComponentLockItem as ValibotComponentLockItem,
-  RegpickLockfile as ValibotRegpickLockfile,
-} from "@/shell/services/lockfile.js";
+import type { RegpickConfig } from "@/domain/configModel.js";
+import type { RegistryFile, RegistryItem } from "@/domain/registryModel.js";
+import type { RegpickLockfile } from "@/shell/services/lockfile.js";
 
 export interface PluginContext {
   cwd: string;
@@ -75,10 +68,8 @@ export interface PathResolverPlugin {
   ) => string | undefined | null;
 }
 
-export type RegpickConfig = ValibotRegpickConfig;
-export type RegistrySourceMeta = ValibotRegistrySourceMeta;
-export type RegistryFile = ValibotRegistryFile;
-export type RegistryItem = ValibotRegistryItem;
+export type { RegpickConfig } from "@/domain/configModel.js";
+export type { RegistryFile, RegistryItem, RegistrySourceMeta } from "@/domain/registryModel.js";
 
 export type PlannedWrite = {
   itemName: string;
@@ -99,8 +90,7 @@ export type InstallPlan = {
   conflicts: PlannedWrite[];
 };
 
-export type ComponentLockItem = ValibotComponentLockItem;
-export type RegpickLockfile = ValibotRegpickLockfile;
+export type { ComponentLockItem, RegpickLockfile } from "@/shell/services/lockfile.js";
 
 export type JournalEntry = {
   id: string;
