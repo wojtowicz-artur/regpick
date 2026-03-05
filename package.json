@@ -57,26 +57,25 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "@clack/prompts": "^1.0.1",
+    "@clack/prompts": "^1.1.0",
     "diff": "^8.0.3",
     "effect": "^3.19.19",
     "memfs": "^4.56.10",
     "unconfig": "^7.5.0"
   },
   "devDependencies": {
-    "@commitlint/cli": "^20.4.2",
-    "@commitlint/config-conventional": "^20.4.2",
+    "@commitlint/cli": "^20.4.3",
+    "@commitlint/config-conventional": "^20.4.3",
     "@release-it/conventional-changelog": "^10.0.5",
-    "@types/diff": "^7.0.2",
-    "@types/node": "^24.3.0",
+    "@types/node": "^24.3.3",
     "@vitest/coverage-v8": "^4.0.18",
     "husky": "^9.1.7",
     "oxfmt": "^0.36.0",
     "oxlint": "^1.51.0",
     "release-it": "^19.2.4",
-    "tsdown": "^0.21.0-beta.2",
-    "tsx": "^4.20.5",
-    "typescript": "^5.9.2",
+    "tsdown": "^0.21.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
     "vite-tsconfig-paths": "^6.1.1",
     "vitest": "^4.0.18"
   },
