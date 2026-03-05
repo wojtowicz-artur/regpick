@@ -24,6 +24,7 @@ export const createMockPrompt = (): {
   warn: vi.fn().mockReturnValue(Effect.void),
   error: vi.fn().mockReturnValue(Effect.void),
   success: vi.fn().mockReturnValue(Effect.void),
+  log: vi.fn().mockReturnValue(Effect.void),
   text: vi.fn().mockImplementation((options: any) => Effect.succeed(options.defaultValue || "")),
   confirm: vi
     .fn()

@@ -140,6 +140,10 @@ export const createPromptLive = () =>
         const { log } = await import("@clack/prompts");
         log.success(message);
       }),
+    log: (message) =>
+      Effect.sync(() => {
+        console.log(message);
+      }),
     text: (options) =>
       Effect.promise(async () => {
         const { text } = await import("@clack/prompts");

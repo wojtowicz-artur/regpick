@@ -144,10 +144,7 @@ export function presentItems(
     yield* runtime.prompt.info(`Found ${items.length} items.`);
     yield* Effect.forEach(
       items,
-      (item) =>
-        Effect.sync(() => {
-          console.log(`- ${formatItemLabel(item, lockfile)}`);
-        }),
+      (item) => runtime.prompt.log(`- ${formatItemLabel(item, lockfile)}`),
       { concurrency: 1 },
     );
   });

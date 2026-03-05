@@ -70,6 +70,7 @@ export function createMockRuntime(initialFiles: Record<string, string> = {}) {
     warn: () => Effect.void,
     error: () => Effect.void,
     success: () => Effect.void,
+    log: () => Effect.void,
     text: vi
       .fn()
       .mockImplementation(

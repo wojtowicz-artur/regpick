@@ -49,6 +49,7 @@ export class PromptPort extends Context.Tag("PromptPort")<
     warn(message: string): Effect.Effect<void, never, never>;
     error(message: string): Effect.Effect<void, never, never>;
     success(message: string): Effect.Effect<void, never, never>;
+    log(message: string): Effect.Effect<void, never, never>;
     text(options: {
       message: string;
       placeholder?: string;

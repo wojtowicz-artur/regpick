@@ -146,8 +146,12 @@ export function queryAvailableUpdates(
   });
 }
 
-function printDiff(oldContent: string, newContent: string): Effect.Effect<void, AppError> {
+function printDiff(
+  oldContent: string,
+  newContent: string,
+): Effect.Effect<void, AppError, PromptPort> {
   return Effect.gen(function* () {
+    const prompt = yield* PromptPort;
     const changes = yield* Effect.tryPromise({
       try: () => import("diff").then(({ diffLines }) => diffLines(oldContent, newContent)),
       catch: toAppError,
@@ -156,12 +160,12 @@ function printDiff(oldContent: string, newContent: string): Effect.Effect<void, 
     yield* Effect.forEach(
       changes,
       (part) =>
-        Effect.sync(() => {
+        Effect.gen(function* () {
           const format = part.added ? "green" : part.removed ? "red" : "gray";
           const prefix = part.added ? "+ " : part.removed ? "- " : "  ";
           const lines = part.value.replace(/\n$/, "").split("\n");
           for (const line of lines) {
-            console.log(styleText(format, `${prefix}${line}`));
+            yield* prompt.log(styleText(format, `${prefix}${line}`));
           }
         }),
       { concurrency: 1 },
@@ -209,7 +213,7 @@ export function queryUserUpdateApproval(
               update.files,
               (rf) =>
                 Effect.gen(function* () {
-                  console.log(styleText("bold", `\nDiff for ${rf.target}:`));
+                  yield* runtime.prompt.log(styleText("bold", `\nDiff for ${rf.target}:`));
                   yield* printDiff(rf.localContent, rf.remoteContent);
                 }),
               { concurrency: 1 },
