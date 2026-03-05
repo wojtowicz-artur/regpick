@@ -38,6 +38,14 @@ export interface CustomQueryItemsResult {
   missingRegistryDeps: string[];
 }
 
+function getPositionalArgs(context: { args: { positionals: string[] } }) {
+  const sourcePosIdx = context.args.positionals[0] === "add" ? 1 : 0;
+  return {
+    sourceValue: context.args.positionals[sourcePosIdx],
+    itemValue: context.args.positionals[sourcePosIdx + 1],
+  };
+}
+
 export function queryConfiguration(): Effect.Effect<
   { config: RegpickConfig; configPath: string },
   AppError,
@@ -74,8 +82,7 @@ export function queryRegistrySource(): Effect.Effect<
     const prompt = yield* PromptPort;
     const runtime = { fs, http, process, prompt };
     const context = yield* CommandContextTag;
-    const sourcePosIdx = context.args.positionals[0] === "add" ? 1 : 0;
-    const argValue = context.args.positionals[sourcePosIdx];
+    const { sourceValue: argValue } = getPositionalArgs(context);
 
     if (argValue) {
       return resolveRegistrySource(argValue, config);
@@ -137,8 +144,7 @@ export function querySelectedItems(
     const prompt = yield* PromptPort;
     const runtime = { fs, http, process, prompt };
     const context = yield* CommandContextTag;
-    const sourcePosIdx = context.args.positionals[0] === "add" ? 1 : 0;
-    const itemPosIdx = sourcePosIdx + 1;
+    const { itemValue: itemName } = getPositionalArgs(context);
 
     const { items } = yield* loadRegistry(source, context.cwd, runtime, plugins);
 
@@ -147,7 +153,6 @@ export function querySelectedItems(
       return yield* Effect.fail(appError("ValidationError", "No installable items in registry."));
     }
 
-    const itemName = context.args.positionals[itemPosIdx];
     if (itemName && !context.args.flags.select) {
       context.args.flags.select = itemName;
     }
