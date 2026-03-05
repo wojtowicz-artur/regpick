@@ -1,9 +1,10 @@
 import { CommandContextTag, ConfigTag } from "@/core/context.js";
 import { toAppError, type AppError } from "@/core/errors.js";
 import { JournalService } from "@/core/journal.js";
-import { runPipeline, type PersistableVFS } from "@/core/pipeline.js";
+import { runPipeline } from "@/core/pipeline.js";
 import { FileSystemPort, HttpPort, ProcessPort, PromptPort } from "@/core/ports.js";
 import type { ApprovedUpdatePlan } from "@/domain/updatePlan.js";
+import { coreUpdatePlugin } from "@/plugins/coreUpdatePlugin.js";
 import { MemoryVFS } from "@/shell/adapters/vfs.js";
 import {
   queryAvailableUpdates,
@@ -11,11 +12,9 @@ import {
   queryUserUpdateApproval,
 } from "@/shell/cli/updateOrchestrator.js";
 import { DirectoryPlugin, FilePlugin, HttpPlugin, loadPlugins } from "@/shell/plugins/index.js";
-import { computeHash, writeLockfile } from "@/shell/services/lockfile.js";
 import type { CommandOutcome } from "@/types.js";
 import { Effect } from "effect";
 import crypto from "node:crypto";
-import path from "node:path";
 
 /**
  * Main controller for the `update` command effect loop.
@@ -99,41 +98,7 @@ export function runUpdateCommand(): Effect.Effect<
 
       const pipelinePlugins: import("../core/pipeline.js").Plugin[] = [
         ...(userPlugins as import("../core/pipeline.js").Plugin[]),
-        {
-          name: "regpick:core-update",
-          async finish(ctx: import("../core/pipeline.js").PipelineContext) {
-            if ("flushToDisk" in ctx.vfs) {
-              await (ctx.vfs as PersistableVFS).flushToDisk();
-            }
-
-            for (const update of approvedPlan.approvedUpdates) {
-              const localFiles = [];
-              for (const file of update.files) {
-                const relativeTarget = path.relative(ctx.cwd, file.target);
-                try {
-                  const localContent = await ctx.vfs.readFile(file.target, "utf-8");
-                  localFiles.push({
-                    path: relativeTarget,
-                    content: localContent.toString(),
-                  });
-                } catch {
-                  localFiles.push({
-                    path: relativeTarget,
-                    content: file.remoteContent,
-                  });
-                }
-              }
-              updatedLockfile.components[update.itemName].files = localFiles
-                .map((file) => ({
-                  path: file.path,
-                  hash: computeHash(file.content),
-                }))
-                .sort((a, b) => a.path.localeCompare(b.path));
-            }
-
-            await Effect.runPromise(writeLockfile(ctx.cwd, updatedLockfile, runtime));
-          },
-        },
+        coreUpdatePlugin(approvedPlan.approvedUpdates, updatedLockfile, runtime),
       ];
 
       const journal = yield* JournalService;

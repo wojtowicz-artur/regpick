@@ -28,6 +28,7 @@ export function coreAddPlugin(
   runtime: RuntimePorts,
   installedItemsInfo: RegistryItem[] = [],
   hydratedWrites: HydratedWriteInfo[] = [],
+  initialLockfile?: import("@/types.js").RegpickLockfile,
 ): Plugin {
   return {
     name: "regpick:core-add",
@@ -49,7 +50,7 @@ export function coreAddPlugin(
           // the tool states that the component is installed, making repeated 'add' attempts idempotent
           // or at least leaving the system in a state where a generic 'npm install' fixes the gap.
           if (installedItemsInfo.length > 0) {
-            const lockfile = yield* readLockfile(ctx.cwd, runtime);
+            const lockfile = initialLockfile || (yield* readLockfile(ctx.cwd, runtime));
             for (const item of installedItemsInfo) {
               if (!lockfile.components) lockfile.components = {};
 

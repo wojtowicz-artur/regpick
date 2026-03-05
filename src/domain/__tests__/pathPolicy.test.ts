@@ -82,8 +82,9 @@ describe("path policy core", () => {
       ...baseConfig,
       plugins: [
         {
+          type: "path-resolver",
           name: "test-resolver",
-          resolvePath: (file: { path: string }, i: number, defaultPath: string) => {
+          resolve: (file: any, i: any, defaultPath: string) => {
             if (file.path.endsWith(".test.tsx")) return `tests/${defaultPath}`;
             return undefined;
           },
@@ -108,8 +109,9 @@ describe("path policy core", () => {
       ...baseConfig,
       plugins: [
         {
+          type: "path-resolver",
           name: "test-resolver-2",
-          resolvePath: (file: { path: string }) => {
+          resolve: (file: any) => {
             if (file.path.endsWith(".css")) return "styles/theme.css";
             return null;
           },

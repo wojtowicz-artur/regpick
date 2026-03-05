@@ -56,16 +56,26 @@ export const resolveOutputPathFromPolicy = (
     // Allow custom path resolvers to override the fallback logic
     if (config.plugins && config.plugins.length > 0) {
       for (const resolver of config.plugins) {
-        if (
-          typeof resolver === "object" &&
-          resolver !== null &&
-          "resolvePath" in resolver &&
-          typeof resolver.resolvePath === "function"
-        ) {
-          const resolved = resolver.resolvePath(file, item, relativeTarget, config);
-          if (resolved) {
-            relativeTarget = resolved;
-            break;
+        if (typeof resolver === "object" && resolver !== null) {
+          // Check for discriminated union or duck-typing
+          if (resolver.type === "path-resolver" || "resolve" in resolver) {
+            const func = (resolver as import("../types.js").PathResolverPlugin).resolve;
+            if (typeof func === "function") {
+              const resolved = func(file, item, relativeTarget, config);
+              if (resolved) {
+                relativeTarget = resolved;
+                break;
+              }
+            }
+          } else if (
+            "resolvePath" in resolver &&
+            typeof (resolver as any).resolvePath === "function"
+          ) {
+            const resolved = (resolver as any).resolvePath(file, item, relativeTarget, config);
+            if (resolved) {
+              relativeTarget = resolved;
+              break;
+            }
           }
         }
       }

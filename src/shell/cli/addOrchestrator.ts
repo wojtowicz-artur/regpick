@@ -307,7 +307,11 @@ export function queryUserApproval(
       if (assumeYes) {
         shouldInstallDeps = true;
       } else {
-        const pm = resolvePackageManager(context.cwd, config.install.packageManager, runtime);
+        const pm = yield* resolvePackageManager(
+          context.cwd,
+          config.install.packageManager,
+          runtime,
+        );
         const msgParts: string[] = [];
         if (state.missingDependencies.length)
           msgParts.push(`dependencies: ${state.missingDependencies.join(", ")}`);

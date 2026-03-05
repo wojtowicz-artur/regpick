@@ -8,7 +8,8 @@ export interface PluginContext {
   runtime: RuntimePorts;
 }
 
-export interface RegpickPlugin {
+export interface PipelinePlugin {
+  type?: "pipeline";
   name: string;
   start?(ctx: PluginContext): void | Promise<void>;
   resolveId?(
@@ -24,12 +25,20 @@ export interface RegpickPlugin {
   ): string | null | undefined | Promise<string | null | undefined>;
   finish?(ctx: PluginContext): void | Promise<void>;
   onError?(err: Error, ctx: PluginContext): void | Promise<void>;
-
-  lockfiles?: string[];
-  detect?: Function;
-  buildInstallCommands?: Function;
-  resolvePath?: Function;
 }
+
+export interface PackageManagerExtensionPlugin extends PackageManagerPlugin {
+  type: "package-manager";
+}
+
+export interface PathResolverExtensionPlugin extends PathResolverPlugin {
+  type: "path-resolver";
+}
+
+export type RegpickPlugin =
+  | PipelinePlugin
+  | PackageManagerExtensionPlugin
+  | PathResolverExtensionPlugin;
 
 export type FlagValue = string | boolean;
 

@@ -14,7 +14,8 @@ import {
   queryUserApproval,
 } from "@/shell/cli/addOrchestrator.js";
 import { DirectoryPlugin, FilePlugin, HttpPlugin, loadPlugins } from "@/shell/plugins/index.js";
-import type { CommandOutcome, RegistryItem } from "@/types.js";
+import { readLockfile } from "@/shell/services/lockfile.js";
+import { type CommandOutcome, type RegistryItem } from "@/types.js";
 import { Effect } from "effect";
 import crypto from "node:crypto";
 
@@ -80,6 +81,10 @@ export function runAddCommand(): Effect.Effect<
         ? approved.dependencyPlan
         : { dependencies: [], devDependencies: [] };
 
+      let lockfileBackup = yield* readLockfile(context.cwd, runtime).pipe(
+        Effect.catchAll(() => Effect.succeed(undefined)),
+      );
+
       const pipelinePlugins: import("../core/pipeline.js").Plugin[] = [
         ...userPlugins,
         coreAddPlugin(
@@ -88,19 +93,11 @@ export function runAddCommand(): Effect.Effect<
           runtime,
           installedItemsInfo,
           hydratedWrites,
+          lockfileBackup,
         ) as import("../core/pipeline.js").Plugin,
       ];
 
       const journal = yield* JournalService;
-      let lockfileBackup: any = yield* Effect.tryPromise({
-        try: () => import("@/shell/services/lockfile.js"),
-        catch: () => undefined,
-      }).pipe(
-        Effect.andThen((m) =>
-          m ? m.readLockfile(context.cwd, runtime) : Effect.succeed(undefined),
-        ),
-        Effect.catchAll(() => Effect.succeed(undefined)),
-      );
 
       const entry = {
         id: crypto.randomUUID(),

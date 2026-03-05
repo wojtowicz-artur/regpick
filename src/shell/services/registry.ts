@@ -17,7 +17,11 @@ function resolveAndLoadWithPlugins(
   plugins: RegpickPlugin[],
 ): Effect.Effect<{ plugin: RegpickPlugin; resolvedId: string; content: unknown }, AppError> {
   return Effect.gen(function* () {
-    for (const plugin of plugins) {
+    const pipelinePlugins = plugins.filter(
+      (p): p is import("@/types.js").PipelinePlugin => p.type === "pipeline" || !("type" in p),
+    );
+
+    for (const plugin of pipelinePlugins) {
       if (!plugin.resolveId || !plugin.load) continue;
 
       const resolvedId = yield* Effect.tryPromise({
