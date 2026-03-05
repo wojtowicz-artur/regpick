@@ -20,7 +20,7 @@ type ListSourceState = {
 export function queryListSourceState(): Effect.Effect<
   ListSourceState,
   AppError,
-  CommandContextTag
+  CommandContextTag | PromptPort
 > {
   return Effect.gen(function* () {
     const context = yield* CommandContextTag;

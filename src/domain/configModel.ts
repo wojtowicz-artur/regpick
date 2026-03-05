@@ -100,7 +100,7 @@ const BaseRegpickConfigSchema = S.Struct({
       }),
     },
   ),
-  plugins: S.optionalWith(S.Array(S.Union(S.Any, S.String)), {
+  plugins: S.optionalWith(S.Array(S.Union(RegpickPluginSchema, S.String)), {
     exact: true,
     default: () => [],
   }),
