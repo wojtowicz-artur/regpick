@@ -1,5 +1,4 @@
 import type { PluginContext, RegpickPlugin } from "@/types.js";
-import { Effect } from "effect";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -38,22 +37,19 @@ export function DirectoryPlugin(): RegpickPlugin {
 
       const fileSystemPath = fileURLToPath(new URL(id));
 
-      const program = Effect.gen(function* () {
-        const statsRes = yield* ctx.runtime.fs.stat(fileSystemPath);
+      try {
+        const statsRes = await ctx.runtime.fs.stat(fileSystemPath);
         if (!statsRes.isDirectory()) return null;
 
-        const dirRes = yield* ctx.runtime.fs.readdir(fileSystemPath);
+        const dirRes = await ctx.runtime.fs.readdir(fileSystemPath);
         const jsonFiles = dirRes.filter((file: string) => file.endsWith(".json"));
 
-        const parsedItems = yield* Effect.all(
-          jsonFiles.map((fileName) => {
+        const parsedItems = await Promise.all(
+          jsonFiles.map(async (fileName) => {
             const fullPath = path.join(fileSystemPath, fileName);
-            return Effect.gen(function* () {
-              const readRes = yield* ctx.runtime.fs.readFile(fullPath, "utf8");
-              const parsed = yield* Effect.try({
-                try: () => JSON.parse(readRes as string),
-                catch: () => null,
-              });
+            try {
+              const readRes = await ctx.runtime.fs.readFile(fullPath, "utf8");
+              const parsed = JSON.parse(readRes as string);
               if (
                 parsed &&
                 typeof parsed === "object" &&
@@ -63,16 +59,17 @@ export function DirectoryPlugin(): RegpickPlugin {
                 return parsed;
               }
               return null;
-            }).pipe(Effect.catchAll(() => Effect.succeed(null)));
+            } catch {
+              return null;
+            }
           }),
-          { concurrency: "unbounded" },
         );
 
         const items = parsedItems.filter((i) => i !== null);
         return { items, resolvedSource: id };
-      }).pipe(Effect.catchAll(() => Effect.succeed(null)));
-
-      return Effect.runPromise(program);
+      } catch {
+        return null;
+      }
     },
   };
 }

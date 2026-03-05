@@ -1,10 +1,71 @@
-import type { RuntimePorts } from "@/core/ports.js";
 import type { RegistryFile, RegistryItem } from "@/domain/registryModel.js";
 import type { RegpickLockfile } from "@/shell/services/lockfile.js";
+export interface StandardFileSystemPort {
+  existsSync(path: string): boolean;
+  pathExists(path: string): Promise<boolean>;
+  ensureDir(path: string): Promise<void>;
+  remove(path: string): Promise<void>;
+  writeFile(path: string, content: string | Uint8Array, encoding?: BufferEncoding): Promise<void>;
+  readFile(path: string, encoding?: BufferEncoding): Promise<string | Uint8Array>;
+  readJsonSync<T = unknown>(path: string): Promise<T>;
+  writeJson(path: string, value: unknown, options?: { spaces?: number }): Promise<void>;
+  stat(path: string): Promise<{ isDirectory(): boolean; isFile(): boolean }>;
+  readdir(path: string): Promise<string[]>;
+}
+
+export interface StandardHttpPort {
+  getJson<T = unknown>(url: string, timeoutMs?: number): Promise<T>;
+  getText(url: string, timeoutMs?: number): Promise<string>;
+}
+
+export interface StandardPromptPort {
+  intro(message: string): Promise<void>;
+  outro(message: string): Promise<void>;
+  cancel(message: string): Promise<void>;
+  isCancel(value: unknown): Promise<boolean>;
+  info(message: string): Promise<void>;
+  warn(message: string): Promise<void>;
+  error(message: string): Promise<void>;
+  success(message: string): Promise<void>;
+  log(message: string): Promise<void>;
+  text(options: {
+    message: string;
+    placeholder?: string;
+    defaultValue?: string;
+  }): Promise<string | symbol>;
+  confirm(options: { message: string; initialValue?: boolean }): Promise<boolean | symbol>;
+  select(options: {
+    message: string;
+    options: Array<{ value: string; label: string; hint?: string }>;
+  }): Promise<string | symbol>;
+  multiselect(options: {
+    message: string;
+    options: Array<{ value: string; label: string; hint?: string }>;
+    maxItems?: number;
+    required?: boolean;
+  }): Promise<Array<string> | symbol>;
+  autocompleteMultiselect(options: {
+    message: string;
+    options: Array<{ value: string; label: string; hint?: string }>;
+    maxItems?: number;
+    required?: boolean;
+  }): Promise<Array<string> | symbol>;
+}
+
+export interface StandardProcessPort {
+  run(command: string, args: string[], cwd: string): { status: number | null };
+}
+
+export interface StandardRuntimePorts {
+  fs: StandardFileSystemPort;
+  http: StandardHttpPort;
+  prompt: StandardPromptPort;
+  process: StandardProcessPort;
+}
 
 export interface PluginContext {
   cwd: string;
-  runtime: RuntimePorts;
+  runtime: StandardRuntimePorts;
 }
 
 export interface PipelinePlugin {
@@ -62,7 +123,7 @@ export interface InstallCommand {
 export interface PackageManagerPlugin {
   name: string;
   lockfiles: string[];
-  detect: (cwd: string, runtime: RuntimePorts) => Promise<boolean> | boolean;
+  detect: (cwd: string, runtime: StandardRuntimePorts) => Promise<boolean> | boolean;
   buildInstallCommands: (dependencies: string[], devDependencies: string[]) => InstallCommand[];
 }
 

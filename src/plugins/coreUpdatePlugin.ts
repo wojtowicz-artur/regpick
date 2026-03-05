@@ -1,4 +1,9 @@
-import { type PersistableVFS, type PipelineContext, type Plugin } from "@/core/pipeline.js";
+import { appError } from "@/core/errors.js";
+import {
+  type EffectPipelinePlugin,
+  type PersistableVFS,
+  type PipelineContext,
+} from "@/core/pipeline.js";
 import { type RuntimePorts } from "@/core/ports.js";
 import { computeHash, writeLockfile } from "@/shell/services/lockfile.js";
 import { type RegpickLockfile } from "@/types.js";
@@ -17,44 +22,60 @@ export function coreUpdatePlugin(
   approvedUpdates: ApprovedUpdate[],
   updatedLockfile: RegpickLockfile,
   runtime: RuntimePorts,
-): Plugin {
+): EffectPipelinePlugin {
   return {
     type: "pipeline",
     name: "regpick:core-update",
-    async finish(ctx: PipelineContext) {
-      if ("flushToDisk" in ctx.vfs) {
-        await (ctx.vfs as PersistableVFS).flushToDisk();
-      }
-
-      for (const update of approvedUpdates) {
-        const localFiles = [];
-        for (const file of update.files) {
-          const relativeTarget = path.relative(ctx.cwd, file.target);
-          try {
-            const localContent = await ctx.vfs.readFile(file.target, "utf-8");
-            localFiles.push({
-              path: relativeTarget,
-              content: localContent.toString(),
-            });
-          } catch {
-            localFiles.push({
-              path: relativeTarget,
-              content: file.remoteContent,
-            });
-          }
+    finish: (ctx: PipelineContext) =>
+      Effect.gen(function* () {
+        if ("flushToDisk" in ctx.vfs) {
+          yield* Effect.tryPromise({
+            try: () => (ctx.vfs as PersistableVFS).flushToDisk(),
+            catch: (e) =>
+              appError(
+                "VfsError",
+                `Failed to flush to disk: ${e instanceof Error ? e.message : String(e)}`,
+              ),
+          });
         }
-        updatedLockfile.components[update.itemName] = {
-          ...updatedLockfile.components[update.itemName],
-          files: localFiles
-            .map((file) => ({
-              path: file.path,
-              hash: computeHash(file.content),
-            }))
-            .sort((a, b) => a.path.localeCompare(b.path)),
-        };
-      }
 
-      await Effect.runPromise(writeLockfile(ctx.cwd, updatedLockfile, runtime));
-    },
+        for (const update of approvedUpdates) {
+          const localFiles = [];
+          for (const file of update.files) {
+            const relativeTarget = path.relative(ctx.cwd, file.target);
+            const localContent = yield* Effect.tryPromise({
+              try: () => ctx.vfs.readFile(file.target, "utf-8"),
+              catch: () => false,
+            }).pipe(Effect.catchAll(() => Effect.succeed(null)));
+
+            if (localContent !== null) {
+              localFiles.push({
+                path: relativeTarget,
+                content: localContent.toString(),
+              });
+            } else {
+              localFiles.push({
+                path: relativeTarget,
+                content: file.remoteContent,
+              });
+            }
+          }
+          updatedLockfile.components[update.itemName] = {
+            ...updatedLockfile.components[update.itemName],
+            files: localFiles
+              .map((file) => ({
+                path: file.path,
+                hash: computeHash(file.content),
+              }))
+              .sort((a, b) => a.path.localeCompare(b.path)),
+          };
+        }
+
+        yield* writeLockfile(ctx.cwd, updatedLockfile, runtime).pipe(
+          Effect.mapError((e) =>
+            appError("FileSystemError", `Failed to write lockfile: ${e.message}`),
+          ),
+        );
+      }),
   };
 }

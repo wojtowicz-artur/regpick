@@ -1,5 +1,4 @@
 import type { PluginContext, RegpickPlugin } from "@/types.js";
-import { Effect } from "effect";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -26,10 +25,9 @@ export function FilePlugin(): RegpickPlugin {
       } else if (ctx && source.endsWith(".json")) {
         resolvedPath = path.resolve(ctx.cwd, source);
       } else {
-        return null; // Not enough context to resolve it as a file reliably, let other plugins try
+        return null;
       }
 
-      // Convert back to file:// URL or just absolute path
       return pathToFileURL(resolvedPath).toString();
     },
 
@@ -39,21 +37,21 @@ export function FilePlugin(): RegpickPlugin {
 
       const fileSystemPath = fileURLToPath(new URL(id));
 
-      const program = Effect.gen(function* () {
-        const stats = yield* ctx.runtime.fs.stat(fileSystemPath);
+      try {
+        const stats = await ctx.runtime.fs.stat(fileSystemPath);
         if (stats.isDirectory()) {
           return null;
         }
 
-        const readValue = yield* ctx.runtime.fs.readFile(fileSystemPath, "utf8");
+        const readValue = await ctx.runtime.fs.readFile(fileSystemPath, "utf8");
         try {
           return JSON.parse(readValue as string);
         } catch {
           return readValue;
         }
-      }).pipe(Effect.catchAll(() => Effect.succeed(null)));
-
-      return Effect.runPromise(program);
+      } catch {
+        return null;
+      }
     },
   };
 }

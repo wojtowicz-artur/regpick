@@ -1,7 +1,7 @@
 import { CommandContextTag, ConfigTag } from "@/core/context.js";
 import { type AppError } from "@/core/errors.js";
 import { JournalService } from "@/core/journal.js";
-import { runPipeline, type Plugin as PipelinePluginDef } from "@/core/pipeline.js";
+import { runPipeline, type EffectPipelinePlugin } from "@/core/pipeline.js";
 import { FileSystemPort, HttpPort, ProcessPort, PromptPort } from "@/core/ports.js";
 import { coreAddPlugin } from "@/plugins/coreAddPlugin.js";
 import { MemoryVFS } from "@/shell/adapters/vfs.js";
@@ -13,6 +13,7 @@ import {
   querySelectedItems,
   queryUserApproval,
 } from "@/shell/cli/addOrchestrator.js";
+import { createEffectPlugin } from "@/shell/plugins/adapter.js";
 import { DirectoryPlugin, FilePlugin, HttpPlugin, loadPlugins } from "@/shell/plugins/index.js";
 import { readLockfile } from "@/shell/services/lockfile.js";
 import type { CommandOutcome, RegistryItem, ResolvedRegpickConfig } from "@/types.js";
@@ -88,8 +89,8 @@ export function runAddCommand(): Effect.Effect<
         Effect.catchAll(() => Effect.succeed(undefined)),
       );
 
-      const pipelinePlugins: PipelinePluginDef[] = [
-        ...(userPlugins as PipelinePluginDef[]),
+      const pipelinePlugins: EffectPipelinePlugin[] = [
+        ...userPlugins.map((p) => createEffectPlugin(p as any)),
         coreAddPlugin(
           depPlan,
           yield* ConfigTag,
@@ -97,7 +98,7 @@ export function runAddCommand(): Effect.Effect<
           installedItemsInfo,
           hydratedWrites,
           lockfileBackup,
-        ) as PipelinePluginDef,
+        ) as EffectPipelinePlugin,
       ];
 
       const journal = yield* JournalService;

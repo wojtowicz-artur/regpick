@@ -1,7 +1,7 @@
 import { CommandContextTag, ConfigTag } from "@/core/context.js";
 import { toAppError, type AppError } from "@/core/errors.js";
 import { JournalService } from "@/core/journal.js";
-import { runPipeline, type Plugin as PipelinePluginDef } from "@/core/pipeline.js";
+import { runPipeline, type EffectPipelinePlugin } from "@/core/pipeline.js";
 import { FileSystemPort, HttpPort, ProcessPort, PromptPort } from "@/core/ports.js";
 import type { ApprovedUpdatePlan } from "@/domain/updatePlan.js";
 import { coreUpdatePlugin } from "@/plugins/coreUpdatePlugin.js";
@@ -11,6 +11,7 @@ import {
   queryUpdateState,
   queryUserUpdateApproval,
 } from "@/shell/cli/updateOrchestrator.js";
+import { createEffectPlugin } from "@/shell/plugins/adapter.js";
 import { DirectoryPlugin, FilePlugin, HttpPlugin, loadPlugins } from "@/shell/plugins/index.js";
 import type { CommandOutcome, ResolvedRegpickConfig } from "@/types.js";
 import { Effect } from "effect";
@@ -101,13 +102,13 @@ export function runUpdateCommand(): Effect.Effect<
       const userPlugins = customPlugins.filter((p) => p.type === "pipeline");
       const vfs = new MemoryVFS();
 
-      const pipelinePlugins: PipelinePluginDef[] = [
-        ...(userPlugins as PipelinePluginDef[]),
+      const pipelinePlugins: EffectPipelinePlugin[] = [
+        ...userPlugins.map((p) => createEffectPlugin(p as any)),
         coreUpdatePlugin(
           approvedPlan.approvedUpdates,
           updatedLockfile,
           runtime,
-        ) as PipelinePluginDef,
+        ) as EffectPipelinePlugin,
       ];
 
       const journal = yield* JournalService;

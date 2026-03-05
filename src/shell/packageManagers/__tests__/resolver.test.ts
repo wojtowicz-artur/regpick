@@ -8,6 +8,39 @@ describe("resolvePackageManager", () => {
   const dummyRuntime = {
     fs: {
       existsSync: vi.fn(),
+      pathExists: vi.fn(),
+      ensureDir: vi.fn(),
+      remove: vi.fn(),
+      writeFile: vi.fn(),
+      readFile: vi.fn(),
+      readJsonSync: vi.fn(),
+      writeJson: vi.fn(),
+      stat: vi.fn(),
+      readdir: vi.fn(),
+    },
+    http: {
+      getJson: vi.fn(),
+      getText: vi.fn(),
+    },
+    prompt: {
+      intro: vi.fn(),
+      outro: vi.fn(),
+      cancel: vi.fn(),
+      isCancel: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      success: vi.fn(),
+      log: vi.fn(),
+      text: vi.fn(),
+      confirm: vi.fn(),
+      select: vi.fn(),
+      multiselect: vi.fn(),
+      autocompleteMultiselect: vi.fn(),
+      spinner: vi.fn(),
+    },
+    process: {
+      run: vi.fn(),
     },
   };
 

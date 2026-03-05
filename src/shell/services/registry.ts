@@ -6,6 +6,7 @@ import {
   normalizeManifestInline,
   PluginRawDataWrapperSchema,
 } from "@/domain/registryModel.js";
+import { createStandardContext } from "@/shell/plugins/adapter.js";
 import type { RegistryFile, RegistryItem, RegistrySourceMeta, RegpickPlugin } from "@/types.js";
 import { Effect, Either, Schema as S } from "effect";
 
@@ -27,10 +28,14 @@ function resolveAndLoadWithPlugins(
 
       const resolvedId = yield* Effect.tryPromise({
         try: async () =>
-          plugin.resolveId!(target, originalSource || cwd, {
-            cwd,
-            runtime,
-          }),
+          plugin.resolveId!(
+            target,
+            originalSource || cwd,
+            createStandardContext({
+              cwd,
+              runtime,
+            }),
+          ),
         catch: (e): AppError => {
           if (e && typeof e === "object" && "_tag" in e) return e as AppError;
           return appError(
@@ -44,7 +49,7 @@ function resolveAndLoadWithPlugins(
       if (!resolvedId) continue;
 
       const content = yield* Effect.tryPromise({
-        try: async () => plugin.load!(resolvedId, { cwd, runtime }),
+        try: async () => plugin.load!(resolvedId, createStandardContext({ cwd, runtime })),
         catch: (e): AppError => {
           if (e && typeof e === "object" && "_tag" in e) return e as AppError;
           return appError(

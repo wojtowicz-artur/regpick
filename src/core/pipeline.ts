@@ -20,11 +20,11 @@ export interface PipelineContext {
   runtime: RuntimePorts;
 }
 
-export interface PluginHooks {
+export interface EffectPipelinePluginHooks {
   /**
    * Called before anything else. Initialize your plugin here.
    */
-  start?(ctx: PipelineContext): Promise<void>;
+  start?(ctx: PipelineContext): Effect.Effect<void, AppError, never>;
 
   /**
    * Resolve an import path/alias to an absolute path.
@@ -33,37 +33,41 @@ export interface PluginHooks {
     source: string,
     importer?: string,
     ctx?: PipelineContext,
-  ): Promise<string | null | void>;
+  ): Effect.Effect<string | null | void, AppError, never>;
 
   /**
    * Load the source code of a file before transformation.
    */
-  load?(id: string, ctx?: PipelineContext): Promise<string | null | void>;
+  load?(id: string, ctx?: PipelineContext): Effect.Effect<string | null | void, AppError, never>;
 
   /**
    * Transform the source code of a file.
    */
-  transform?(code: string, id: string, ctx?: PipelineContext): Promise<string | null | void>;
+  transform?(
+    code: string,
+    id: string,
+    ctx?: PipelineContext,
+  ): Effect.Effect<string | null | void, AppError, never>;
 
   /**
    * End of the pipeline, perform any final cleanup or generation steps.
    */
-  finish?(ctx: PipelineContext): Promise<void>;
+  finish?(ctx: PipelineContext): Effect.Effect<void, AppError, never>;
 
   /**
    * Invoked if an error occurs anywhere in the pipeline.
    */
-  onError?(error: Error, ctx: PipelineContext): Promise<void>;
+  onError?(error: Error, ctx: PipelineContext): Effect.Effect<void, AppError, never>;
 }
 
-export interface Plugin extends PluginHooks {
+export interface EffectPipelinePlugin extends EffectPipelinePluginHooks {
   type: "pipeline";
   name: string;
 }
 
 export const runPipeline = (
   ctx: PipelineContext,
-  plugins: Plugin[],
+  plugins: EffectPipelinePlugin[],
   files: { id: string; code: string | Uint8Array }[],
 ): Effect.Effect<void, AppError> => {
   return Effect.gen(function* () {
@@ -73,14 +77,16 @@ export const runPipeline = (
       (plugin) =>
         Effect.gen(function* () {
           if (plugin.start) {
-            yield* Effect.tryPromise({
-              try: () => plugin.start!(ctx),
-              catch: (e) =>
-                appError(
-                  "PluginError",
-                  `[${plugin.name}] Failed during start hook: ${e instanceof Error ? e.message : String(e)}`,
+            yield* plugin.start!(ctx).pipe(
+              Effect.catchAll((err) =>
+                Effect.fail(
+                  appError(
+                    "PluginError",
+                    `[${plugin.name}] Failed during start hook: ${err instanceof Error ? err.message : String(err)}`,
+                  ),
                 ),
-            });
+              ),
+            );
           }
         }),
       { concurrency: 1, discard: true },
@@ -94,14 +100,16 @@ export const runPipeline = (
           let currentId = file.id;
           for (const plugin of plugins) {
             if (plugin.resolveId) {
-              const resolved = yield* Effect.tryPromise({
-                try: () => plugin.resolveId!(currentId, undefined, ctx),
-                catch: (e) =>
-                  appError(
-                    "PluginError",
-                    `[${plugin.name}] Failed to resolveId for '${currentId}': ${e instanceof Error ? e.message : String(e)}`,
+              const resolved = yield* plugin.resolveId!(currentId, undefined, ctx).pipe(
+                Effect.catchAll((err) =>
+                  Effect.fail(
+                    appError(
+                      "PluginError",
+                      `[${plugin.name}] Failed to resolveId for '${currentId}': ${err instanceof Error ? err.message : String(err)}`,
+                    ),
                   ),
-              });
+                ),
+              );
               if (resolved) {
                 currentId = resolved;
                 break;
@@ -131,14 +139,16 @@ export const runPipeline = (
             // load
             for (const plugin of plugins) {
               if (plugin.load) {
-                const loaded = yield* Effect.tryPromise({
-                  try: () => plugin.load!(currentId, ctx),
-                  catch: (e) =>
-                    appError(
-                      "PluginError",
-                      `[${plugin.name}] Failed to load '${currentId}': ${e instanceof Error ? e.message : String(e)}`,
+                const loaded = yield* plugin.load!(currentId, ctx).pipe(
+                  Effect.catchAll((err) =>
+                    Effect.fail(
+                      appError(
+                        "PluginError",
+                        `[${plugin.name}] Failed to load '${currentId}': ${err instanceof Error ? err.message : String(err)}`,
+                      ),
                     ),
-                });
+                  ),
+                );
                 if (loaded !== null && loaded !== undefined) {
                   currentCode = loaded;
                   break;
@@ -151,14 +161,20 @@ export const runPipeline = (
               if (typeof currentCode === "string") {
                 for (const plugin of plugins) {
                   if (plugin.transform) {
-                    const transformed = yield* Effect.tryPromise({
-                      try: () => plugin.transform!(currentCode as string, currentId, ctx),
-                      catch: (e) =>
-                        appError(
-                          "PluginError",
-                          `[${plugin.name}] Failed to transform '${currentId}': ${e instanceof Error ? e.message : String(e)}`,
+                    const transformed: string | void | null = yield* plugin.transform!(
+                      currentCode as string,
+                      currentId,
+                      ctx,
+                    ).pipe(
+                      Effect.catchAll((err) =>
+                        Effect.fail(
+                          appError(
+                            "PluginError",
+                            `[${plugin.name}] Failed to transform '${currentId}': ${err instanceof Error ? err.message : String(err)}`,
+                          ),
                         ),
-                    });
+                      ),
+                    );
                     if (transformed !== null && transformed !== undefined) {
                       currentCode = transformed;
                     }
@@ -185,14 +201,16 @@ export const runPipeline = (
       (plugin) =>
         Effect.gen(function* () {
           if (plugin.finish) {
-            yield* Effect.tryPromise({
-              try: () => plugin.finish!(ctx),
-              catch: (e) =>
-                appError(
-                  "PluginError",
-                  `[${plugin.name}] Failed during finish hook: ${e instanceof Error ? e.message : String(e)}`,
+            yield* plugin.finish!(ctx).pipe(
+              Effect.catchAll((err) =>
+                Effect.fail(
+                  appError(
+                    "PluginError",
+                    `[${plugin.name}] Failed during finish hook: ${err instanceof Error ? err.message : String(err)}`,
+                  ),
                 ),
-            });
+              ),
+            );
           }
         }),
       { concurrency: 1, discard: true },
@@ -205,10 +223,10 @@ export const runPipeline = (
           (plugin) =>
             Effect.gen(function* () {
               if (plugin.onError) {
-                yield* Effect.tryPromise({
-                  try: () => plugin.onError!(err as Error, ctx),
-                  catch: (e) => appError("PluginError", "Cleanup error ignored", e),
-                }).pipe(Effect.ignore);
+                yield* plugin.onError!(err as Error, ctx).pipe(
+                  Effect.catchAll(() => Effect.void),
+                  Effect.ignore,
+                );
               }
             }),
           { concurrency: 1, discard: true },
