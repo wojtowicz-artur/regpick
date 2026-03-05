@@ -1,10 +1,10 @@
 import { appError, type AppError } from "@/core/errors.js";
+import type { RuntimePorts } from "@/core/ports.js";
 import {
   extractItemReferences,
   normalizeItem,
   normalizeManifestInline,
 } from "@/domain/registryModel.js";
-import type { RuntimePorts } from "@/core/ports.js";
 import type { RegistryFile, RegistryItem, RegistrySourceMeta, RegpickPlugin } from "@/types.js";
 import { Effect, Either } from "effect";
 
@@ -23,7 +23,7 @@ function resolveAndLoadWithPlugins(
       const resolvedId = yield* Effect.tryPromise({
         try: async () =>
           plugin.resolveId!(target, originalSource || cwd, {
-            cwd: process.cwd(),
+            cwd,
             runtime,
           }),
         catch: (e): AppError => {
@@ -39,7 +39,7 @@ function resolveAndLoadWithPlugins(
       if (!resolvedId) continue;
 
       const content = yield* Effect.tryPromise({
-        try: async () => plugin.load!(resolvedId, { cwd: process.cwd(), runtime }),
+        try: async () => plugin.load!(resolvedId, { cwd, runtime }),
         catch: (e): AppError => {
           if (e && typeof e === "object" && "_tag" in e) return e as AppError;
           return appError(
@@ -63,19 +63,14 @@ function resolveAndLoadWithPlugins(
 
 function resolveItemReference(
   itemRef: string,
+  cwd: string,
   sourceMeta: RegistrySourceMeta,
   runtime: RuntimePorts,
   plugins: RegpickPlugin[],
 ): Effect.Effect<RegistryItem | null, AppError> {
   return Effect.gen(function* () {
     const loadOpt = yield* Effect.either(
-      resolveAndLoadWithPlugins(
-        itemRef,
-        process.cwd(),
-        sourceMeta.originalSource,
-        runtime,
-        plugins,
-      ),
+      resolveAndLoadWithPlugins(itemRef, cwd, sourceMeta.originalSource, runtime, plugins),
     );
 
     if (Either.isLeft(loadOpt)) {
@@ -110,6 +105,7 @@ function resolveItemReference(
 
 function normalizeManifest(
   data: unknown,
+  cwd: string,
   sourceMeta: RegistrySourceMeta,
   runtime: RuntimePorts,
   plugins: RegpickPlugin[],
@@ -129,7 +125,7 @@ function normalizeManifest(
     const inlineItems = yield* Effect.catchAll(inlineItemsRes, () => Effect.succeed([]));
 
     const resolvedItems = yield* Effect.all(
-      references.map((ref) => resolveItemReference(ref, sourceMeta, runtime, plugins)),
+      references.map((ref) => resolveItemReference(ref, cwd, sourceMeta, runtime, plugins)),
       { concurrency: "unbounded" },
     ).pipe(Effect.map((items) => items.filter((item): item is RegistryItem => item !== null)));
 
@@ -189,6 +185,7 @@ export function loadRegistry(
     } else if (manifest && typeof manifest === "object" && "rawData" in manifest) {
       items = yield* normalizeManifest(
         manifest.rawData,
+        cwd,
         (manifest as unknown as { sourceMeta: RegistrySourceMeta }).sourceMeta,
         runtime,
         plugins,
@@ -196,6 +193,7 @@ export function loadRegistry(
     } else if ((manifest && typeof manifest === "object") || Array.isArray(manifest)) {
       items = yield* normalizeManifest(
         manifest,
+        cwd,
         { type: "system", originalSource: resolvedId },
         runtime,
         plugins,
@@ -248,7 +246,7 @@ export function resolveFileContent(
     const loadOpt = yield* Effect.either(
       resolveAndLoadWithPlugins(
         targetPathOrUrl,
-        process.cwd(),
+        cwd,
         item.sourceMeta.originalSource || cwd,
         runtime,
         plugins,
