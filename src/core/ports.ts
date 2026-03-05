@@ -10,10 +10,13 @@ export class FileSystemPort extends Context.Tag("FileSystemPort")<
     remove(path: string): Effect.Effect<void, AppError, never>;
     writeFile(
       path: string,
-      content: string,
-      encoding: BufferEncoding,
+      content: string | Uint8Array,
+      encoding?: BufferEncoding,
     ): Effect.Effect<void, AppError, never>;
-    readFile(path: string, encoding: BufferEncoding): Effect.Effect<string, AppError, never>;
+    readFile(
+      path: string,
+      encoding?: BufferEncoding,
+    ): Effect.Effect<string | Uint8Array, AppError, never>;
     readJsonSync<T = unknown>(path: string): Effect.Effect<T, AppError, never>;
     writeJson(
       path: string,

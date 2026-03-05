@@ -46,7 +46,7 @@ export function FilePlugin(): RegpickPlugin {
 
         const readValue = yield* ctx.runtime.fs.readFile(fileSystemPath, "utf8");
         try {
-          return JSON.parse(readValue);
+          return JSON.parse(readValue as string);
         } catch {
           return readValue;
         }

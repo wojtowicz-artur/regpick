@@ -124,7 +124,7 @@ export const generateRegistryItems = (
           const content = yield* runtime.fs.readFile(file, "utf8");
           return buildRegistryItemFromFile({
             path: file,
-            content,
+            content: content as string,
             targetDir: state.targetDir,
           });
         }),

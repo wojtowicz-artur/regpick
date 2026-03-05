@@ -33,7 +33,7 @@ export const createFileSystemLive = () =>
       }),
     readFile: (path, encoding) =>
       Effect.tryPromise({
-        try: () => fsPromises.readFile(path, encoding).then((b) => b.toString()),
+        try: () => fsPromises.readFile(path, encoding),
         catch: (cause) => appError("FileSystemError", `Failed to read file: ${path}`, cause),
       }),
     readJsonSync: <T = unknown>(path: string) =>
