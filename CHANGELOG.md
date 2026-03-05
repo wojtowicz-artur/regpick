@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.20.3](https://github.com/wojtowicz-artur/regpick/compare/v0.20.2...v0.20.3) (2026-03-05)
+
+### Bug Fixes
+
+* add discard option to concurrency settings in runPipeline and fix pipeline types ([24c5275](https://github.com/wojtowicz-artur/regpick/commit/24c5275fbd3d07c211d7f1e2652d3f7f26773d75))
+
 ## [0.20.2](https://github.com/wojtowicz-artur/regpick/compare/v0.20.1...v0.20.2) (2026-03-05)
 
 ### Bug Fixes
