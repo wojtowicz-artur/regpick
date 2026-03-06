@@ -8,7 +8,7 @@ import type {
   RegistryItem,
   RegpickLockfile,
   ResolvedRegpickConfig,
-} from "@/types.js";
+} from "@/domain/models/index.js";
 import { Effect } from "effect";
 
 export type UpdateFile = {

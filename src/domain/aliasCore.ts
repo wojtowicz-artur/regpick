@@ -1,4 +1,4 @@
-import type { RegpickConfig } from "@/types.js";
+import type { RegpickConfig } from "@/domain/models/index.js";
 
 export function applyAliases(content: string, config: Pick<RegpickConfig, "resolve">): string {
   let result = content;

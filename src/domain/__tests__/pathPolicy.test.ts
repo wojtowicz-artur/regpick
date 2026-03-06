@@ -2,7 +2,7 @@ import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { resolveOutputPathFromPolicy } from "@/domain/pathPolicy.js";
-import type { RegistryItem, ResolvedRegpickConfig } from "@/types.js";
+import type { RegistryItem, ResolvedRegpickConfig } from "@/domain/models/index.js";
 
 const baseConfig: ResolvedRegpickConfig = {
   registry: {

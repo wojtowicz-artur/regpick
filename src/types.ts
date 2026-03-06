@@ -1,5 +1,4 @@
-import type { RegistryFile, RegistryItem } from "@/domain/registryModel.js";
-import type { RegpickLockfile } from "@/shell/services/lockfile.js";
+import type { RegistryFile, RegistryItem } from "@/domain/models/index.js";
 export interface StandardFileSystemPort {
   existsSync(path: string): boolean;
   pathExists(path: string): Promise<boolean>;
@@ -100,12 +99,7 @@ export type RegpickPlugin =
   | PackageManagerExtensionPlugin
   | PathResolverExtensionPlugin;
 
-export type FlagValue = string | boolean;
-
-export type CliArgs = {
-  flags: Record<string, FlagValue>;
-  positionals: string[];
-};
+export type { CliArgs, FlagValue } from "@/domain/models/index.js";
 
 export type CommandContext = {
   cwd: string;
@@ -138,36 +132,18 @@ export interface PathResolverPlugin {
 }
 
 export type { RegpickConfig, ResolvedRegpickConfig } from "@/domain/configModel.js";
-export type { RegistryFile, RegistryItem, RegistrySourceMeta } from "@/domain/registryModel.js";
+export type { RegistryFile, RegistryItem } from "@/domain/models/index.js";
+export type { RegistrySourceMeta } from "@/domain/registryModel.js";
 
-export type PlannedWrite = {
-  itemName: string;
-  sourceFile: RegistryFile;
-  absoluteTarget: string;
-  relativeTarget: string;
-};
+export type {
+  DependencyPlan,
+  InstallCommand,
+  InstallPlan,
+  OverwritePolicy,
+  PlannedWrite,
+} from "@/domain/models/index.js";
 
-export type DependencyPlan = {
-  dependencies: string[];
-  devDependencies: string[];
-};
-
-export type InstallPlan = {
-  selectedItems: RegistryItem[];
-  plannedWrites: PlannedWrite[];
-  dependencyPlan: DependencyPlan;
-  conflicts: PlannedWrite[];
-};
-
-export type { ComponentLockItem, RegpickLockfile } from "@/shell/services/lockfile.js";
-
-export type JournalEntry = {
-  id: string;
-  command: "add" | "update";
-  status: "pending";
-  plannedFiles: string[];
-  lockfileBackup?: RegpickLockfile;
-};
+export type { ComponentLockItem, JournalEntry, RegpickLockfile } from "@/domain/models/index.js";
 
 export type CommandOutcome =
   | {

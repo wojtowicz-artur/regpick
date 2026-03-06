@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import { appError, type AppError } from "@/core/errors.js";
-import type { CommandContext, RegistryItem } from "@/types.js";
+import type { CommandContext, RegistryItem } from "@/domain/models/index.js";
 
 export function parseSelectedNames(rawSelectFlag: string | boolean | undefined): string[] {
   if (!rawSelectFlag) {

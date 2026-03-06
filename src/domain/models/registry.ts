@@ -1,5 +1,6 @@
 export type RegistryFile = {
   path?: string;
+  target?: string;
   url?: string;
   content?: string;
   type?: string;
@@ -7,6 +8,8 @@ export type RegistryFile = {
 
 export type RegistryItem = {
   name: string;
+  title?: string;
+  description?: string;
   type: string;
   dependencies?: string[];
   devDependencies?: string[];

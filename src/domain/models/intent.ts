@@ -5,6 +5,11 @@ export type CliArgs = {
   positionals: string[];
 };
 
+export type CommandContext = {
+  cwd: string;
+  args: CliArgs;
+};
+
 export type AddFlags = {
   cwd: string;
   yes?: boolean;

@@ -2,7 +2,7 @@ import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { buildInstallPlan, resolveRegistryDependencies } from "@/domain/addPlan.js";
-import type { RegistryItem, ResolvedRegpickConfig } from "@/types.js";
+import type { RegistryItem, ResolvedRegpickConfig } from "@/domain/models/index.js";
 
 const config: ResolvedRegpickConfig = {
   resolve: {

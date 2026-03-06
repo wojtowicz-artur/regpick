@@ -1,9 +1,16 @@
 export type ComponentLockItem = {
   version?: string;
-  [key: string]: unknown;
+  installedAt: string;
+  source?: string;
+  dependencies?: string[];
+  files: Array<{
+    path: string;
+    hash?: string;
+  }>;
 };
 
 export type RegpickLockfile = {
+  lockfileVersion: 2;
   components: Record<string, ComponentLockItem>;
 };
 

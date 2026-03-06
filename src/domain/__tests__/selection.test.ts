@@ -6,7 +6,7 @@ import {
   parseSelectedNames,
   selectItemsFromFlags,
 } from "@/domain/selection.js";
-import type { CommandContext, RegistryItem } from "@/types.js";
+import type { CommandContext, RegistryItem } from "@/domain/models/index.js";
 
 const items: RegistryItem[] = [
   {

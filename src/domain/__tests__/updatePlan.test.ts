@@ -3,7 +3,11 @@ import { describe, expect, it } from "vitest";
 
 import { buildUpdatePlanForItem } from "@/domain/updatePlan.js";
 import { computeHash } from "@/shell/services/lockfile.js";
-import type { ComponentLockItem, RegistryItem, ResolvedRegpickConfig } from "@/types.js";
+import type {
+  ComponentLockItem,
+  RegistryItem,
+  ResolvedRegpickConfig,
+} from "@/domain/models/index.js";
 
 const config: ResolvedRegpickConfig = {
   resolve: {

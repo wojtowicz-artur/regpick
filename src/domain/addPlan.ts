@@ -1,6 +1,11 @@
 import { RegistryError, type AppError } from "@/core/errors.js";
 import { resolveOutputPathFromPolicy } from "@/domain/pathPolicy.js";
-import type { InstallPlan, PlannedWrite, RegistryItem, ResolvedRegpickConfig } from "@/types.js";
+import type {
+  InstallPlan,
+  PlannedWrite,
+  RegistryItem,
+  ResolvedRegpickConfig,
+} from "@/domain/models/index.js";
 import { Array, Effect } from "effect";
 
 function buildDependencyPlan(selectedItems: RegistryItem[]): InstallPlan["dependencyPlan"] {
