@@ -103,6 +103,9 @@ export function runAddWorkflow(): Effect.Effect<
         id: crypto.randomUUID(),
         command: "add" as const,
         status: "pending" as const,
+        currentStep: "write_journal" as const,
+        lastCompletedStep: "write_journal" as const,
+        lockfilePath: "regpick-lock.json",
         plannedFiles: hydratedWrites.map((w) => w.absoluteTarget),
         lockfileBackup: lockfileBackup,
       };

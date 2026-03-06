@@ -32,6 +32,9 @@ describe("regpick e2e (journal rollback)", () => {
         id: "mock-crash-uuid",
         command: "add",
         status: "pending",
+        currentStep: "write_journal",
+        lastCompletedStep: "write_journal",
+        lockfilePath: "regpick-lock.json",
         plannedFiles: [mockComponentPath],
         lockfileBackup: { lockfileVersion: 2, components: {} }, // Simulate lockfile rollback
       };

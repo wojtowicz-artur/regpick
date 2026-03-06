@@ -7,7 +7,7 @@ const LOCKFILE_NAME = "regpick-lock.json";
 
 export const FileLockSchema = S.Struct({
   path: S.String,
-  hash: S.String,
+  hash: S.optional(S.String),
 });
 export type FileLockItem = S.Schema.Type<typeof FileLockSchema>;
 
@@ -15,8 +15,8 @@ export const ComponentLockSchema = S.Struct({
   version: S.optional(S.String),
   installedAt: S.String,
   source: S.optional(S.String),
-  dependencies: S.optional(S.Array(S.String)),
-  files: S.Array(FileLockSchema),
+  dependencies: S.optional(S.mutable(S.Array(S.String))),
+  files: S.mutable(S.Array(FileLockSchema)),
 });
 export type ComponentLockItem = S.Schema.Type<typeof ComponentLockSchema>;
 

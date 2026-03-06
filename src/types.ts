@@ -99,20 +99,17 @@ export type RegpickPlugin =
   | PackageManagerExtensionPlugin
   | PathResolverExtensionPlugin;
 
-export type { CliArgs, FlagValue } from "@/domain/models/index.js";
+import type { CliArgs, FlagValue } from "@/domain/models/intent.js";
+export type { CliArgs, FlagValue };
 
 export type CommandContext = {
   cwd: string;
   args: CliArgs;
 };
 
-export type OverwritePolicy = "prompt" | "overwrite" | "skip";
 export type PackageManager = string;
 
-export interface InstallCommand {
-  command: string;
-  args: string[];
-}
+import type { InstallCommand } from "@/domain/models/index.js";
 
 export interface PackageManagerPlugin {
   name: string;
@@ -132,7 +129,6 @@ export interface PathResolverPlugin {
 }
 
 export type { RegpickConfig, ResolvedRegpickConfig } from "@/domain/configModel.js";
-export type { RegistryFile, RegistryItem } from "@/domain/models/index.js";
 export type { RegistrySourceMeta } from "@/domain/registryModel.js";
 
 export type {
@@ -144,6 +140,7 @@ export type {
 } from "@/domain/models/index.js";
 
 export type { ComponentLockItem, JournalEntry, RegpickLockfile } from "@/domain/models/index.js";
+export type { RegistryFile, RegistryItem };
 
 export type CommandOutcome =
   | {

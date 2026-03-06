@@ -6,7 +6,6 @@ describe("MemoryVFS (Windows Path normalization)", () => {
   it("should normalize Windows paths to forward-slashes when writing and reading", async () => {
     const vfs = new MemoryVFS();
     const windowsPath = "src\\components\\button.tsx";
-    const nestedWindowsPath = "src\\\\components\\\\ui\\\\button.tsx";
 
     // Write using windows path
     await Effect.runPromise(

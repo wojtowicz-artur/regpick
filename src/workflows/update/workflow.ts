@@ -1,36 +1,38 @@
 import { CommandContextTag, ConfigTag } from "@/core/context.js";
-import { type AppError } from "@/core/errors.js";
+import { toAppError, type AppError } from "@/core/errors.js";
 import { JournalService } from "@/core/journal.js";
 import { runPipeline, type EffectPipelinePlugin } from "@/core/pipeline.js";
 import { FileSystemPort, HttpPort, ProcessPort, PromptPort } from "@/core/ports.js";
+import type { ApprovedUpdatePlan } from "@/domain/updatePlan.js";
 import { coreUpdatePlugin } from "@/plugins/coreUpdatePlugin.js";
 import { MemoryVFS } from "@/shell/adapters/vfs.js";
 import {
-  queryConfiguration,
-  queryFileContents,
-  queryInstallationState,
-  queryRegistrySource,
-  querySelectedItems,
-  queryUserApproval,
-} from "@/shell/cli/addOrchestrator.js";
+  queryAvailableUpdates,
+  queryUpdateState,
+  queryUserUpdateApproval,
+} from "@/shell/cli/updateOrchestrator.js";
 import { createEffectPlugin } from "@/shell/plugins/adapter.js";
 import { DirectoryPlugin, FilePlugin, HttpPlugin, loadPlugins } from "@/shell/plugins/index.js";
-import { readLockfile } from "@/shell/services/lockfile.js";
-import type { CommandOutcome, RegistryItem, ResolvedRegpickConfig } from "@/types.js";
+import type { CommandOutcome, ResolvedRegpickConfig } from "@/types.js";
 import { Effect } from "effect";
 import crypto from "node:crypto";
 
+/**
+ * Main controller for the `update` command effect loop.
+ */
 export function runUpdateWorkflow(): Effect.Effect<
   CommandOutcome,
   AppError,
   FileSystemPort | HttpPort | ProcessPort | PromptPort | CommandContextTag | JournalService
 > {
   return Effect.gen(function* () {
-    const { config } = yield* queryConfiguration();
+    const state = yield* queryUpdateState();
     const context = yield* CommandContextTag;
-    const resolvedPlugins = yield* loadPlugins(config.plugins || [], context.cwd);
+    const resolvedPlugins = yield* loadPlugins(state.config.plugins || [], context.cwd).pipe(
+      Effect.mapError(toAppError),
+    );
     const hydratedConfig: ResolvedRegpickConfig = {
-      ...config,
+      ...state.config,
       plugins: resolvedPlugins,
     };
 
@@ -41,60 +43,71 @@ export function runUpdateWorkflow(): Effect.Effect<
       const prompt = yield* PromptPort;
       const runtime = { fs, http, process, prompt };
 
-      const source = yield* queryRegistrySource();
-      if (!source)
+      const componentNames = Object.keys(state.lockfile.components);
+      if (componentNames.length === 0) {
+        yield* runtime.prompt.info("No components installed. Nothing to update.");
         return {
           kind: "noop",
-          message: "No source provided",
+          message: "No components to update.",
         } as CommandOutcome;
+      }
 
       const customPlugins = (yield* ConfigTag).plugins || [];
+
       const plugins = [...customPlugins, HttpPlugin(), FilePlugin(), DirectoryPlugin()];
 
-      const itemsToProc = yield* querySelectedItems(source, plugins);
-      for (const d of itemsToProc.missingRegistryDeps || []) {
-        yield* runtime.prompt.warn(`Registry dependency "${d}" not found in current registry.`);
+      const updates = yield* queryAvailableUpdates(state.lockfile, plugins);
+
+      if (updates.length === 0) {
+        return {
+          kind: "noop",
+          message: "All components are up to date.",
+        } as CommandOutcome;
       }
 
-      const state = yield* queryInstallationState(itemsToProc.selectedItems);
-      const approved = yield* queryUserApproval(state);
-      const hydratedWrites = yield* queryFileContents(
-        approved.finalWrites,
-        approved.selectedItems,
-        plugins,
+      let approvedPlan: ApprovedUpdatePlan;
+
+      if (context.args?.flags?.yes) {
+        approvedPlan = { approvedUpdates: updates };
+      } else {
+        approvedPlan = yield* queryUserUpdateApproval(updates);
+      }
+
+      const approvedCount = approvedPlan.approvedUpdates.length;
+      if (approvedCount === 0) {
+        return {
+          kind: "noop",
+          message: "No updates approved.",
+        } as CommandOutcome;
+      }
+
+      const updatedLockfile = JSON.parse(JSON.stringify(state.lockfile));
+      const vfsFiles: { id: string; code: string }[] = [];
+
+      yield* Effect.forEach(
+        approvedPlan.approvedUpdates,
+        (update) =>
+          Effect.sync(() => {
+            update.files.forEach((file) => {
+              vfsFiles.push({
+                id: file.target,
+                code: file.remoteContent,
+              });
+            });
+            updatedLockfile.components[update.itemName].installedAt = new Date().toISOString();
+          }),
+        { concurrency: "unbounded" },
       );
-
-      const vfs = new MemoryVFS();
-      const vfsFiles = hydratedWrites.map((w) => ({
-        id: w.absoluteTarget,
-        code: w.finalContent,
-      }));
-      const installedItemsInfo: RegistryItem[] = [];
-      for (const write of hydratedWrites) {
-        const originalItem = approved.selectedItems.find((i) => i.name === write.itemName);
-        if (originalItem && !installedItemsInfo.some((i) => i.name === originalItem.name)) {
-          installedItemsInfo.push(originalItem);
-        }
-      }
 
       const userPlugins = customPlugins.filter((p) => p.type === "pipeline");
-      const depPlan = approved.shouldInstallDeps
-        ? approved.dependencyPlan
-        : { dependencies: [], devDependencies: [] };
-
-      let lockfileBackup = yield* readLockfile(context.cwd, runtime).pipe(
-        Effect.catchAll(() => Effect.succeed(undefined)),
-      );
+      const vfs = new MemoryVFS();
 
       const pipelinePlugins: EffectPipelinePlugin[] = [
         ...userPlugins.map((p) => createEffectPlugin(p as any)),
         coreUpdatePlugin(
-          depPlan,
-          yield* ConfigTag,
+          approvedPlan.approvedUpdates,
+          updatedLockfile,
           runtime,
-          installedItemsInfo,
-          hydratedWrites,
-          lockfileBackup,
         ) as EffectPipelinePlugin,
       ];
 
@@ -103,8 +116,11 @@ export function runUpdateWorkflow(): Effect.Effect<
         id: crypto.randomUUID(),
         command: "update" as const,
         status: "pending" as const,
-        plannedFiles: hydratedWrites.map((w) => w.absoluteTarget),
-        lockfileBackup: lockfileBackup,
+        currentStep: "write_journal" as const,
+        lastCompletedStep: "write_journal" as const,
+        lockfilePath: "regpick-lock.json",
+        plannedFiles: vfsFiles.map((f) => f.id),
+        lockfileBackup: state.lockfile,
       };
 
       yield* journal.writeIntent(entry, context.cwd);
@@ -125,9 +141,12 @@ export function runUpdateWorkflow(): Effect.Effect<
         Effect.tap(() => journal.clearIntent(context.cwd)),
       );
 
-      return { kind: "success", plan: approved } as CommandOutcome;
-    }).pipe(Effect.provideService(ConfigTag, hydratedConfig));
+      return {
+        kind: "success",
+        message: `Updated ${approvedCount} components.`,
+      } as CommandOutcome;
+    });
 
-    return yield* logic;
+    return yield* Effect.provideService(logic, ConfigTag, hydratedConfig);
   });
 }
