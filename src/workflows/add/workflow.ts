@@ -4,7 +4,7 @@ import * as domain from "@/domain/addPlan.js";
 import { applyAliases } from "@/domain/aliasCore.js";
 import { selectItemsFromFlags } from "@/domain/selection.js";
 import type { AddIntent } from "@/domain/models/intent.js";
-import type { ResolvedPlan } from "@/domain/models/plan.js";
+import type { ResolvedPlan, OverwritePolicy } from "@/domain/models/plan.js";
 import type { JournalEntry, RegpickLockfile } from "@/domain/models/state.js";
 import { resolveOutputPathFromPolicy } from "@/domain/pathPolicy.js";
 import { ExecPort } from "@/execution/exec/port.js";
@@ -127,24 +127,35 @@ export const addWorkflow = (
     const preSelected = yield* selectItemsFromFlags(reg.items, intent);
     const selected = preSelected ? preSelected : yield* prompt.selectItems(reg.items, intent);
 
+    const { resolvedItems, missingDependencies } = yield* domain.resolveRegistryDependencies(
+      selected,
+      reg.items,
+    );
+
+    if (missingDependencies.length > 0) {
+      yield* prompt.warn(`Missing registry dependencies: ${missingDependencies.join(", ")}`);
+    }
+
     // ── build_plan ────────────────────────────────────────────────────────────
     const lockfileBackup = yield* lf
       .read(intent.flags.cwd)
       .pipe(Effect.catchAll(() => Effect.succeed(undefined)));
-    const existingTargets = yield* resolveExistingTargets(selected, intent.flags.cwd, config);
+    const existingTargets = yield* resolveExistingTargets(resolvedItems, intent.flags.cwd, config);
     const plan = yield* domain.buildInstallPlan(
-      selected,
+      resolvedItems,
       intent.flags.cwd,
       config,
       existingTargets as any,
     );
 
     // ── resolve_conflicts ─────────────────────────────────────────────────────
-    const conflictPolicy = intent.flags.overwrite
-      ? "overwrite"
-      : intent.flags.yes
+    const conflictPolicy = (
+      intent.flags.overwrite
         ? "overwrite"
-        : config.install.overwritePolicy;
+        : intent.flags.yes
+          ? "overwrite"
+          : (config.install?.overwritePolicy ?? "prompt")
+    ) as OverwritePolicy;
 
     const { writes } = yield* prompt.resolveConflicts(plan.conflicts, conflictPolicy);
 
@@ -165,11 +176,16 @@ export const addWorkflow = (
         : false);
 
     const resolvedPlan: ResolvedPlan = {
-      selectedItems: selected,
-      finalWrites: [
-        ...plan.plannedWrites.filter((pw) => !existingTargets.has(pw.absoluteTarget)),
-        ...writes,
-      ],
+      selectedItems: resolvedItems,
+      finalWrites: domain.computeFinalWrites(
+        plan.plannedWrites,
+        existingTargets,
+        new Map(writes.map((w) => [w.absoluteTarget, "overwrite" as domain.OverwriteResolution])),
+        intent.flags.yes || false,
+        conflictPolicy === "prompt" || conflictPolicy === "overwrite" || conflictPolicy === "skip"
+          ? conflictPolicy
+          : "prompt",
+      ),
       dependencyPlan: plan.dependencyPlan,
       shouldInstallDeps,
     };

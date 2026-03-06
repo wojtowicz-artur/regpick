@@ -6,7 +6,6 @@ import * as path from "node:path";
 
 import type { UpdateIntent } from "@/domain/models/intent.js";
 import type { JournalEntry, RegpickLockfile } from "@/domain/models/state.js";
-import { ExecPort } from "@/execution/exec/port.js";
 import { JournalPort } from "@/execution/journal/port.js";
 import { LockfilePort } from "@/execution/lockfile/port.js";
 import { VFSPort, type VFSFile } from "@/execution/vfs/port.js";
@@ -29,14 +28,7 @@ export const updateWorkflow = (
 ): Effect.Effect<
   void,
   AppError,
-  | RegistryPort
-  | PromptPort
-  | VFSPort
-  | ExecPort
-  | LockfilePort
-  | JournalPort
-  | ConfigTag
-  | FileSystemPort
+  RegistryPort | PromptPort | VFSPort | LockfilePort | JournalPort | ConfigTag | FileSystemPort
 > =>
   Effect.gen(function* () {
     const registry = yield* RegistryPort;
@@ -112,7 +104,10 @@ export const updateWorkflow = (
           updates.push({
             itemName,
             newFiles: action.newFiles,
-            files: detFiles as any,
+            files: Array.from(detFiles),
+            version: regItem.version,
+            dependencies: regItem.dependencies,
+            source: source,
           });
         }
       }
@@ -179,11 +174,16 @@ export const updateWorkflow = (
       newLockfile.components[update.itemName] = {
         ...newLockfile.components[update.itemName],
         files: update.newFiles,
+        installedAt: new Date().toISOString(),
+        version: update.version || newLockfile.components[update.itemName].version,
+        dependencies: update.dependencies || newLockfile.components[update.itemName].dependencies,
+        source: update.source || newLockfile.components[update.itemName].source,
       };
     }
 
     yield* lf.write(intent.flags.cwd, newLockfile);
     yield* journal.updateStep(journalEntry.id, "commit_lockfile", intent.flags.cwd);
 
+    yield* journal.clear(intent.flags.cwd);
     yield* prompt.success(`Updated ${approvedCount} components.`);
   });

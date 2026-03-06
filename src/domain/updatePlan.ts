@@ -33,6 +33,9 @@ export type DetectedUpdate = {
   itemName: string;
   newFiles: { path: string; hash: string }[];
   files: DetectedUpdateFile[];
+  version?: string;
+  dependencies?: string[];
+  source?: string;
 };
 
 export type ApprovedUpdatePlan = {

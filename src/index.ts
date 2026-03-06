@@ -19,6 +19,8 @@ import { addWorkflow } from "@/workflows/add/workflow.js";
 import { initWorkflow } from "@/workflows/init/workflow.js";
 import { listWorkflow } from "@/workflows/list/workflow.js";
 import { packWorkflow } from "@/workflows/pack/workflow.js";
+import { updateWorkflow } from "@/workflows/update/workflow.js";
+import { buildUpdateIntent } from "@/interfaces/cli/commands/updateCli.js";
 
 function printHelp(): void {
   console.log(`
@@ -131,12 +133,11 @@ function run() {
           commandEffect = packWorkflow(intent);
           break;
         }
-        case "update":
-          commandEffect = Effect.gen(function* () {
-            yield* prompt.outro(styleText("yellow", `Mocked ${command} workflow...`));
-            return { kind: "noop", message: `Mocked ${command} completed` };
-          });
+        case "update": {
+          const intent = buildUpdateIntent(parsed);
+          commandEffect = updateWorkflow(intent);
           break;
+        }
         default:
           yield* prompt.error(`Unknown command: ${command}`);
           printHelp();

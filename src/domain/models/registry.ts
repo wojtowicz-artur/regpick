@@ -8,6 +8,7 @@ export type RegistryFile = {
 
 export type RegistryItem = {
   name: string;
+  version?: string;
   title?: string;
   description?: string;
   type: string;
