@@ -46,6 +46,7 @@ export type InitIntent = {
 };
 
 export type ListIntent = {
+  source?: string;
   flags: { cwd: string };
 };
 

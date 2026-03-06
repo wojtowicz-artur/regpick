@@ -1,136 +1,171 @@
-import { CommandContextTag, ConfigTag } from "@/core/context.js";
+import { ConfigTag } from "@/core/context.js";
 import { type AppError } from "@/core/errors.js";
-import { JournalService } from "@/core/journal.js";
-import { runPipeline, type EffectPipelinePlugin } from "@/core/pipeline.js";
-import { FileSystemPort, HttpPort, ProcessPort, PromptPort } from "@/core/ports.js";
-import { coreAddPlugin } from "@/plugins/coreAddPlugin.js";
-import { MemoryVFS } from "@/shell/adapters/vfs.js";
-import {
-  queryConfiguration,
-  queryFileContents,
-  queryInstallationState,
-  queryRegistrySource,
-  querySelectedItems,
-  queryUserApproval,
-} from "@/shell/cli/addOrchestrator.js";
-import { createEffectPlugin } from "@/shell/plugins/adapter.js";
-import { DirectoryPlugin, FilePlugin, HttpPlugin, loadPlugins } from "@/shell/plugins/index.js";
-import { readLockfile } from "@/shell/services/lockfile.js";
-import type { CommandOutcome, RegistryItem, ResolvedRegpickConfig } from "@/types.js";
+import * as domain from "@/domain/addPlan.js";
+import { applyAliases } from "@/domain/aliasCore.js";
+import type { AddIntent } from "@/domain/models/intent.js";
+import type { ResolvedPlan } from "@/domain/models/plan.js";
+import type { JournalEntry } from "@/domain/models/state.js";
+import { ExecPort } from "@/execution/exec/port.js";
+import { JournalPort } from "@/execution/journal/port.js";
+import { LockfilePort } from "@/execution/lockfile/port.js";
+import { VFSPort } from "@/execution/vfs/port.js";
+import { PromptPort } from "@/interfaces/prompt/port.js";
+import { RegistryPort } from "@/registry/port.js";
 import { Effect } from "effect";
 import crypto from "node:crypto";
+import * as path from "node:path";
 
-export function runAddWorkflow(): Effect.Effect<
-  CommandOutcome,
+// TODO: stubbed or imported missing domain logic
+function resolveExistingTargets(selected: any[], cwd: string, config: any) {
+  return Effect.succeed(new Set<string>());
+}
+
+function resolvePackageManagerName(cwd: string, config: any) {
+  return Effect.succeed("npm");
+}
+
+function resolveTransformPlugins(config: any) {
+  return [];
+}
+
+function getLockfilePath(cwd: string) {
+  return path.join(cwd, "regpick.lock.json");
+}
+
+function buildNewLockfile(backup: any, plan: any, vfsOut: any, source: string): any {
+  const lockfile = backup || { lockfileVersion: 2, components: {} };
+  if (!lockfile.components) lockfile.components = {};
+  for (const item of plan.selectedItems) {
+    lockfile.components[item.name] = {
+      version: item.version || "0.0.0",
+      type: item.type,
+      source: source,
+    };
+  }
+  return lockfile;
+}
+
+export const addWorkflow = (
+  intent: AddIntent,
+): Effect.Effect<
+  void,
   AppError,
-  FileSystemPort | HttpPort | ProcessPort | PromptPort | CommandContextTag | JournalService
-> {
-  return Effect.gen(function* () {
-    const { config } = yield* queryConfiguration();
-    const context = yield* CommandContextTag;
-    const resolvedPlugins = yield* loadPlugins(config.plugins || [], context.cwd);
-    const hydratedConfig: ResolvedRegpickConfig = {
-      ...config,
-      plugins: resolvedPlugins,
+  RegistryPort | PromptPort | VFSPort | ExecPort | LockfilePort | JournalPort | ConfigTag
+> =>
+  Effect.gen(function* () {
+    const registry = yield* RegistryPort;
+    const prompt = yield* PromptPort;
+    const vfsPort = yield* VFSPort;
+    const exec = yield* ExecPort;
+    const lf = yield* LockfilePort;
+    const journal = yield* JournalPort;
+    const config = yield* ConfigTag;
+
+    // ── collect_intent ────────────────────────────────────────────────────────
+    // Już wykonany – intent pochodzi z addCli.ts
+
+    // ── load_registry ─────────────────────────────────────────────────────────
+    const reg = yield* registry.loadManifest(intent.source);
+
+    // ── select_scope ──────────────────────────────────────────────────────────
+    const selected = yield* prompt.selectItems(reg.items, intent);
+
+    // ── build_plan ────────────────────────────────────────────────────────────
+    const lockfileBackup = yield* lf
+      .read(intent.flags.cwd)
+      .pipe(Effect.catchAll(() => Effect.succeed(undefined)));
+    const existingTargets = yield* resolveExistingTargets(selected, intent.flags.cwd, config);
+    const plan = yield* domain.buildInstallPlan(
+      selected,
+      intent.flags.cwd,
+      config,
+      existingTargets as any,
+    );
+
+    // ── resolve_conflicts ─────────────────────────────────────────────────────
+    const { writes, skipped } = yield* prompt.resolveConflicts(
+      plan.conflicts,
+      config.install.overwritePolicy,
+    );
+    yield* prompt.confirmInstall(plan);
+
+    // ── resolve deps ──────────────────────────────────────────────────────────
+    const pmName = yield* resolvePackageManagerName(intent.flags.cwd, config);
+    const shouldInstallDeps =
+      intent.flags.yes ||
+      (plan.dependencyPlan.dependencies.length > 0 || plan.dependencyPlan.devDependencies.length > 0
+        ? yield* prompt.confirmDependencyInstall(
+            plan.dependencyPlan.dependencies,
+            plan.dependencyPlan.devDependencies,
+            pmName,
+          )
+        : false);
+
+    const resolvedPlan: ResolvedPlan = {
+      selectedItems: selected,
+      finalWrites: [
+        ...plan.plannedWrites.filter((pw) => !existingTargets.has(pw.absoluteTarget)),
+        ...writes,
+      ],
+      dependencyPlan: plan.dependencyPlan,
+      shouldInstallDeps,
     };
 
-    const logic = Effect.gen(function* () {
-      const fs = yield* FileSystemPort;
-      const http = yield* HttpPort;
-      const process = yield* ProcessPort;
-      const prompt = yield* PromptPort;
-      const runtime = { fs, http, process, prompt };
-
-      const source = yield* queryRegistrySource();
-      if (!source)
-        return {
-          kind: "noop",
-          message: "No source provided",
-        } as CommandOutcome;
-
-      const customPlugins = (yield* ConfigTag).plugins || [];
-      const plugins = [...customPlugins, HttpPlugin(), FilePlugin(), DirectoryPlugin()];
-
-      const itemsToProc = yield* querySelectedItems(source, plugins);
-      for (const d of itemsToProc.missingRegistryDeps || []) {
-        yield* runtime.prompt.warn(`Registry dependency "${d}" not found in current registry.`);
-      }
-
-      const state = yield* queryInstallationState(itemsToProc.selectedItems);
-      const approved = yield* queryUserApproval(state);
-      const hydratedWrites = yield* queryFileContents(
-        approved.finalWrites,
-        approved.selectedItems,
-        plugins,
-      );
-
-      const vfs = new MemoryVFS();
-      const vfsFiles = hydratedWrites.map((w) => ({
-        id: w.absoluteTarget,
-        code: w.finalContent,
-      }));
-      const installedItemsInfo: RegistryItem[] = [];
-      for (const write of hydratedWrites) {
-        const originalItem = approved.selectedItems.find((i) => i.name === write.itemName);
-        if (originalItem && !installedItemsInfo.some((i) => i.name === originalItem.name)) {
-          installedItemsInfo.push(originalItem);
-        }
-      }
-
-      const userPlugins = customPlugins.filter((p) => p.type === "pipeline");
-      const depPlan = approved.shouldInstallDeps
-        ? approved.dependencyPlan
-        : { dependencies: [], devDependencies: [] };
-
-      let lockfileBackup = yield* readLockfile(context.cwd, runtime).pipe(
-        Effect.catchAll(() => Effect.succeed(undefined)),
-      );
-
-      const pipelinePlugins: EffectPipelinePlugin[] = [
-        ...userPlugins.map((p) => createEffectPlugin(p as any)),
-        coreAddPlugin(
-          depPlan,
-          yield* ConfigTag,
-          runtime,
-          installedItemsInfo,
-          hydratedWrites,
-          lockfileBackup,
-        ) as EffectPipelinePlugin,
-      ];
-
-      const journal = yield* JournalService;
-      const entry = {
-        id: crypto.randomUUID(),
-        command: "add" as const,
-        status: "pending" as const,
-        currentStep: "write_journal" as const,
-        lastCompletedStep: "write_journal" as const,
-        lockfilePath: "regpick-lock.json",
-        plannedFiles: hydratedWrites.map((w) => w.absoluteTarget),
-        lockfileBackup: lockfileBackup,
-      };
-
-      yield* journal.writeIntent(entry, context.cwd);
-
-      yield* runPipeline(
-        { vfs, cwd: context.cwd, runtime: runtime },
-        pipelinePlugins,
-        vfsFiles,
-      ).pipe(
-        Effect.tapError(() => journal.clearIntent(context.cwd)),
-        Effect.catchAll((error) => {
-          vfs.rollback();
-          return Effect.gen(function* () {
-            yield* runtime.prompt.error(`[Failed] Installation aborted: ${error.message}`);
-            return yield* Effect.fail(error);
-          });
+    // ── hydrate_files ─────────────────────────────────────────────────────────
+    const rawFiles = yield* Effect.forEach(
+      resolvedPlan.finalWrites,
+      (write) =>
+        Effect.gen(function* () {
+          const item = resolvedPlan.selectedItems.find((i) => i.name === write.itemName)!;
+          const content = yield* registry.loadFileContent(write.sourceFile, item);
+          return {
+            id: write.absoluteTarget,
+            content: applyAliases(content, config),
+          };
         }),
-        Effect.tap(() => journal.clearIntent(context.cwd)),
+      { concurrency: "unbounded" },
+    );
+
+    // ── transform_files ───────────────────────────────────────────────────────
+    const transformPlugins = resolveTransformPlugins(config);
+    const vfsOutput = yield* vfsPort.transform(rawFiles as any, transformPlugins, {
+      cwd: intent.flags.cwd,
+      config,
+    });
+
+    // ── BARIERA: write_journal ────────────────────────────────────────────────
+    // INV-06: pierwsza mutacja
+    const journalEntry: JournalEntry = {
+      id: crypto.randomUUID(),
+      command: "add",
+      status: "pending",
+      currentStep: "write_journal",
+      lastCompletedStep: "transform_files",
+      plannedFiles: resolvedPlan.finalWrites.map((w) => w.absoluteTarget),
+      lockfileBackup: lockfileBackup as any,
+      lockfilePath: getLockfilePath(intent.flags.cwd),
+    };
+    yield* journal.write(journalEntry, intent.flags.cwd);
+
+    // ── commit_files ──────────────────────────────────────────────────────────
+    yield* vfsPort.flush(vfsOutput, intent.flags.cwd);
+    yield* journal.updateStep(journalEntry.id, "commit_files", intent.flags.cwd);
+
+    // ── commit_lockfile ───────────────────────────────────────────────────────
+    const newLockfile = buildNewLockfile(lockfileBackup, resolvedPlan, vfsOutput, reg.source);
+    yield* lf.write(intent.flags.cwd, newLockfile);
+    yield* journal.updateStep(journalEntry.id, "commit_lockfile", intent.flags.cwd);
+
+    // ── reconcile_deps ────────────────────────────────────────────────────────
+    if (resolvedPlan.shouldInstallDeps) {
+      yield* exec.installPackages(
+        intent.flags.cwd,
+        resolvedPlan.dependencyPlan.dependencies,
+        resolvedPlan.dependencyPlan.devDependencies,
       );
+    }
 
-      return { kind: "success", plan: approved } as CommandOutcome;
-    }).pipe(Effect.provideService(ConfigTag, hydratedConfig));
-
-    return yield* logic;
+    // ── finalize ──────────────────────────────────────────────────────────────
+    // INV-07: ostatnia operacja
+    yield* journal.clear(intent.flags.cwd);
   });
-}

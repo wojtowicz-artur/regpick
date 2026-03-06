@@ -1,4 +1,4 @@
-import type { InstallCommand } from "@/domain/models/plan.js";
+import type { InstallCommand } from "../domain/models/index.js";
 
 export interface PackageManagerPlugin {
   readonly type: "package-manager";

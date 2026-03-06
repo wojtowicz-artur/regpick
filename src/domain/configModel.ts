@@ -1,6 +1,6 @@
 import { Schema as S } from "effect";
 import path from "node:path";
-import type { RegpickPlugin } from "../types.js";
+import type { RegpickPlugin } from "../sdk/index.js";
 
 export const OverwritePolicySchema = S.Union(
   S.Literal("prompt"),

@@ -1,4 +1,4 @@
-import type { ResolvedRegpickConfig } from "@/domain/configModel.js";
+import type { ResolvedRegpickConfig } from "../domain/models/index.js";
 
 export interface PathResolverPlugin {
   readonly type: "path-resolver";

@@ -20,6 +20,7 @@ export interface RawRegistryData {
 export interface RegistryAdapter {
   readonly type: "registry-adapter";
   readonly name: string;
+  /** INV-08: czysta heurystyka, zero I/O */
   canHandle(source: string): boolean;
   load(source: string, ctx: AdapterContext): Promise<RawRegistryData>;
   loadFileContent(

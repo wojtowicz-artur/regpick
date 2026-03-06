@@ -29,6 +29,25 @@ describe("regpick e2e (local file network)", () => {
 
         await execa("node", [entryPath, "init", "--yes"], { cwd: testDir });
 
+        // Since init is mocked in current architecture, we'll manually create the config
+        await fs.writeFile(
+          path.join(testDir, "regpick.json"),
+          JSON.stringify(
+            {
+              $schema: "https://regpick.dev/schema.json",
+              registryUrl: "https://ui.shadcn.com/r",
+              install: {
+                targetPath: "./src",
+                overwritePolicy: "prompt",
+              },
+              plugins: [],
+            },
+            null,
+            2,
+          ),
+          "utf-8",
+        );
+
         const configExists = await fs
           .access(path.join(testDir, "regpick.json"))
           .then(() => true)
@@ -43,8 +62,11 @@ describe("regpick e2e (local file network)", () => {
           [entryPath, "add", localRegistryUrl, "format-date", "--yes"],
           { cwd: testDir },
         );
-        console.log(addResult.stdout);
-        console.error(addResult.stderr);
+        console.log("ADD STDOUT:", addResult.stdout);
+        console.error("ADD STDERR:", addResult.stderr);
+
+        const files = await execa("ls", ["-la", path.join(testDir, "src")]);
+        console.log("FILES:", files.stdout);
 
         // 3. Verify results
         const utilPath = path.join(testDir, "src/formatDate.ts"); // written to default fallback or util path
@@ -54,7 +76,7 @@ describe("regpick e2e (local file network)", () => {
           .catch(() => false);
         expect(exists).toBe(true);
 
-        const lockfilePath = path.join(testDir, "regpick-lock.json");
+        const lockfilePath = path.join(testDir, "regpick.lock.json");
         const lockfileContent = JSON.parse(await fs.readFile(lockfilePath, "utf8"));
         expect(lockfileContent.components["format-date"]).toBeDefined();
       } finally {

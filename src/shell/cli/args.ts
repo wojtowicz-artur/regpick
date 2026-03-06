@@ -1,4 +1,4 @@
-import type { CliArgs, FlagValue } from "@/types.js";
+import type { CliArgs, FlagValue } from "@/domain/models/index.js";
 
 function parseValue(rawValue: string): FlagValue {
   if (rawValue === "true") {

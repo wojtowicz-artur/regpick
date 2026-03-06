@@ -31,7 +31,7 @@ export const createClackPromptLive = () =>
       Effect.gen(function* () {
         if (intent.flags.all) return items;
 
-        const components = (intent as any).components;
+        const components = (intent as any).flags?.components || (intent as any).components;
         if (components && components.length > 0) {
           return items.filter((item) => components.includes(item.name));
         }

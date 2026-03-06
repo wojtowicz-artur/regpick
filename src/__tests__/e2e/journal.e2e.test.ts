@@ -1,4 +1,4 @@
-import type { JournalEntry } from "@/types.js";
+import type { JournalEntry } from "@/domain/models/index.js";
 import { execa } from "execa";
 import fs from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -25,8 +25,7 @@ describe("regpick e2e (journal rollback)", () => {
       const mockComponentPath = path.join(testDir, "mock-component.ts");
       await fs.writeFile(mockComponentPath, "export const Button = () => {};");
 
-      const journalDir = path.join(testDir, "node_modules", ".cache", "regpick");
-      await fs.mkdir(journalDir, { recursive: true });
+      const journalDir = testDir;
 
       const mockEntry: JournalEntry = {
         id: "mock-crash-uuid",
@@ -39,7 +38,10 @@ describe("regpick e2e (journal rollback)", () => {
         lockfileBackup: { lockfileVersion: 2, components: {} }, // Simulate lockfile rollback
       };
 
-      await fs.writeFile(path.join(journalDir, "journal.json"), JSON.stringify(mockEntry, null, 2));
+      await fs.writeFile(
+        path.join(journalDir, ".regpick-journal.json"),
+        JSON.stringify(mockEntry, null, 2),
+      );
 
       // Verify the simulated state
       expect(await fs.stat(mockComponentPath).catch(() => null)).not.toBeNull();
@@ -51,9 +53,9 @@ describe("regpick e2e (journal rollback)", () => {
       });
 
       // 4. Assertions
-      console.log(listResult.stderr, listResult.stdout);
+      // In Architecture V6, recovery output is printed via symbols. We just match the text.
       expect(listResult.stdout + listResult.stderr).toContain(
-        "Previous incomplete operation detected and rolled back",
+        "Previous incomplete operation detected. Recovering",
       );
 
       // The rollback should have DELETED the planned un-committed files
@@ -65,7 +67,7 @@ describe("regpick e2e (journal rollback)", () => {
 
       // The journal file itself should be cleaned up
       const journalCleared = await fs
-        .stat(path.join(journalDir, "journal.json"))
+        .stat(path.join(journalDir, ".regpick-journal.json"))
         .then(() => true)
         .catch(() => false);
       expect(journalCleared).toBe(false);

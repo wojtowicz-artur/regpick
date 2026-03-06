@@ -2,7 +2,7 @@ import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 
 import { buildUpdatePlanForItem } from "@/domain/updatePlan.js";
-import { computeHash } from "@/shell/services/lockfile.js";
+import { computeHash } from "@/execution/lockfile/service.js";
 import type {
   ComponentLockItem,
   RegistryItem,

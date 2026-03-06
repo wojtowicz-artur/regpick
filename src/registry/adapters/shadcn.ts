@@ -10,7 +10,8 @@ export function normalizeShadcnRegistry(
 ): Effect.Effect<Registry, RegistryError> {
   return Effect.try({
     try: () => {
-      const items = (data.items || []).map(
+      const rawItems = Array.isArray(data) ? data : data.items || [];
+      const items = rawItems.map(
         (item: any) =>
           ({
             name: item.name,

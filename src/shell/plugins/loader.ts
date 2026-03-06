@@ -1,6 +1,6 @@
 import { appError, type AppError } from "@/core/errors.js";
-import { PromptPort } from "@/core/ports.js";
-import type { RegpickPlugin } from "@/types.js";
+import { PromptPort } from "@/interfaces/prompt/port.js";
+import type { RegpickPlugin } from "@/sdk/index.js";
 import { Effect, Option, Schema as S } from "effect";
 import path from "node:path";
 import { RegpickPluginSchema } from "../config/index.js";
@@ -55,6 +55,6 @@ export function loadPlugins(
       { concurrency: "unbounded" },
     );
 
-    return results.filter((p): p is RegpickPlugin => p !== null);
+    return results.filter((p: unknown): p is RegpickPlugin => p !== null);
   });
 }

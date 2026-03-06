@@ -2,7 +2,7 @@ import { InstallError } from "@/core/errors.js";
 import { ExecPort } from "./port.js";
 import { Effect } from "effect";
 import { spawnSync } from "child_process";
-import type { ResolvedRegpickConfig } from "@/types.js";
+import type { ResolvedRegpickConfig } from "@/domain/models/index.js";
 
 export const createExecService = (cwd: string, config: ResolvedRegpickConfig) =>
   ExecPort.of({

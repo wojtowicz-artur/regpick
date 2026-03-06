@@ -1,11 +1,13 @@
-import type { InstallCommand, PackageManagerPlugin, RegpickConfig } from "@/types.js";
+import type { InstallCommand, RegpickConfig } from "@/domain/models/index.js";
+import type { PackageManagerPlugin } from "@/sdk/index.js";
 import path from "node:path";
 
 export const npmPlugin: PackageManagerPlugin & { type: "package-manager" } = {
   type: "package-manager",
   name: "npm",
   lockfiles: ["package-lock.json"],
-  detect: (cwd, runtime) => runtime.fs.existsSync(path.join(cwd, "package-lock.json")),
+  detect: (cwd: string, fs: { existsSync(path: string): boolean }) =>
+    fs.existsSync(path.join(cwd, "package-lock.json")),
   buildInstallCommands: (dependencies: string[], devDependencies: string[]): InstallCommand[] => {
     const commands: InstallCommand[] = [];
     if (dependencies.length) {
@@ -25,7 +27,8 @@ export const yarnPlugin: PackageManagerPlugin & { type: "package-manager" } = {
   type: "package-manager",
   name: "yarn",
   lockfiles: ["yarn.lock"],
-  detect: (cwd, runtime) => runtime.fs.existsSync(path.join(cwd, "yarn.lock")),
+  detect: (cwd: string, fs: { existsSync(path: string): boolean }) =>
+    fs.existsSync(path.join(cwd, "yarn.lock")),
   buildInstallCommands: (dependencies: string[], devDependencies: string[]): InstallCommand[] => {
     const commands: InstallCommand[] = [];
     if (dependencies.length) {
@@ -45,7 +48,8 @@ export const pnpmPlugin: PackageManagerPlugin & { type: "package-manager" } = {
   type: "package-manager",
   name: "pnpm",
   lockfiles: ["pnpm-lock.yaml"],
-  detect: (cwd, runtime) => runtime.fs.existsSync(path.join(cwd, "pnpm-lock.yaml")),
+  detect: (cwd: string, fs: { existsSync(path: string): boolean }) =>
+    fs.existsSync(path.join(cwd, "pnpm-lock.yaml")),
   buildInstallCommands: (dependencies: string[], devDependencies: string[]): InstallCommand[] => {
     const commands: InstallCommand[] = [];
     if (dependencies.length) {
@@ -65,9 +69,8 @@ export const bunPlugin: PackageManagerPlugin & { type: "package-manager" } = {
   type: "package-manager",
   name: "bun",
   lockfiles: ["bun.lockb", "bun.lock"],
-  detect: (cwd, runtime) =>
-    runtime.fs.existsSync(path.join(cwd, "bun.lockb")) ||
-    runtime.fs.existsSync(path.join(cwd, "bun.lock")),
+  detect: (cwd: string, fs: { existsSync(path: string): boolean }) =>
+    fs.existsSync(path.join(cwd, "bun.lockb")) || fs.existsSync(path.join(cwd, "bun.lock")),
   buildInstallCommands: (dependencies: string[], devDependencies: string[]): InstallCommand[] => {
     const commands: InstallCommand[] = [];
     if (dependencies.length) {

@@ -1,7 +1,7 @@
 import type { AppError } from "@/core/errors.js";
 import { applyAliases } from "@/domain/aliasCore.js";
 import { resolveOutputPathFromPolicy } from "@/domain/pathPolicy.js";
-import { computeHash } from "@/shell/services/lockfile.js";
+import { computeHash } from "@/execution/lockfile/service.js";
 import type {
   ComponentLockItem,
   RegistryFile,
