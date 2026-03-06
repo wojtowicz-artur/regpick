@@ -40,6 +40,8 @@ Options:
 `);
 }
 
+export { defineConfig, type RegpickConfig } from "@/domain/configModel.js";
+
 function run() {
   return Effect.gen(function* () {
     const abortController = new AbortController();
