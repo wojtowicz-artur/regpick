@@ -1,5 +1,5 @@
 import { Effect, Layer } from "effect";
-import { AppError, PluginError } from "../../core/errors.js";
+import { AppError } from "../../core/errors.js";
 
 import { createNodeFileSystemLive } from "../fs/node.js";
 import { FileSystemPort } from "../fs/port.js";
@@ -20,11 +20,20 @@ import { JournalService } from "../../execution/journal/service.js";
 import { VFSPort } from "../../execution/vfs/port.js";
 import { RegistryPort } from "../../registry/port.js";
 import { createRegistryService } from "../../registry/service.js";
+import {
+  ShadcnRegistryAdapter,
+  HttpRegistryAdapter,
+  FileRegistryAdapter,
+  DirectoryRegistryAdapter,
+  createAdapterContext,
+} from "../../registry/adapters/index.js";
 
 import path from "node:path";
 import { CommandContextTag, ConfigTag } from "../../core/context.js";
 import { readConfig } from "../../shell/config/index.js";
 import { loadPlugins } from "../../shell/plugins/loader.js";
+
+import { runVFSEngine } from "../../execution/vfs/engine.js";
 
 // -- Mocks and Wrappers --
 const createVFSLive = () =>
@@ -33,30 +42,7 @@ const createVFSLive = () =>
     Effect.gen(function* () {
       const fs = yield* FileSystemPort;
       return VFSPort.of({
-        transform: (files, plugins, ctx) =>
-          Effect.gen(function* () {
-            const transformedFiles = [];
-            for (const file of files) {
-              let currentCode = file.content;
-              for (const plugin of plugins) {
-                const res = plugin.transform(currentCode, file.id, ctx);
-                if (res != null) {
-                  const resolved =
-                    typeof res === "string"
-                      ? res
-                      : yield* Effect.tryPromise({
-                          try: () => Promise.resolve(res),
-                          catch: () => new PluginError({ message: "error" }),
-                        });
-                  if (resolved != null) {
-                    currentCode = resolved;
-                  }
-                }
-              }
-              transformedFiles.push({ ...file, content: currentCode });
-            }
-            return { mutations: transformedFiles, additionalDeps: [] } as any;
-          }) as any,
+        transform: (files, plugins, ctx) => runVFSEngine({ files, plugins, ctx }),
         flush: (output, cwd) =>
           Effect.gen(function* () {
             for (const mutation of output.mutations) {
@@ -129,9 +115,28 @@ export const buildRootLayer = (options?: {
   const RegistryLive = Layer.effect(
     RegistryPort,
     Effect.gen(function* () {
+      const http = yield* HttpPort;
+      const fs = yield* FileSystemPort;
+      const ctx = yield* CommandContextTag;
       const config = yield* Effect.serviceOption(ConfigTag);
       const plugins = config._tag === "Some" ? config.value.plugins || [] : [];
-      return createRegistryService(plugins);
+
+      const customAdapters = plugins.filter(
+        (p: any) => typeof p === "object" && p !== null && p.type === "registry-adapter",
+      ) as any[];
+
+      const adapterCtx = createAdapterContext(http, fs, ctx.cwd);
+
+      return createRegistryService(
+        [
+          ...customAdapters,
+          new ShadcnRegistryAdapter(),
+          new HttpRegistryAdapter(),
+          new FileRegistryAdapter(),
+          new DirectoryRegistryAdapter(),
+        ],
+        adapterCtx,
+      );
     }),
   ).pipe(Layer.provideMerge(Layer.mergeAll(BaseLive, ConfigLive)));
 

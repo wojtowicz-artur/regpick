@@ -5,33 +5,23 @@ import crypto from "node:crypto";
 import * as path from "node:path";
 
 import type { UpdateIntent } from "@/domain/models/intent.js";
-import type { JournalEntry } from "@/domain/models/state.js";
+import type { JournalEntry, RegpickLockfile } from "@/domain/models/state.js";
 import { ExecPort } from "@/execution/exec/port.js";
 import { JournalPort } from "@/execution/journal/port.js";
 import { LockfilePort } from "@/execution/lockfile/port.js";
-import { VFSPort } from "@/execution/vfs/port.js";
+import { VFSPort, type VFSFile } from "@/execution/vfs/port.js";
+import { FileSystemPort } from "@/interfaces/fs/port.js";
 import { PromptPort } from "@/interfaces/prompt/port.js";
 import { RegistryPort } from "@/registry/port.js";
-
-// TODO: stubbed or imported missing domain logic
-function queryAvailableUpdates(lockfile: any, plugins: any) {
-  return Effect.succeed([]);
-}
-
-function queryUserUpdateApproval(updates: any) {
-  return Effect.succeed({ approvedUpdates: [] });
-}
+import type { TransformPlugin } from "@/sdk/TransformPlugin.js";
+import { groupBySource, buildUpdatePlanForItem, type DetectedUpdate } from "@/domain/updatePlan.js";
 
 function getLockfilePath(cwd: string) {
   return path.join(cwd, "regpick-lock.json");
 }
 
-function buildNewLockfile(backup: any, plan: any, vfsOut: any): any {
-  return backup || {};
-}
-
 function resolveTransformPlugins(config: any) {
-  return [];
+  return (config.plugins || []).filter((p: any) => p.type === "transform") as TransformPlugin[];
 }
 
 export const updateWorkflow = (
@@ -39,21 +29,32 @@ export const updateWorkflow = (
 ): Effect.Effect<
   void,
   AppError,
-  RegistryPort | PromptPort | VFSPort | ExecPort | LockfilePort | JournalPort | ConfigTag
+  | RegistryPort
+  | PromptPort
+  | VFSPort
+  | ExecPort
+  | LockfilePort
+  | JournalPort
+  | ConfigTag
+  | FileSystemPort
 > =>
   Effect.gen(function* () {
     const registry = yield* RegistryPort;
     const prompt = yield* PromptPort;
     const vfsPort = yield* VFSPort;
-    const exec = yield* ExecPort;
     const lf = yield* LockfilePort;
     const journal = yield* JournalPort;
     const config = yield* ConfigTag;
+    const fs = yield* FileSystemPort;
 
     // ── load_lockfile ────────────────────────────────────────────────────────
     const lockfile = yield* lf
       .read(intent.flags.cwd)
-      .pipe(Effect.catchAll(() => Effect.succeed({ components: {} } as any)));
+      .pipe(
+        Effect.catchAll(() =>
+          Effect.succeed({ lockfileVersion: 2, components: {} } as RegpickLockfile),
+        ),
+      );
 
     const componentNames = Object.keys(lockfile.components || {});
     if (componentNames.length === 0) {
@@ -61,27 +62,91 @@ export const updateWorkflow = (
       return;
     }
 
-    const updates = yield* queryAvailableUpdates(lockfile, []);
+    const bySource = groupBySource(lockfile);
+    const updates: DetectedUpdate[] = [];
+
+    for (const source of Object.keys(bySource)) {
+      const reg = yield* registry
+        .loadManifest(source)
+        .pipe(Effect.catchAll(() => Effect.succeed(null)));
+      if (!reg) continue;
+
+      for (const itemName of bySource[source]) {
+        const lockItem = lockfile.components[itemName];
+        const regItem = reg.items.find((i) => i.name === itemName);
+        if (!regItem) continue;
+
+        const resolvedFiles = yield* Effect.forEach(regItem.files, (f) =>
+          Effect.gen(function* () {
+            const content = yield* registry.loadFileContent(f, regItem);
+            return { file: f, content };
+          }),
+        );
+
+        const action = yield* buildUpdatePlanForItem(
+          itemName,
+          regItem,
+          resolvedFiles as any,
+          lockItem,
+          intent.flags.cwd,
+          config,
+        );
+
+        if (action.status === "requires-diff-prompt") {
+          const detFiles = yield* Effect.forEach(action.files, (af) =>
+            Effect.gen(function* () {
+              let localContent = "";
+              const exists = yield* fs.pathExists(af.target);
+              if (exists) {
+                const b = yield* fs.readFile(af.target, "utf-8");
+                localContent = typeof b === "string" ? b : b.toString();
+              }
+              return {
+                target: af.target,
+                remoteContent: af.content,
+                localContent,
+              };
+            }),
+          );
+
+          updates.push({
+            itemName,
+            newFiles: action.newFiles,
+            files: detFiles as any,
+          });
+        }
+      }
+    }
 
     if (updates.length === 0) {
       yield* prompt.info("All components are up to date.");
       return;
     }
 
-    let approvedPlan: any;
+    let approvedUpdates: DetectedUpdate[] = [];
     if (intent.flags.all || intent.flags.yes) {
-      approvedPlan = { approvedUpdates: updates };
+      approvedUpdates = updates;
     } else {
-      approvedPlan = yield* queryUserUpdateApproval(updates);
+      const selectedNames = yield* prompt.multiselect({
+        message: "Select components to update",
+        options: updates.map((u) => ({ value: u.itemName, label: u.itemName })),
+      });
+      approvedUpdates = updates.filter((u) => selectedNames.includes(u.itemName));
     }
 
-    const approvedCount = approvedPlan?.approvedUpdates?.length || 0;
+    const approvedCount = approvedUpdates.length;
     if (approvedCount === 0) {
       yield* prompt.info("No updates approved.");
       return;
     }
 
-    const vfsFiles: { id: string; code: string }[] = [];
+    const vfsFiles: VFSFile[] = [];
+    for (const update of approvedUpdates) {
+      for (const file of update.files) {
+        vfsFiles.push({ id: file.target, content: file.remoteContent });
+      }
+    }
+
     const lockfileBackup = lockfile;
 
     // ── BARIERA: write_journal ───────────────────────────────────────────────
@@ -97,7 +162,7 @@ export const updateWorkflow = (
     };
     yield* journal.write(journalEntry, intent.flags.cwd);
 
-    // ── hydrate_and_transform_files (Mocked) ─────────────────────────────────
+    // ── hydrate_and_transform_files ──────────────────────────────────────────
     const transformPlugins = resolveTransformPlugins(config);
     const vfsOutput = yield* vfsPort.transform(vfsFiles as any, transformPlugins, {
       cwd: intent.flags.cwd,
@@ -109,7 +174,14 @@ export const updateWorkflow = (
     yield* journal.updateStep(journalEntry.id, "commit_files", intent.flags.cwd);
 
     // ── commit_lockfile ──────────────────────────────────────────────────────
-    const newLockfile = buildNewLockfile(lockfileBackup, approvedPlan, vfsOutput);
+    const newLockfile = { ...lockfileBackup, components: { ...lockfileBackup.components } };
+    for (const update of approvedUpdates) {
+      newLockfile.components[update.itemName] = {
+        ...newLockfile.components[update.itemName],
+        files: update.newFiles,
+      };
+    }
+
     yield* lf.write(intent.flags.cwd, newLockfile);
     yield* journal.updateStep(journalEntry.id, "commit_lockfile", intent.flags.cwd);
 

@@ -1,52 +1,38 @@
-import { RegistryError } from "@/core/errors.js";
-import { Registry, RegistryFile } from "@/domain/models/registry.js";
-import { Effect } from "effect";
-import fs from "fs/promises";
-import path from "path";
-import { normalizeShadcnRegistry } from "./shadcn.js";
+import type {
+  AdapterContext,
+  RawRegistryData,
+  RegistryAdapter,
+} from "../../sdk/RegistryAdapter.js";
+import path from "node:path";
 
-export function readLocalRegistry(filePath: string): Effect.Effect<Registry, RegistryError> {
-  return Effect.gen(function* () {
-    const raw = yield* Effect.tryPromise({
-      try: () => fs.readFile(filePath, "utf-8"),
-      catch: (e) =>
-        new RegistryError({
-          message: `Failed to read local registry from ${filePath}`,
-          cause: e as Error,
-        }),
-    });
+export class FileRegistryAdapter implements RegistryAdapter {
+  readonly type = "registry-adapter" as const;
+  readonly name = "file";
 
-    let data;
-    try {
-      data = JSON.parse(raw);
-    } catch (e) {
-      return yield* Effect.fail(
-        new RegistryError({
-          message: `Invalid JSON in ${filePath}`,
-          cause: e as Error,
-        }),
-      );
-    }
-
-    return yield* normalizeShadcnRegistry(data, filePath);
-  });
-}
-
-export function readLocalFileContent(
-  basePath: string,
-  file: RegistryFile,
-): Effect.Effect<string, RegistryError> {
-  if (!file.path) {
-    return Effect.fail(new RegistryError({ message: "File path is missing" }));
+  canHandle(source: string): boolean {
+    return source.startsWith("file://") || source.endsWith(".json");
   }
 
-  const fullPath = path.resolve(path.dirname(basePath), file.path);
-  return Effect.tryPromise({
-    try: () => fs.readFile(fullPath, "utf-8"),
-    catch: (e) =>
-      new RegistryError({
-        message: `Failed to read local file ${fullPath}`,
-        cause: e as Error,
-      }),
-  });
+  async load(source: string, ctx: AdapterContext): Promise<RawRegistryData> {
+    const filePath = source.startsWith("file://") ? source.slice("file://".length) : source;
+    const text = await ctx.fs.readFile(filePath, "utf-8");
+    const data = JSON.parse(text.toString());
+    const items = Array.isArray(data) ? data : (data.items ?? []);
+    return { items, source: filePath };
+  }
+
+  async loadFileContent(
+    file: { path?: string; url?: string; content?: string },
+    item: { sourceMeta: { originalSource?: string } },
+    ctx: AdapterContext,
+  ): Promise<string> {
+    if (!file.path) {
+      throw new Error("File path is missing");
+    }
+    const baseRaw = item.sourceMeta.originalSource ?? "";
+    const base = baseRaw.startsWith("file://") ? baseRaw.slice("file://".length) : baseRaw;
+    const fullPath = path.resolve(path.dirname(base), file.path);
+    const text = await ctx.fs.readFile(fullPath, "utf-8");
+    return text.toString();
+  }
 }

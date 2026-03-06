@@ -4,45 +4,93 @@ import * as domain from "@/domain/addPlan.js";
 import { applyAliases } from "@/domain/aliasCore.js";
 import type { AddIntent } from "@/domain/models/intent.js";
 import type { ResolvedPlan } from "@/domain/models/plan.js";
-import type { JournalEntry } from "@/domain/models/state.js";
+import type { JournalEntry, RegpickLockfile } from "@/domain/models/state.js";
+import { resolveOutputPathFromPolicy } from "@/domain/pathPolicy.js";
 import { ExecPort } from "@/execution/exec/port.js";
 import { JournalPort } from "@/execution/journal/port.js";
 import { LockfilePort } from "@/execution/lockfile/port.js";
 import { VFSPort } from "@/execution/vfs/port.js";
+import { FileSystemPort } from "@/interfaces/fs/port.js";
 import { PromptPort } from "@/interfaces/prompt/port.js";
 import { RegistryPort } from "@/registry/port.js";
+import type { TransformPlugin } from "@/sdk/TransformPlugin.js";
+import { resolvePackageManager } from "@/shell/packageManagers/resolver.js";
 import { Effect } from "effect";
 import crypto from "node:crypto";
 import * as path from "node:path";
 
-// TODO: stubbed or imported missing domain logic
 function resolveExistingTargets(selected: any[], cwd: string, config: any) {
-  return Effect.succeed(new Set<string>());
+  return Effect.gen(function* () {
+    const fs = yield* FileSystemPort;
+    const existing = new Set<string>();
+    for (const item of selected) {
+      for (const file of item.files) {
+        const { absoluteTarget } = yield* resolveOutputPathFromPolicy(item, file, cwd, config);
+        const exists = yield* fs.pathExists(absoluteTarget);
+        if (exists) {
+          existing.add(absoluteTarget);
+        }
+      }
+    }
+    return existing;
+  });
 }
 
 function resolvePackageManagerName(cwd: string, config: any) {
-  return Effect.succeed("npm");
+  return Effect.gen(function* () {
+    const fs = yield* FileSystemPort;
+    return yield* resolvePackageManager(
+      cwd,
+      config.install?.packageManager,
+      { fs: { existsSync: fs.existsSync } },
+      config,
+    );
+  });
 }
 
 function resolveTransformPlugins(config: any) {
-  return [];
+  return (config.plugins || []).filter((p: any) => p.type === "transform") as TransformPlugin[];
 }
 
 function getLockfilePath(cwd: string) {
   return path.join(cwd, "regpick.lock.json");
 }
 
-function buildNewLockfile(backup: any, plan: any, vfsOut: any, source: string): any {
-  const lockfile = backup || { lockfileVersion: 2, components: {} };
-  if (!lockfile.components) lockfile.components = {};
+function buildNewLockfile(
+  backup: RegpickLockfile | undefined,
+  plan: any,
+  vfsOut: any,
+  source: string,
+): RegpickLockfile {
+  const lockfile: RegpickLockfile = backup || { lockfileVersion: 2, components: {} };
+  const newComponents = { ...lockfile.components };
+
   for (const item of plan.selectedItems) {
-    lockfile.components[item.name] = {
+    const writes = plan.finalWrites.filter((w: any) => w.itemName === item.name);
+    const files = writes.map((w: any) => {
+      const vfsFile = vfsOut.mutations.find((m: any) => m.id === w.absoluteTarget);
+      const hash = vfsFile
+        ? crypto.createHash("sha256").update(vfsFile.content).digest("hex")
+        : undefined;
+      return {
+        path: w.relativeTarget,
+        hash,
+      };
+    });
+
+    newComponents[item.name] = {
       version: item.version || "0.0.0",
-      type: item.type,
+      installedAt: new Date().toISOString(),
       source: source,
+      dependencies: item.dependencies,
+      files,
     };
   }
-  return lockfile;
+
+  return {
+    lockfileVersion: 2,
+    components: newComponents,
+  };
 }
 
 export const addWorkflow = (
@@ -50,7 +98,14 @@ export const addWorkflow = (
 ): Effect.Effect<
   void,
   AppError,
-  RegistryPort | PromptPort | VFSPort | ExecPort | LockfilePort | JournalPort | ConfigTag
+  | RegistryPort
+  | PromptPort
+  | VFSPort
+  | ExecPort
+  | LockfilePort
+  | JournalPort
+  | ConfigTag
+  | FileSystemPort
 > =>
   Effect.gen(function* () {
     const registry = yield* RegistryPort;
@@ -83,7 +138,7 @@ export const addWorkflow = (
     );
 
     // ── resolve_conflicts ─────────────────────────────────────────────────────
-    const { writes, skipped } = yield* prompt.resolveConflicts(
+    const { writes } = yield* prompt.resolveConflicts(
       plan.conflicts,
       config.install.overwritePolicy,
     );

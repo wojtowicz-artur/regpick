@@ -26,21 +26,15 @@ export default {
   },
   plugins: [
     {
-      type: "pipeline",
+      type: "registry-adapter",
       name: "mock-proto",
-      resolveId: async (source, importer) => {
-        if (source.startsWith("mock-proto://")) return source;
-        if (source === "mock-button.ts") return source;
-        return null;
+      canHandle: (source) => source.startsWith("mock-proto://"),
+      load: async (source) => {
+        return { items: [{ name: "mock-button", type: "registry:test", files: [{ path: "mock-button.ts" }] }], source };
       },
-      load: async (id) => {
-        if (id === "mock-proto://my-custom-registry") {
-            return { items: [{ name: "mock-button", type: "registry:test", files: [{ path: "mock-button.ts" }] }] };
-        }
-        if (id === "mock-button.ts") {
-            return "export const MockButton = () => <button>Hello</button>;";
-        }
-        return null;
+      loadFileContent: async (file, item) => {
+        if (file.path === "mock-button.ts") return "export const MockButton = () => <button>Hello</button>;";
+        throw new Error("File not found");
       }
     }
   ]
@@ -94,18 +88,15 @@ export default {
       // create custom adapter module
       const adapterContent = `
 export default {
-  type: "pipeline",
+  type: "registry-adapter",
   name: "external-proto",
-  resolveId: async (source, importer) => {
-      if (source.startsWith("external-proto://") || source === 'card.ts') return source;
-      return null;
+  canHandle: (source) => source.startsWith("external-proto://"),
+  load: async (source) => {
+      return { items: [{ name: "external-card", type: "registry:test", files: [{ path: "card.ts" }] }], source };
   },
-  load: async (id) => {
-      if (id.startsWith("external-proto://")) {
-          return { items: [{ name: "external-card", type: "registry:test", files: [{ path: "card.ts" }] }] };
-      }
-      if (id === "card.ts") return "export const Card = () => <div />;";
-      return null;
+  loadFileContent: async (file, item) => {
+      if (file.path === "card.ts") return "export const Card = () => <div />;";
+      throw new Error("Not found");
   }
 };
 `;

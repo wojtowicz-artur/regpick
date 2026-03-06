@@ -16,15 +16,18 @@ const FunctionType = S.declare(isFunction, {
 }) as S.Schema<Function>;
 export const FunctionSchema = FunctionType;
 
-export const PluginSchema = S.Struct({
-  type: S.Literal("pipeline"),
+export const RegistryAdapterSchema = S.Struct({
+  type: S.Literal("registry-adapter"),
   name: S.String,
-  start: S.optionalWith(FunctionSchema, { exact: true }),
-  resolveId: S.optionalWith(FunctionSchema, { exact: true }),
-  load: S.optionalWith(FunctionSchema, { exact: true }),
-  transform: S.optionalWith(FunctionSchema, { exact: true }),
-  finish: S.optionalWith(FunctionSchema, { exact: true }),
-  onError: S.optionalWith(FunctionSchema, { exact: true }),
+  canHandle: FunctionSchema,
+  load: FunctionSchema,
+  loadFileContent: FunctionSchema,
+}).pipe(S.typeSchema);
+
+export const TransformPluginSchema = S.Struct({
+  type: S.Literal("transform"),
+  name: S.String,
+  transform: FunctionSchema,
 }).pipe(S.typeSchema);
 
 export const PackageManagerPluginSchema = S.Struct({
@@ -42,7 +45,8 @@ export const PathResolverPluginSchema = S.Struct({
 }).pipe(S.typeSchema);
 
 export const RegpickPluginSchema = S.Union(
-  PluginSchema,
+  RegistryAdapterSchema,
+  TransformPluginSchema,
   PackageManagerPluginSchema,
   PathResolverPluginSchema,
 );

@@ -1,38 +1,46 @@
-import { RegistryError } from "@/core/errors.js";
-import { Registry } from "@/domain/models/registry.js";
-import { Effect } from "effect";
-import fs from "fs/promises";
-import path from "path";
-import { readLocalRegistry } from "./file.js";
+import type {
+  AdapterContext,
+  RawRegistryData,
+  RegistryAdapter,
+} from "../../sdk/RegistryAdapter.js";
+import path from "node:path";
 
-// Sometimes users might point to a directory instead of a specific registry.json file.
-export function readDirectoryRegistry(dirPath: string): Effect.Effect<Registry, RegistryError> {
-  return Effect.gen(function* () {
-    // Basic approach: look for a registry.json inside the directory
-    // A more advanced approach could scan for subdirectories.
+export class DirectoryRegistryAdapter implements RegistryAdapter {
+  readonly type = "registry-adapter" as const;
+  readonly name = "directory";
+
+  canHandle(source: string): boolean {
+    return (
+      !source.startsWith("http://") && !source.startsWith("https://") && !source.endsWith(".json")
+    );
+  }
+
+  async load(source: string, ctx: AdapterContext): Promise<RawRegistryData> {
+    const dirPath = source.startsWith("file://") ? source.slice("file://".length) : source;
     const registryPath = path.join(dirPath, "registry.json");
 
-    const exists = yield* Effect.tryPromise({
-      try: () =>
-        fs
-          .stat(registryPath)
-          .then(() => true)
-          .catch(() => false),
-      catch: (e) =>
-        new RegistryError({
-          message: `Failed to check stat for ${registryPath}`,
-          cause: e as Error,
-        }),
-    });
-
-    if (!exists) {
-      return yield* Effect.fail(
-        new RegistryError({
-          message: `No registry.json found in directory: ${dirPath}`,
-        }),
-      );
+    if (!ctx.fs.existsSync(registryPath)) {
+      throw new Error(`No registry.json found in directory: ${dirPath}`);
     }
 
-    return yield* readLocalRegistry(registryPath);
-  });
+    const text = await ctx.fs.readFile(registryPath, "utf-8");
+    const data = JSON.parse(text.toString());
+    const items = Array.isArray(data) ? data : (data.items ?? []);
+    return { items, source: registryPath };
+  }
+
+  async loadFileContent(
+    file: { path?: string; url?: string; content?: string },
+    item: { sourceMeta: { originalSource?: string } },
+    ctx: AdapterContext,
+  ): Promise<string> {
+    if (!file.path) {
+      throw new Error("File path is missing");
+    }
+    // originalSource for directory adapter is registryPath, so dirname(originalSource) is dirPath
+    const base = item.sourceMeta.originalSource ?? "";
+    const fullPath = path.resolve(path.dirname(base), file.path);
+    const text = await ctx.fs.readFile(fullPath, "utf-8");
+    return text.toString();
+  }
 }

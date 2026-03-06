@@ -1,40 +1,49 @@
-import { RegistryError } from "@/core/errors.js";
-import { Registry, RegistryItem } from "@/domain/models/registry.js";
-import { Effect } from "effect";
+import type {
+  AdapterContext,
+  RawRegistryData,
+  RegistryAdapter,
+} from "../../sdk/RegistryAdapter.js";
 
-// Adapter specifically for standardizing Shadcn format.
-// Many sources just use the base format, but if we need a specific parser, we put it here.
-export function normalizeShadcnRegistry(
-  data: any,
-  source: string,
-): Effect.Effect<Registry, RegistryError> {
-  return Effect.try({
-    try: () => {
-      const rawItems = Array.isArray(data) ? data : data.items || [];
-      const items = rawItems.map(
-        (item: any) =>
-          ({
-            name: item.name,
-            title: item.title,
-            description: item.description,
-            type: item.type || "registry:ui",
-            dependencies: item.dependencies || [],
-            devDependencies: item.devDependencies || [],
-            registryDependencies: item.registryDependencies || [],
-            files: item.files || [],
-            sourceMeta: { originalSource: source, ...item },
-          }) as RegistryItem,
-      );
+export class ShadcnRegistryAdapter implements RegistryAdapter {
+  readonly type = "registry-adapter" as const;
+  readonly name = "shadcn-v4";
 
-      return {
-        source,
-        items,
-      };
-    },
-    catch: (error) =>
-      new RegistryError({
-        message: "Failed to normalize Shadcn format",
-        cause: error as Error,
-      }),
-  });
+  canHandle(source: string): boolean {
+    return (
+      source.includes("ui.shadcn.com") ||
+      source.startsWith("shadcn://") ||
+      (source.includes("/r/") && source.endsWith(".json"))
+    );
+  }
+
+  async load(source: string, ctx: AdapterContext): Promise<RawRegistryData> {
+    const url = this.normalizeUrl(source);
+    const text = await ctx.http.getText(url);
+    const data = JSON.parse(text);
+    const items = Array.isArray(data) ? data : (data.items ?? []);
+    return { items, source: url };
+  }
+
+  async loadFileContent(
+    file: { path?: string; url?: string; content?: string },
+    item: { sourceMeta: { originalSource?: string } },
+    ctx: AdapterContext,
+  ): Promise<string> {
+    if (file.url) {
+      return ctx.http.getText(file.url);
+    }
+    const base = item.sourceMeta.originalSource ?? "";
+    const fileUrl = new URL(file.path ?? "", base).toString();
+    return ctx.http.getText(fileUrl);
+  }
+
+  private normalizeUrl(source: string): string {
+    if (source.includes("github.com") && source.includes("/blob/")) {
+      return source.replace("github.com", "raw.githubusercontent.com").replace("/blob/", "/");
+    }
+    if (source.startsWith("shadcn://")) {
+      return `https://ui.shadcn.com/r/${source.slice("shadcn://".length)}`;
+    }
+    return source;
+  }
 }

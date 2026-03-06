@@ -1,66 +1,34 @@
-import { RegistryError } from "@/core/errors.js";
-import { Registry, RegistryFile } from "@/domain/models/registry.js";
-import { Effect } from "effect";
-import { normalizeShadcnRegistry } from "./shadcn.js";
+import type {
+  AdapterContext,
+  RawRegistryData,
+  RegistryAdapter,
+} from "../../sdk/RegistryAdapter.js";
 
-export function fetchHttpRegistry(url: string): Effect.Effect<Registry, RegistryError> {
-  return Effect.gen(function* () {
-    const response = yield* Effect.tryPromise({
-      try: () => fetch(url),
-      catch: (e) =>
-        new RegistryError({
-          message: `Failed to fetch registry from ${url}`,
-          cause: e as Error,
-        }),
-    });
+export class HttpRegistryAdapter implements RegistryAdapter {
+  readonly type = "registry-adapter" as const;
+  readonly name = "http";
 
-    if (!response.ok) {
-      return yield* Effect.fail(new RegistryError({ message: `HTTP Error: ${response.status}` }));
-    }
-
-    const data = yield* Effect.tryPromise({
-      try: () => response.json(),
-      catch: (e) =>
-        new RegistryError({
-          message: `Failed to parse JSON from ${url}`,
-          cause: e as Error,
-        }),
-    });
-
-    return yield* normalizeShadcnRegistry(data, url);
-  });
-}
-
-export function fetchHttpFileContent(file: RegistryFile): Effect.Effect<string, RegistryError> {
-  if (!file.url) {
-    return Effect.fail(new RegistryError({ message: "File URL is missing" }));
+  canHandle(source: string): boolean {
+    return source.startsWith("http://") || source.startsWith("https://");
   }
 
-  return Effect.gen(function* () {
-    const response = yield* Effect.tryPromise({
-      try: () => fetch(file.url!),
-      catch: (e) =>
-        new RegistryError({
-          message: `Failed to fetch file content from ${file.url}`,
-          cause: e as Error,
-        }),
-    });
+  async load(source: string, ctx: AdapterContext): Promise<RawRegistryData> {
+    const text = await ctx.http.getText(source);
+    const data = JSON.parse(text);
+    const items = Array.isArray(data) ? data : (data.items ?? []);
+    return { items, source };
+  }
 
-    if (!response.ok) {
-      return yield* Effect.fail(
-        new RegistryError({
-          message: `HTTP Error fetching file: ${response.status}`,
-        }),
-      );
+  async loadFileContent(
+    file: { path?: string; url?: string; content?: string },
+    item: { sourceMeta: { originalSource?: string } },
+    ctx: AdapterContext,
+  ): Promise<string> {
+    if (file.url) {
+      return ctx.http.getText(file.url);
     }
-
-    return yield* Effect.tryPromise({
-      try: () => response.text(),
-      catch: (e) =>
-        new RegistryError({
-          message: `Failed to read text from ${file.url}`,
-          cause: e as Error,
-        }),
-    });
-  });
+    const base = item.sourceMeta.originalSource ?? "";
+    const fileUrl = new URL(file.path ?? "", base).toString();
+    return ctx.http.getText(fileUrl);
+  }
 }

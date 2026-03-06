@@ -10,7 +10,7 @@ export function shadcnPlugin(): TransformPlugin {
     type: "transform",
     name: "regpick:shadcn-compatibility",
 
-    transform: (code: string, fileId: string, ctx: TransformContext) => {
+    transform: (code: string, fileId: string, _ctx: TransformContext) => {
       // Basic heuristic: if it's a TS/TSX file, we can map common paths.
       if (!fileId.endsWith(".ts") && !fileId.endsWith(".tsx")) {
         return null;

@@ -98,7 +98,7 @@ function run() {
           };
 
           const result = yield* Effect.either(executeRecovery(pendingEntry, ports));
-          if (result._op === "Left") {
+          if (result._tag === "Left") {
             yield* prompt.error(styleText("red", `Recovery failed: ${result.left.message}`));
           } else {
             yield* prompt.outro(styleText("green", "Recovery completed."));

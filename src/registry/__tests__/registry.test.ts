@@ -2,7 +2,13 @@ import { Effect, Either } from "effect";
 import fsPromises from "fs/promises";
 import path from "path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { RegistryService } from "../service.js";
+import { createRegistryService } from "../service.js";
+import {
+  ShadcnRegistryAdapter,
+  HttpRegistryAdapter,
+  FileRegistryAdapter,
+  DirectoryRegistryAdapter,
+} from "../adapters/index.js";
 
 vi.stubGlobal("fetch", vi.fn());
 
@@ -21,14 +27,49 @@ describe("RegistryService (Infra Adapters)", () => {
     vi.mocked(fsPromises.readFile).mockClear();
   });
 
+  const mockFs = {
+    existsSync: vi.fn().mockReturnValue(true),
+    readFile: (p: string) => fsPromises.readFile(p, "utf-8"),
+    stat: (p: string) => fsPromises.stat(p) as any,
+    readdir: (p: string) => fsPromises.readdir(p),
+  };
+
+  const mockHttp = {
+    getJson: async <T>(url: string) => {
+      const res = await fetch(url);
+      return res.json() as Promise<T>;
+    },
+    getText: async (url: string) => {
+      const res = await fetch(url);
+      return res.text();
+    },
+  };
+
+  const adapterCtx = {
+    cwd: "/",
+    fs: mockFs as any,
+    http: mockHttp,
+  };
+
+  const RegistryService = createRegistryService(
+    [
+      new ShadcnRegistryAdapter(),
+      new HttpRegistryAdapter(),
+      new FileRegistryAdapter(),
+      new DirectoryRegistryAdapter(),
+    ],
+    adapterCtx,
+  );
+
   const loadManifest = (src: string) =>
     Effect.runPromise(Effect.either(RegistryService.loadManifest(src)));
   const loadFileContent = (file: any, item: any) =>
     Effect.runPromise(Effect.either(RegistryService.loadFileContent(file, item)));
 
-  it("should fetch HTTP registry using fetchHttpRegistry", async () => {
+  it("should fetch HTTP registry using HttpRegistryAdapter", async () => {
     vi.mocked(fetch).mockResolvedValueOnce({
       ok: true,
+      text: () => Promise.resolve(JSON.stringify({ items: [{ name: "btn" }] })),
       json: () => Promise.resolve({ items: [{ name: "btn" }] }),
     } as any);
 
@@ -39,7 +80,7 @@ describe("RegistryService (Infra Adapters)", () => {
     }
   });
 
-  it("should load a registry from a local json file using readLocalRegistry", async () => {
+  it("should load a registry from a local json file using FileRegistryAdapter", async () => {
     vi.mocked(fsPromises.stat).mockResolvedValueOnce({
       isDirectory: () => false,
     } as any);
@@ -49,7 +90,7 @@ describe("RegistryService (Infra Adapters)", () => {
       }),
     );
 
-    const result = await loadManifest("/abs/path/local.json");
+    const result = await loadManifest("file:///abs/path/local.json");
     expect(Either.isRight(result)).toBe(true);
     if (Either.isRight(result)) {
       expect(result.right.items[0].name).toBe("local-btn");
@@ -84,7 +125,7 @@ describe("RegistryService (Infra Adapters)", () => {
       name: "comp",
       type: "registry:ui",
       files: [],
-      sourceMeta: { originalSource: "/abs/path/registry.json" },
+      sourceMeta: { originalSource: "file:///abs/path/registry.json" },
     };
     const file = { path: "utils.ts" };
 
