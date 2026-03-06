@@ -27,15 +27,8 @@ const callPrompt = <T>(promise: Promise<T | symbol>) =>
 
 export const createClackPromptLive = () =>
   Layer.succeed(PromptPort, {
-    selectItems: (items, intent) =>
+    selectItems: (items, _intent) =>
       Effect.gen(function* () {
-        if (intent.flags.all) return items;
-
-        const components = (intent as any).flags?.components || (intent as any).components;
-        if (components && components.length > 0) {
-          return items.filter((item) => components.includes(item.name));
-        }
-
         const selectedNames = yield* callPrompt(
           p.multiselect({
             message: "Which components would you like to install?",
@@ -106,7 +99,7 @@ export const createClackPromptLive = () =>
 
     confirmInstall: (plan) =>
       Effect.gen(function* () {
-        const writes = (plan as any).finalWrites || (plan as any).writes || [];
+        const writes = (plan as any).finalWrites ?? (plan as any).plannedWrites ?? [];
         if (writes.length === 0) return;
 
         const result = yield* callPrompt(

@@ -46,8 +46,8 @@ describe("regpick e2e (journal rollback)", () => {
       // Verify the simulated state
       expect(await fs.stat(mockComponentPath).catch(() => null)).not.toBeNull();
 
-      // 3. Run ANY command to trigger the global app boot process (e.g., list)
-      const listResult = await execa("node", [entryPath, "list"], {
+      // 3. Run ANY command to trigger the global app boot process (e.g., update)
+      const listResult = await execa("node", [entryPath, "update"], {
         cwd: testDir,
         reject: false,
       });

@@ -83,8 +83,8 @@ function run() {
       const pendingEntry = yield* journal.read(context.cwd);
       if (pendingEntry) {
         const action = determineRecoveryAction(pendingEntry);
-        if (action !== "none") {
-          yield* prompt.error(
+        if (action !== "none" && action !== "cleanup_journal") {
+          yield* prompt.warn(
             styleText(
               "yellow",
               `Previous incomplete operation detected. Recovering (${action})...`,
@@ -93,8 +93,10 @@ function run() {
 
           const ports = {
             removeFile: (p: string) => fs.remove(p),
-            restoreLockfile: (p: string, l: any) => lockfileOpts.write(context.cwd, l),
+            restoreLockfile: (p: string, l: any) => lockfileOpts.write(path.dirname(p), l),
             deleteJournalEntry: (_id: string) => journal.clear(context.cwd),
+            warn: (msg: string) =>
+              prompt.warn(styleText("yellow", msg)) as Effect.Effect<void, Error, never>,
           };
 
           const result = yield* Effect.either(executeRecovery(pendingEntry, ports));

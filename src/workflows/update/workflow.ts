@@ -17,7 +17,7 @@ import type { TransformPlugin } from "@/sdk/TransformPlugin.js";
 import { groupBySource, buildUpdatePlanForItem, type DetectedUpdate } from "@/domain/updatePlan.js";
 
 function getLockfilePath(cwd: string) {
-  return path.join(cwd, "regpick-lock.json");
+  return path.join(cwd, "regpick.lock.json");
 }
 
 function resolveTransformPlugins(config: any) {

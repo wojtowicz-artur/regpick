@@ -20,7 +20,7 @@ export const packWorkflow = (
 
     const stat = yield* fs.stat(sourcePath).pipe(Effect.catchAll(() => Effect.succeed(null)));
 
-    if (!stat || !stat.isDirectory) {
+    if (!stat || !stat.isDirectory()) {
       yield* prompt.error(`Source directory not found: ${sourcePath}`);
       return;
     }

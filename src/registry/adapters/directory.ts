@@ -10,8 +10,14 @@ export class DirectoryRegistryAdapter implements RegistryAdapter {
   readonly name = "directory";
 
   canHandle(source: string): boolean {
+    if (source.startsWith("file://") && !source.endsWith(".json")) {
+      return true;
+    }
     return (
-      !source.startsWith("http://") && !source.startsWith("https://") && !source.endsWith(".json")
+      !source.startsWith("http://") &&
+      !source.startsWith("https://") &&
+      !source.endsWith(".json") &&
+      !source.startsWith("file://")
     );
   }
 

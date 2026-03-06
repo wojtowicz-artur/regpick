@@ -32,11 +32,11 @@ describe("Recovery Executor", () => {
       expect(determineRecoveryAction(entry)).toBe("rollback_full");
     });
 
-    it("4. should return none for safe steps", () => {
+    it("4. should return cleanup_journal for safe steps", () => {
       const entry = createMockEntry({
         lastCompletedStep: "collect_intent" as any,
       });
-      expect(determineRecoveryAction(entry)).toBe("none");
+      expect(determineRecoveryAction(entry)).toBe("cleanup_journal");
     });
   });
 

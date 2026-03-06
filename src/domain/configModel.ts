@@ -157,9 +157,7 @@ export const DEFAULT_CONFIG: RegpickConfig = {
     aliases: {},
   },
   registry: {
-    sources: {
-      tebra: "./tebra-icon-registry/registry",
-    },
+    sources: {},
     preferManifestTarget: true,
   },
   install: {

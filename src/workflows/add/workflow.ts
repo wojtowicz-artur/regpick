@@ -2,6 +2,7 @@ import { ConfigTag } from "@/core/context.js";
 import { type AppError } from "@/core/errors.js";
 import * as domain from "@/domain/addPlan.js";
 import { applyAliases } from "@/domain/aliasCore.js";
+import { selectItemsFromFlags } from "@/domain/selection.js";
 import type { AddIntent } from "@/domain/models/intent.js";
 import type { ResolvedPlan } from "@/domain/models/plan.js";
 import type { JournalEntry, RegpickLockfile } from "@/domain/models/state.js";
@@ -123,7 +124,8 @@ export const addWorkflow = (
     const reg = yield* registry.loadManifest(intent.source);
 
     // ── select_scope ──────────────────────────────────────────────────────────
-    const selected = yield* prompt.selectItems(reg.items, intent);
+    const preSelected = yield* selectItemsFromFlags(reg.items, intent);
+    const selected = preSelected ? preSelected : yield* prompt.selectItems(reg.items, intent);
 
     // ── build_plan ────────────────────────────────────────────────────────────
     const lockfileBackup = yield* lf
@@ -138,11 +140,17 @@ export const addWorkflow = (
     );
 
     // ── resolve_conflicts ─────────────────────────────────────────────────────
-    const { writes } = yield* prompt.resolveConflicts(
-      plan.conflicts,
-      config.install.overwritePolicy,
-    );
-    yield* prompt.confirmInstall(plan);
+    const conflictPolicy = intent.flags.overwrite
+      ? "overwrite"
+      : intent.flags.yes
+        ? "overwrite"
+        : config.install.overwritePolicy;
+
+    const { writes } = yield* prompt.resolveConflicts(plan.conflicts, conflictPolicy);
+
+    if (!intent.flags.yes) {
+      yield* prompt.confirmInstall(plan);
+    }
 
     // ── resolve deps ──────────────────────────────────────────────────────────
     const pmName = yield* resolvePackageManagerName(intent.flags.cwd, config);
