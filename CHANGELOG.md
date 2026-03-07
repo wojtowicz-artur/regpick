@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.22.0](https://github.com/wojtowicz-artur/regpick/compare/v0.21.0...v0.22.0) (2026-03-07)
+
+### Features
+
+* complete Sprint 1 – Types and Contracts ([5ec255e](https://github.com/wojtowicz-artur/regpick/commit/5ec255e64e8da794098411aa123a76088370c2be))
+* **core:** finalize V6 architecture implementation and stabilize workflows ([ad69942](https://github.com/wojtowicz-artur/regpick/commit/ad69942912319ccf9ecd2d61349612dfe07d1521))
+* **index:** export configuration model types for improved modularity ([cee1d4d](https://github.com/wojtowicz-artur/regpick/commit/cee1d4d3dd841d6a977c913b4a493e539e8bee29))
+* **infra:** implement infrastructure adapters for registry, lockfile, and journal (Sprint 5) ([1deeaa8](https://github.com/wojtowicz-artur/regpick/commit/1deeaa8d26995a43868184764fad58732355760f))
+* **recovery:** enhance recovery action handling and improve journal recovery process ([bc7bc2c](https://github.com/wojtowicz-artur/regpick/commit/bc7bc2c306a7786f206670d5fce468f817769a56))
+* **workflow:** implement add/update workflows and integrate execution pipeline (Sprint 6) ([d7cfb45](https://github.com/wojtowicz-artur/regpick/commit/d7cfb45664328713525016e649049c99691ed19c))
+* **workflow:** introduce update workflow and enhance CLI argument handling ([f9a86c1](https://github.com/wojtowicz-artur/regpick/commit/f9a86c185dd3e3542333eede8de05cb94dbc1f12))
+
+### Bug Fixes
+
+* **infra:** resolve compilation issues and finalize Effect-based container integration (Sprint 7) ([dfa088d](https://github.com/wojtowicz-artur/regpick/commit/dfa088ddeec4cd339c1834b8224af441ec98e467))
+
+### Code Refactoring
+
+* **core:** large-scale refactor of DI, workflows, SDK, and legacy cleanup ([1801e2c](https://github.com/wojtowicz-artur/regpick/commit/1801e2c7b856340b2adf546784acbbc81b86d98b))
+* **core:** migrate domain models and implement VFS engine with recovery (Sprints 2–4) ([f1d3317](https://github.com/wojtowicz-artur/regpick/commit/f1d3317f420d99824599b419a0d2064794ab651d))
+* **workflow:** extract add/update business logic into dedicated workflows (Sprint 6) ([f7c015b](https://github.com/wojtowicz-artur/regpick/commit/f7c015b90782c790ae0fb415193b14e74db4f4c7))
+
 ## [0.21.0](https://github.com/wojtowicz-artur/regpick/compare/v0.20.5...v0.21.0) (2026-03-05)
 
 ### Features
