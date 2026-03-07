@@ -23,19 +23,19 @@ export const RegistryItemSchema = S.Struct({
     exact: true,
     default: () => "registry:file",
   }),
-  dependencies: S.optionalWith(S.Array(S.String), {
+  dependencies: S.optionalWith(S.mutable(S.Array(S.String)), {
     exact: true,
     default: () => [],
   }),
-  devDependencies: S.optionalWith(S.Array(S.String), {
+  devDependencies: S.optionalWith(S.mutable(S.Array(S.String)), {
     exact: true,
     default: () => [],
   }),
-  registryDependencies: S.optionalWith(S.Array(S.String), {
+  registryDependencies: S.optionalWith(S.mutable(S.Array(S.String)), {
     exact: true,
     default: () => [],
   }),
-  files: S.optionalWith(S.Array(RegistryFileSchema), {
+  files: S.optionalWith(S.mutable(S.Array(RegistryFileSchema)), {
     exact: true,
     default: () => [],
   }),

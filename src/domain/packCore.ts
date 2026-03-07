@@ -1,4 +1,4 @@
-import type { RegistryItem } from "@/types.js";
+import type { RegistryItem } from "@/domain/models/index.js";
 import path from "node:path";
 
 export function extractDependencies(content: string): string[] {

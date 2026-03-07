@@ -1,13 +1,15 @@
-import type { RuntimePorts } from "@/core/ports.js";
-import { createStandardRuntime } from "@/shell/plugins/adapter.js";
-import type { PackageManager, RegpickConfig } from "@/types.js";
+import type { RegpickConfig } from "@/domain/models/index.js";
 import { Effect } from "effect";
 import { getAllPackageManagerPlugins } from "./strategy.js";
 
+type MinimalRuntime = {
+  fs: { existsSync(path: string): boolean };
+};
+
 export function resolvePackageManager(
   cwd: string,
-  configured: PackageManager,
-  runtime: RuntimePorts,
+  configured: string | undefined,
+  runtime: MinimalRuntime,
   config?: RegpickConfig,
 ): Effect.Effect<string, never, never> {
   return Effect.gen(function* () {
@@ -16,11 +18,10 @@ export function resolvePackageManager(
     }
 
     const plugins = getAllPackageManagerPlugins(config);
-    const stdRuntime = createStandardRuntime(runtime);
 
     for (const plugin of plugins) {
       const isDetected = yield* Effect.tryPromise({
-        try: () => Promise.resolve(plugin.detect(cwd, stdRuntime)),
+        try: () => Promise.resolve(plugin.detect(cwd, runtime.fs)),
         catch: () => false,
       }).pipe(Effect.catchAll(() => Effect.succeed(false)));
 

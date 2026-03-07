@@ -1,4 +1,4 @@
-import type { CommandContext, ResolvedRegpickConfig } from "@/types.js";
+import type { CommandContext, ResolvedRegpickConfig } from "@/domain/models/index.js";
 import { Context } from "effect";
 
 export class CommandContextTag extends Context.Tag("CommandContext")<

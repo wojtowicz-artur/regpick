@@ -1,7 +1,7 @@
 import { Effect } from "effect";
 import path from "node:path";
 
-import type { RegistryFile, RegistryItem, ResolvedRegpickConfig } from "@/types.js";
+import type { RegistryFile, RegistryItem, ResolvedRegpickConfig } from "@/domain/models/index.js";
 
 import { appError, type AppError } from "@/core/errors.js";
 

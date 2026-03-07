@@ -1,14 +1,14 @@
 import type { AppError } from "@/core/errors.js";
 import { applyAliases } from "@/domain/aliasCore.js";
 import { resolveOutputPathFromPolicy } from "@/domain/pathPolicy.js";
-import { computeHash } from "@/shell/services/lockfile.js";
+import { computeHash } from "@/core/hash.js";
 import type {
   ComponentLockItem,
   RegistryFile,
   RegistryItem,
   RegpickLockfile,
   ResolvedRegpickConfig,
-} from "@/types.js";
+} from "@/domain/models/index.js";
 import { Effect } from "effect";
 
 export type UpdateFile = {
@@ -33,6 +33,9 @@ export type DetectedUpdate = {
   itemName: string;
   newFiles: { path: string; hash: string }[];
   files: DetectedUpdateFile[];
+  version?: string;
+  dependencies?: string[];
+  source?: string;
 };
 
 export type ApprovedUpdatePlan = {

@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import { appError, type AppError } from "@/core/errors.js";
-import type { CommandContext, RegistryItem } from "@/types.js";
+import type { RegistryItem } from "@/domain/models/index.js";
 
 export function parseSelectedNames(rawSelectFlag: string | boolean | undefined): string[] {
   if (!rawSelectFlag) {
@@ -30,10 +30,14 @@ export function filterItemsByQuery(items: RegistryItem[], query: string): Regist
 
 export function selectItemsFromFlags(
   items: RegistryItem[],
-  context: CommandContext,
+  contextOrIntent: any,
 ): Effect.Effect<RegistryItem[] | null, AppError> {
-  const { flags } = context.args;
-  const explicit = parseSelectedNames(flags.select);
+  const flags = contextOrIntent.args?.flags || contextOrIntent.flags || {};
+  let explicit = parseSelectedNames(flags.select);
+  if (explicit.length === 0 && Array.isArray(flags.components)) {
+    explicit = flags.components;
+  }
+
   if (flags.all) {
     return Effect.succeed(items);
   }
@@ -41,9 +45,7 @@ export function selectItemsFromFlags(
   if (explicit.length) {
     const selected = items.filter((item) => explicit.includes(item.name));
     if (!selected.length) {
-      return Effect.fail(
-        appError("ValidationError", `No items matched --select=${String(flags.select)}`),
-      );
+      return Effect.fail(appError("ValidationError", `No items matched the provided selection.`));
     }
     return Effect.succeed(selected);
   }

@@ -1,14 +1,26 @@
-import { Effect, Layer } from "effect";
+import { Effect } from "effect";
 import path from "node:path";
 import { styleText } from "node:util";
 
 import { CommandContextTag } from "@/core/context.js";
-import { type AppError, toAppError } from "@/core/errors.js";
-import { JournalService } from "@/core/journal.js";
-import { PromptPort } from "@/core/ports.js";
-import { JournalServiceImpl } from "@/shell/adapters/journal.js";
-import { parseCliArgs } from "@/shell/cli/args.js";
-import type { CommandContext, CommandOutcome } from "@/types.js";
+import { toAppError } from "@/core/errors.js";
+import { JournalPort } from "@/execution/journal/port.js";
+import { determineRecoveryAction, executeRecovery } from "@/execution/journal/recovery.js";
+import { LockfilePort } from "@/execution/lockfile/port.js";
+import { container } from "@/interfaces/bootstrap/container.js";
+import { buildAddIntent } from "@/interfaces/cli/commands/addCli.js";
+import { buildInitIntent } from "@/interfaces/cli/commands/initCli.js";
+import { buildListIntent } from "@/interfaces/cli/commands/listCli.js";
+import { buildPackIntent } from "@/interfaces/cli/commands/packCli.js";
+import { parseCliArgs } from "@/interfaces/cli/parser.js";
+import { FileSystemPort } from "@/interfaces/fs/port.js";
+import { PromptPort } from "@/interfaces/prompt/port.js";
+import { addWorkflow } from "@/workflows/add/workflow.js";
+import { initWorkflow } from "@/workflows/init/workflow.js";
+import { listWorkflow } from "@/workflows/list/workflow.js";
+import { packWorkflow } from "@/workflows/pack/workflow.js";
+import { updateWorkflow } from "@/workflows/update/workflow.js";
+import { buildUpdateIntent } from "@/interfaces/cli/commands/updateCli.js";
 
 function printHelp(): void {
   console.log(`
@@ -28,11 +40,12 @@ Options:
 `);
 }
 
-function run(): Effect.Effect<void, never> {
+export { defineConfig, type RegpickConfig } from "@/domain/configModel.js";
+
+function run() {
   return Effect.gen(function* () {
     const abortController = new AbortController();
 
-    // Abort prompts on background errors or process termination
     const handleTerminate = (err?: Error) => {
       if (!abortController.signal.aborted) {
         abortController.abort(err);
@@ -58,7 +71,7 @@ function run(): Effect.Effect<void, never> {
       return;
     }
 
-    const context: CommandContext = {
+    const context = {
       cwd: parsed.flags.cwd ? path.resolve(process.cwd(), String(parsed.flags.cwd)) : process.cwd(),
       args: parsed,
     };
@@ -66,52 +79,67 @@ function run(): Effect.Effect<void, never> {
     console.log(styleText("cyan", "regpick"));
 
     const executeCommand = Effect.gen(function* () {
-      const journal = yield* JournalService;
+      const journal = yield* JournalPort;
+      const fs = yield* FileSystemPort;
+      const lockfileOpts = yield* LockfilePort;
       const prompt = yield* PromptPort;
-      const rolledBack = yield* journal.rollbackIntent(context.cwd);
-      if (rolledBack) {
-        yield* prompt.error(
-          styleText("yellow", "Previous incomplete operation detected and rolled back."),
-        );
+
+      const pendingEntry = yield* journal.read(context.cwd);
+      if (pendingEntry) {
+        const action = determineRecoveryAction(pendingEntry);
+        if (action !== "none" && action !== "cleanup_journal") {
+          yield* prompt.warn(
+            styleText(
+              "yellow",
+              `Previous incomplete operation detected. Recovering (${action})...`,
+            ),
+          );
+
+          const ports = {
+            removeFile: (p: string) => fs.remove(p),
+            restoreLockfile: (p: string, l: any) => lockfileOpts.write(path.dirname(p), l),
+            deleteJournalEntry: (_id: string) => journal.clear(context.cwd),
+            warn: (msg: string) =>
+              prompt.warn(styleText("yellow", msg)) as Effect.Effect<void, Error, never>,
+          };
+
+          const result = yield* Effect.either(executeRecovery(pendingEntry, ports));
+          if (result._tag === "Left") {
+            yield* prompt.error(styleText("red", `Recovery failed: ${result.left.message}`));
+          } else {
+            yield* prompt.outro(styleText("green", "Recovery completed."));
+          }
+        }
       }
 
-      let commandEffect: Effect.Effect<
-        CommandOutcome,
-        AppError,
-        | CommandContextTag
-        | JournalService
-        | import("@/core/ports.js").FileSystemPort
-        | import("@/core/ports.js").ProcessPort
-        | import("@/core/ports.js").HttpPort
-        | import("@/core/ports.js").PromptPort
-      >;
+      let commandEffect: Effect.Effect<any, any, any>;
 
       switch (command) {
-        case "init":
-          commandEffect = yield* Effect.promise(() =>
-            import("@/commands/init.js").then((mod) => mod.runInitCommand()),
-          );
+        case "add": {
+          const intent = buildAddIntent(parsed);
+          commandEffect = addWorkflow(intent);
           break;
-        case "list":
-          commandEffect = yield* Effect.promise(() =>
-            import("@/commands/list.js").then((mod) => mod.runListCommand()),
-          );
+        }
+        case "init": {
+          const intent = buildInitIntent(parsed);
+          commandEffect = initWorkflow(intent);
           break;
-        case "add":
-          commandEffect = yield* Effect.promise(() =>
-            import("@/commands/add.js").then((mod) => mod.runAddCommand()),
-          );
+        }
+        case "list": {
+          const intent = buildListIntent(parsed);
+          commandEffect = listWorkflow(intent);
           break;
-        case "update":
-          commandEffect = yield* Effect.promise(() =>
-            import("@/commands/update.js").then((mod) => mod.runUpdateCommand()),
-          );
+        }
+        case "pack": {
+          const intent = buildPackIntent(parsed);
+          commandEffect = packWorkflow(intent);
           break;
-        case "pack":
-          commandEffect = yield* Effect.promise(() =>
-            import("@/commands/pack.js").then((mod) => mod.runPackCommand()),
-          );
+        }
+        case "update": {
+          const intent = buildUpdateIntent(parsed);
+          commandEffect = updateWorkflow(intent);
           break;
+        }
         default:
           yield* prompt.error(`Unknown command: ${command}`);
           printHelp();
@@ -121,12 +149,12 @@ function run(): Effect.Effect<void, never> {
 
       const result = yield* commandEffect;
 
-      if (result.kind === "noop") {
-        prompt.outro(styleText("yellow", result.message));
+      if (result && result.kind === "noop") {
+        yield* prompt.outro(styleText("yellow", result.message));
         return;
       }
 
-      prompt.outro(styleText("green", "Done."));
+      yield* prompt.outro(styleText("green", "Done."));
     }).pipe(
       Effect.catchAll((error) =>
         Effect.gen(function* () {
@@ -147,28 +175,20 @@ function run(): Effect.Effect<void, never> {
       ),
     );
 
-    const RuntimeLive = yield* Effect.promise(() =>
-      import("@/shell/adapters/runtime.js").then((m) =>
-        m.createRuntimeLive({ signal: abortController.signal }),
-      ),
+    yield* executeCommand.pipe(
+      Effect.provide(container),
+      Effect.provideService(CommandContextTag, context),
     );
-
-    const layer = Layer.mergeAll(
-      RuntimeLive,
-      Layer.succeed(CommandContextTag, context),
-      Layer.succeed(JournalService, JournalServiceImpl),
-    );
-    yield* executeCommand.pipe(Effect.provide(layer));
   });
 }
 
-function handleAppError(error: AppError, write: (message: string) => void): void {
+function handleAppError(error: any, write: (message: string) => void): void {
   if (error._tag === "UserCancelled") {
     write(error.message);
     return;
   }
 
-  let msg = `[${error._tag}] ${error.message}`;
+  let msg = `[${error._tag || "Error"}] ${error.message}`;
 
   if (error.cause) {
     if (error.cause instanceof Error) {
@@ -187,4 +207,17 @@ function handleAppError(error: AppError, write: (message: string) => void): void
   console.error(msg);
 }
 
-Effect.runPromise(run());
+Effect.runPromise(
+  run().pipe(
+    Effect.catchAll((err) => {
+      console.error("UNCAUGHT:", err);
+      process.exit(1);
+      return Effect.succeed(undefined);
+    }),
+    Effect.catchAllDefect((d) => {
+      console.error("DEFECT:", d);
+      process.exit(1);
+      return Effect.succeed(undefined);
+    }),
+  ) as any,
+);

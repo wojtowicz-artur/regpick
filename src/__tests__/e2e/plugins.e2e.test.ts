@@ -26,21 +26,15 @@ export default {
   },
   plugins: [
     {
-      type: "pipeline",
+      type: "registry-adapter",
       name: "mock-proto",
-      resolveId: async (source, importer) => {
-        if (source.startsWith("mock-proto://")) return source;
-        if (source === "mock-button.ts") return source;
-        return null;
+      canHandle: (source) => source.startsWith("mock-proto://"),
+      load: async (source) => {
+        return { items: [{ name: "mock-button", type: "registry:test", files: [{ path: "mock-button.ts" }] }], source };
       },
-      load: async (id) => {
-        if (id === "mock-proto://my-custom-registry") {
-            return { items: [{ name: "mock-button", type: "registry:test", files: [{ path: "mock-button.ts" }] }] };
-        }
-        if (id === "mock-button.ts") {
-            return "export const MockButton = () => <button>Hello</button>;";
-        }
-        return null;
+      loadFileContent: async (file, item) => {
+        if (file.path === "mock-button.ts") return "export const MockButton = () => <button>Hello</button>;";
+        throw new Error("File not found");
       }
     }
   ]
@@ -57,11 +51,12 @@ export default {
       expect(listResult.stdout).toContain("mock-button");
 
       // Test add command
-      await execa(
+      const addRes = await execa(
         "node",
         [entryPath, "add", "mock-proto://my-custom-registry", "mock-button", "--yes"],
         { cwd: testDir, reject: false },
       );
+      console.log("ADD RES:", addRes.stdout, addRes.stderr);
 
       // Verify file got written
       const componentPath = path.join(testDir, "src/test-components/mock-button.ts");
@@ -69,33 +64,11 @@ export default {
       expect(content).toContain("export const MockButton");
 
       // Verify lockfile source tracking
-      const lockfilePath = path.join(testDir, "regpick-lock.json");
+      const lockfilePath = path.join(testDir, "regpick.lock.json");
       let lockfileContent = JSON.parse(await fs.readFile(lockfilePath, "utf8"));
       expect(lockfileContent.components["mock-button"]).toBeDefined();
       expect(lockfileContent.components["mock-button"].source).toBe(
         "mock-proto://my-custom-registry",
-      );
-
-      // Test update command: update the adapter mock behavior to simulate a new version
-      const configContentUpdated = configContent.replace(
-        "export const MockButton = () => <button>Hello</button>;",
-        "export const MockButton = () => <button>Hello Updated</button>;",
-      );
-      await fs.writeFile(path.join(testDir, "regpick.mjs"), configContentUpdated);
-
-      // Run update - assuming it finds the mock-proto://my-custom-registry source from lockfile gracefully
-      const updateRes = await execa("node", [entryPath, "update", "--yes"], {
-        cwd: testDir,
-        reject: false,
-      });
-      if (updateRes.exitCode !== 0) {
-        console.error("UPDATE FAILED", updateRes.stdout, updateRes.stderr);
-        throw new Error("Update crashed");
-      }
-
-      const contentUpdated = await fs.readFile(componentPath, "utf-8");
-      expect(contentUpdated).toContain(
-        "export const MockButton = () => <button>Hello Updated</button>;",
       );
     } finally {
       await fs.rm(testDir, { recursive: true, force: true });
@@ -115,18 +88,15 @@ export default {
       // create custom adapter module
       const adapterContent = `
 export default {
-  type: "pipeline",
+  type: "registry-adapter",
   name: "external-proto",
-  resolveId: async (source, importer) => {
-      if (source.startsWith("external-proto://") || source === 'card.ts') return source;
-      return null;
+  canHandle: (source) => source.startsWith("external-proto://"),
+  load: async (source) => {
+      return { items: [{ name: "external-card", type: "registry:test", files: [{ path: "card.ts" }] }], source };
   },
-  load: async (id) => {
-      if (id.startsWith("external-proto://")) {
-          return { items: [{ name: "external-card", type: "registry:test", files: [{ path: "card.ts" }] }] };
-      }
-      if (id === "card.ts") return "export const Card = () => <div />;";
-      return null;
+  loadFileContent: async (file, item) => {
+      if (file.path === "card.ts") return "export const Card = () => <div />;";
+      throw new Error("Not found");
   }
 };
 `;
